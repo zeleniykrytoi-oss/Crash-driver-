@@ -7015,9 +7015,21 @@ var bu = 7.5,
   Mu = 7,
   lt = I("view"),
   Oe = matchMedia("(any-pointer: coarse)").matches,
+  // a weak device (few cores, little memory, or slow at a short sum): starts on Low, without MSAA
+  pdzWeak = (() => {
+    let e = navigator,
+      t = 1 / 0,
+      a = 0;
+    for (let n = 0; n < 2; n++) {
+      let o = performance.now();
+      for (let r = 0; r < 6e5; r++) a += Math.sqrt(r * 1.0001) * 1e-9;
+      t = Math.min(t, performance.now() - o);
+    }
+    return ((window.__pdzBench = t + a * 0), (Oe && ((e.hardwareConcurrency || 8) <= 4 || (e.deviceMemory || 8) <= 3)) || t > 6);
+  })(),
   gt = new E1({
     canvas: lt,
-    antialias: !0,
+    antialias: !pdzWeak,
     powerPreference: "high-performance",
     preserveDrawingBuffer: Kr,
   }),
@@ -7996,8 +8008,9 @@ function Ou(e, t, a, n, o, r, s) {
           ? S > p && ((p = S), (y = x[0]), (w = x[1]), (k = x[2]))
           : S < m && (m = S);
       }
-      if (b || p > m || m < 0) continue;
-      let M = Math.max(p, 0);
+      // a wheel whose hub is already inside a block is not standing on it: that is a crash, not a bump stop
+      if (b || p > m || m < 0 || p < 0) continue;
+      let M = p;
       M < i && ((i = M), (l = y), (f = w), (c = k), (u = !0));
     } else {
       if (o < -1e-6 && t >= h.h) {
@@ -11094,7 +11107,7 @@ function M2(e, t) {
   return { tire: l, rim: p, polish: w, disc: b, cal: M, dr: k, hw: n };
 }
 function x2(e, t) {
-  let a = b2(),
+  let a = pdzWheelMats(e),
     n = new Rt(),
     o = new Rt();
   for (let l of ["tire", "rim", "polish", "disc"]) {
@@ -14810,6 +14823,7 @@ function Z2() {
       a.add(n),
       ie.add(a),
       (t.group = a),
+      (t.fixedG = o.fixed),
       (t.spinner = o.spin));
   }
 }
@@ -16142,8 +16156,12 @@ function wo(e = 0, t = 0, a = 0) {
       (r.omega = 0),
       (r.comp = 0),
       (r.contact = !1),
-      (r.s = wa.up));
-  (tc(e, t, a),
+      (r.s = wa.up),
+      pdzWbReset(r));
+  v.wheelsLost = 0;
+  ((We.calm = 0),
+    (We.wake = 1),
+    tc(e, t, a),
     ki(),
     d0 && (d0.fill(0), (Q0.needsUpdate = !0), (Wa = -1)),
     pdzDmgFxReset(),
@@ -16348,13 +16366,16 @@ function vi(e) {
 }
 var ht = 1 / 480,
   qr = 2,
-  br = null;
+  br = null,
+  pdzCrashW = 9,
+  pdzCrashV = 6,
+  pdzCrashR = 10;
 function hc(e) {
   let t = v.dtPrev,
     a = e / t,
     n = 1 / t,
     o = e * e;
-  ((ht = e), qr++, (!br || br.length !== J) && (br = new Int32Array(J)), vo());
+  (pdzTic(), (ht = e), qr++, (!br || br.length !== J) && (br = new Int32Array(J)), vo(), pdzToc("vo"));
   let r = v.R,
     s = Math.min(1, (fs + v.impactDamp) * e),
     i = Math.min(1, fs * 2 * e);
@@ -16377,6 +16398,50 @@ function hc(e) {
     ((Ve[u] = Z[u] - (S - h * (S - x)) * t),
       (tt[u] = Y[u] - (E - h * (E - A)) * t),
       (Ke[u] = X[u] - (D - h * (D - R)) * t));
+  }
+  // a hard hit must not throw the car: while the impact lasts, the body's pitch and roll rates and its
+  // climb are bled off (yaw and the slide along the ground are left alone)
+  if (v.impactDamp > 0.5) {
+    let f = Math.min(1, v.impactDamp / 8),
+      kw = 1 - Math.exp(-pdzCrashW * f * e),
+      kv = 1 - Math.exp(-pdzCrashV * f * e),
+      ux = r[1],
+      uy = r[4],
+      uz = r[7],
+      wu = v.wx * ux + v.wy * uy + v.wz * uz,
+      ax = (v.wx - wu * ux) * kw,
+      ay = (v.wy - wu * uy) * kw,
+      az = (v.wz - wu * uz) * kw,
+      vy = v.vy > 0 ? v.vy * kv : 0;
+    if (ax * ax + ay * ay + az * az > 1e-10 || vy > 0)
+      for (let u = 0; u < J; u++) {
+        if (V0[Ye[u]] !== oe) continue;
+        let x = Z[u] - v.cx,
+          y = Y[u] - v.cy,
+          z = X[u] - v.cz;
+        ((Ve[u] += (ay * z - az * y) * t), (tt[u] += (az * x - ax * z + vy) * t), (Ke[u] += (ax * y - ay * x) * t));
+      }
+  }
+  // nor fling it back off what it hit: once a crash has slowed the car, speed it picks up again on its own
+  // (the crushed body springing off a post) is bled away
+  if (v.guard && !Te.throttle) {
+    let q = Math.hypot(v.vx, v.vy, v.vz),
+      x = q - (v.postMin + 0.6),
+      W = Math.hypot(v.wx, v.wy, v.wz),
+      y = v.postMin < 1.5 ? W - (v.postMinW + 0.8) : 0,
+      f = 1 - Math.exp(-pdzCrashR * e),
+      k = x > 0 ? (f * x) / q : 0,
+      g = y > 0 ? (f * y) / W : 0;
+    if (k > 0 || g > 0)
+      for (let u = 0; u < J; u++) {
+        if (V0[Ye[u]] !== oe) continue;
+        let a = Z[u] - v.cx,
+          b = Y[u] - v.cy,
+          z = X[u] - v.cz;
+        ((Ve[u] += (v.vx * k + g * (v.wy * z - v.wz * b)) * t),
+          (tt[u] += (v.vy * k + g * (v.wz * a - v.wx * z)) * t),
+          (Ke[u] += (v.vz * k + g * (v.wx * b - v.wy * a)) * t));
+      }
   }
   if (v.reboundOK && v.impactDamp > 1) {
     let u = v.impV,
@@ -16401,6 +16466,7 @@ function hc(e) {
       w = (su * Math.sqrt(h * h + p * p + m * m)) / Go;
     ((G0[u] = -y * w * h), ($0[u] = -y * (F0 + w * p)), (q0[u] = -y * w * m));
   }
+  pdzToc("nodes");
   let l =
     v.impactDamp > 2 && v.reboundOK ? Math.min(1, v.impactDamp * K1 * e) : 0;
   for (let u = 0; u < ke; u++) {
@@ -16501,7 +16567,7 @@ function hc(e) {
       ($0[h] -= F),
       (q0[h] -= L));
   }
-  (gc(e, n, r), ac(n));
+  (pdzToc("beams"), gc(e, n, r), pdzToc("wheels"), ac(n), pdzToc("ac"));
   let f = 90 * e,
     c = f * f;
   for (let u = 0; u < J; u++) {
@@ -16521,7 +16587,7 @@ function hc(e) {
       (Y[u] += p),
       (X[u] += m));
   }
-  (nc(e), pc(o));
+  (pdzToc("integ"), nc(e), pdzToc("nc"), pc(o), pdzToc("pc"));
   for (let u = 0; u < ke; u++) {
     if (qe[u] === 2) continue;
     let d = st[u],
@@ -16556,7 +16622,7 @@ function hc(e) {
       (Y[h] += y * M * A),
       (X[h] += w * M * A));
   }
-  ((yn = nu * e), mc(), P2(), oc(e), lc(), (v.dtPrev = e));
+  (pdzToc("minlen"), (yn = nu * e), mc(), pdzWbStep(e), pdzToc("mc"), P2(), pdzToc("P2"), oc(e), pdzToc("oc"), lc(), pdzToc("lc"), (v.dtPrev = e));
 }
 function pc(e) {
   let t = nn[Yn];
@@ -16619,6 +16685,14 @@ function pc(e) {
   }
 }
 var yn = 0;
+// a node against a wall or a post: this step's approach is always taken out in full, but a node the body
+// has already wrapped deep round a post only comes back out a centimetre per step, so the crushed body
+// cannot spring the car off (or spin it round) the thing it hit
+function pdzMrO(e, t, a, n, o, r) {
+  We.touchN = (We.touchN || 0) + 1;
+  let c = (Z[e] - Ve[e]) * t + (Y[e] - tt[e]) * a + (X[e] - Ke[e]) * n;
+  Mr(e, t, a, n, Math.min(o, Math.max(0.01, 0.01 - c)), r, Qr);
+}
 function Mr(e, t, a, n, o, r, s) {
   let i = Z[e] - Ve[e],
     l = Y[e] - tt[e],
@@ -16703,14 +16777,13 @@ function mc() {
           let h = c >= 0 ? c : l;
           if (h < 0) continue;
           let p = d[h];
-          Mr(
+          pdzMrO(
             t,
             p[0],
             p[1],
             p[2],
             -(p[0] * o + p[1] * r + p[2] * s - p[3] - e),
             n.mu,
-            Qr,
           );
         } else {
           let i = o - n.x,
@@ -16720,8 +16793,8 @@ function mc() {
           let c = n.r + e - f,
             u = n.h + e - r;
           tt[t] >= n.h + e - 0.02 || u < c
-            ? Mr(t, 0, 1, 0, u, n.mu, Qr)
-            : f > 1e-6 && Mr(t, i / f, 0, l / f, c, n.mu, Qr);
+            ? pdzMrO(t, 0, 1, 0, u, n.mu)
+            : f > 1e-6 && pdzMrO(t, i / f, 0, l / f, c, n.mu);
         }
     }
   }
@@ -16731,6 +16804,11 @@ function gc(e, t, a) {
     o = a[4],
     r = a[7];
   for (let c of Je) {
+    let wb = c.wb || pdzWbInit(c);
+    if (wb.det) {
+      ((c.contact = !1), (c.comp = 0), (c.load = 0));
+      continue;
+    }
     let u = 0,
       d = 0,
       h = 0,
@@ -16756,7 +16834,9 @@ function gc(e, t, a) {
       (c.tx = u + a[0] * c.ox + a[1] * c.oy + a[2] * c.oz),
       (c.ty = d + a[3] * c.ox + a[4] * c.oy + a[5] * c.oz),
       (c.tz = h + a[6] * c.ox + a[7] * c.oy + a[8] * c.oz));
-    let w = Ou(c.tx, c.ty, c.tz, -n, -o, -r, c.sMax + c.r + 0.15);
+    pdzWbFrameE(c, a, pdzWbE);
+    let re = pdzWbREff(c, wb, pdzWbE, -n, -o, -r),
+      w = Ou(c.tx, c.ty, c.tz, -n, -o, -r, c.sMax + c.r + 0.15);
     if (w) {
       let k = c.tx - n * w.t,
         b = c.ty - o * w.t,
@@ -16770,13 +16850,14 @@ function gc(e, t, a) {
     ((c.contact = !1),
       (c.s = c.sMax),
       w &&
-        w.t - c.r < c.sMax &&
+        w.t - re < c.sMax &&
         ((c.contact = !0),
-        (c.s = w.t - c.r),
+        (c.s = w.t - re),
         (c.nx = w.nx),
         (c.ny = w.ny),
         (c.nz = w.nz)),
-      (c.comp = c.contact ? c.sMax - c.s : 0));
+      (c.comp = c.contact ? c.sMax - c.s : 0),
+      pdzWbHit(c, wb, a, e));
   }
   let s = v.fwdSpeed,
     i = Math.abs(s),
@@ -16797,7 +16878,7 @@ function gc(e, t, a) {
         c.kSpring * Ue.spring * c.comp +
         wa.damp * Ue.damp * u +
         wa.antiRoll * Ue.arb * (c.comp - c.pair.comp);
-    (c.s < 0 && (d += wa.bump * -c.s), d < 0 && (d = 0), (c.load = d));
+    (c.s < 0 && (d += wa.bump * Math.min(-c.s, 0.06)), d < 0 && (d = 0), (c.load = d));
     let h = c.front ? v.steer : 0,
       p = Math.cos(h),
       m = Math.sin(h),
@@ -16938,6 +17019,10 @@ function vc(e) {
   }
   ((v.speed = Math.hypot(v.vx, v.vy, v.vz)),
     (v.fwdSpeed = v.vx * v.R[2] + v.vy * v.R[5] + v.vz * v.R[8]));
+  // the fastest-moving panel (a hanging door still swinging keeps the car awake)
+  let pdzA = 0;
+  for (let l = 0; l < oe; l++) _a[l] && Ba[l] > 0 && (pdzA = Math.max(pdzA, Math.hypot(kt[l * 3], kt[l * 3 + 1], kt[l * 3 + 2])));
+  We.act = pdzA;
   let t = (v.vx - v.lastV[0]) / e,
     a = (v.vy - v.lastV[1]) / e,
     n = (v.vz - v.lastV[2]) / e;
@@ -16960,6 +17045,11 @@ function vc(e) {
       V1 * Math.min(1, (v.gEma - 4) / 6),
     ))),
     (v.impactDamp *= Math.exp(-e / 0.4)));
+  // the guard is on in a crash and while the body leans on something; it tracks the slowest the car got
+  ((v.guard = v.impactDamp > 0.25 || We.touchN > 0),
+    (We.touchN = 0),
+    (v.postMin = v.guard ? Math.min(v.postMin ?? 1e9, v.speed) : 1e9),
+    (v.postMinW = v.guard ? Math.min(v.postMinW ?? 1e9, Math.hypot(v.wx, v.wy, v.wz)) : 1e9));
   let o = v.impV,
     r = o[0] * o[0] + o[1] * o[1] + o[2] * o[2];
   ((v.reboundOK = r > 4 && v.vx * o[0] + v.vy * o[1] + v.vz * o[2] < 0.15 * r),
@@ -16981,6 +17071,10 @@ function vc(e) {
         $t[m] === Qe.JOINT && W0[m] === l.part && qe[m] !== 2 && gl(m);
   }
   for (let l of Je) {
+    if (l.wb && l.wb.det) {
+      l.omega = 0;
+      continue;
+    }
     let f = l.contact ? l.vLong / l.r : l.omega * Math.pow(0.6, e);
     (Te.handbrake && !l.front && l.contact && (f = 0),
       !l.contact && Te.throttle > 0 && (f = l.omega + Te.throttle * 60 * e),
@@ -16999,11 +17093,56 @@ function vc(e) {
   ),
     Rc());
 }
+var pdzProf = { on: !1, t: {}, n: 0 },
+  pdzT0 = 0;
+function pdzTic() {
+  pdzProf.on && (pdzT0 = performance.now());
+}
+function pdzToc(k) {
+  if (!pdzProf.on) return;
+  let t = performance.now();
+  ((pdzProf.t[k] = (pdzProf.t[k] || 0) + t - pdzT0), (pdzT0 = t));
+}
+// a car standing still that nothing is touching skips the solver until something changes
+function pdzCalm(c, e) {
+  let s = c.sim,
+    i = c.input,
+    b = c.box,
+    busy =
+      !b ||
+      c.wake ||
+      s.speed > 0.05 ||
+      (c.act || 0) > 0.05 ||
+      Math.hypot(s.wx, s.wy, s.wz) > 0.05 ||
+      s.impactDamp > 0.01 ||
+      i.throttle ||
+      i.brake ||
+      i.steer ||
+      c.wheels.some((w) => w.wb && w.wb.det && !w.wb.sleep);
+  if (!busy)
+    for (let o of je) {
+      let q = o.box;
+      if (o === c || !q) continue;
+      if (q[0] < b[3] + 1.5 && q[3] > b[0] - 1.5 && q[1] < b[4] + 1.5 && q[4] > b[1] - 1.5 && q[2] < b[5] + 1.5 && q[5] > b[2] - 1.5) busy = !0;
+      for (let w of o.wheels) {
+        let P = w.wb && w.wb.det && !w.wb.sleep && w.wb.P;
+        P && P[0] > b[0] - 1.5 && P[0] < b[3] + 1.5 && P[1] > b[1] - 1.5 && P[1] < b[4] + 1.5 && P[2] > b[2] - 1.5 && P[2] < b[5] + 1.5 && (busy = !0);
+      }
+    }
+  return ((c.wake = 0), (c.calm = busy ? 0 : (c.calm || 0) + e), c.calm > 1.5);
+}
 function yl(e) {
-  ((e = Math.min(e, No)), v0(() => wc(e)));
+  e = Math.min(e, No);
+  let L = je.filter((c) => !pdzCalm(c, e)),
+    w0 = (f) => {
+      for (let c of L) (Zt(c), f(c), go(c));
+      ut && Zt(ut);
+    };
+  w0(() => wc(e));
   let t = e / Uo;
-  for (let a = 0; a < Uo; a++) (v0(() => hc(t)), je.length > 1 && Mc());
-  (v0(() => vc(e)), Fi(e), g2(), Vs(e), Pu(e), v0(() => pdzWheelFx(e)), pdzFxTick(e));
+  (pdzProf.on && pdzProf.n++, w0(pdzWbPrep));
+  for (let a = 0; a < Uo; a++) (w0(() => hc(t)), pdzTic(), L.length > 1 && Mc(), pdzToc("carcar"));
+  (pdzTic(), (pdzDtF = e), w0(pdzWbFrame), w0(() => vc(e)), pdzToc("vc"), Fi(e), pdzToc("Fi"), g2(), pdzToc("g2"), Vs(e), pdzToc("Vs"), Pu(e), v0(() => pdzWheelFx(e)), pdzFxTick(e), pdzToc("fx"));
 }
 var bc = 0.2,
   xr = new Float64Array(6),
@@ -17083,29 +17222,44 @@ function xc(e, t) {
                 D = m - t.pz[R],
                 B = S * S + E * E + D * D;
               if (B >= a * a || B < 1e-12) continue;
+              // bodies meet mostly side on: the push is tilted towards the horizontal so one car does not ride
+              // up and over the other, and the overlap is resolved without turning it into speed
               let P = Math.sqrt(B),
                 F = S / P,
-                L = E / P,
+                L = (E / P) * 0.35,
                 z = D / P,
+                K = 1 / Math.sqrt(F * F + L * L + z * z),
                 G = a - P,
-                j = e.invM[d] / (e.invM[d] + t.invM[R]),
-                U =
-                  ((e.px[d] - e.ox[d]) / e.curDt -
-                    (t.px[R] - t.ox[R]) / t.curDt) *
-                    F +
-                  ((e.py[d] - e.oy[d]) / e.curDt -
-                    (t.py[R] - t.oy[R]) / t.curDt) *
-                    L +
-                  ((e.pz[d] - e.oz[d]) / e.curDt -
-                    (t.pz[R] - t.oz[R]) / t.curDt) *
-                    z;
+                j = e.invM[d] / (e.invM[d] + t.invM[R]);
+              ((F *= K), (L *= K), (z *= K));
+              let U =
+                ((e.px[d] - e.ox[d]) / e.curDt -
+                  (t.px[R] - t.ox[R]) / t.curDt) *
+                  F +
+                ((e.py[d] - e.oy[d]) / e.curDt -
+                  (t.py[R] - t.oy[R]) / t.curDt) *
+                  L +
+                ((e.pz[d] - e.oz[d]) / e.curDt -
+                  (t.pz[R] - t.oz[R]) / t.curDt) *
+                  z;
               (-U > l && ((l = -U), (f = h), (c = p), (u = m)),
                 (e.px[d] = h += F * G * j),
                 (e.py[d] = p += L * G * j),
                 (e.pz[d] = m += z * G * j),
+                (e.ox[d] += F * G * j),
+                (e.oy[d] += L * G * j),
+                (e.oz[d] += z * G * j),
                 (t.px[R] -= F * G * (1 - j)),
                 (t.py[R] -= L * G * (1 - j)),
-                (t.pz[R] -= z * G * (1 - j)));
+                (t.pz[R] -= z * G * (1 - j)),
+                (t.ox[R] -= F * G * (1 - j)),
+                (t.oy[R] -= L * G * (1 - j)),
+                (t.oz[R] -= z * G * (1 - j)));
+              if (U < 0) {
+                let k = -U * j * e.curDt,
+                  q = -U * (1 - j) * t.curDt;
+                ((e.ox[d] -= F * k), (e.oy[d] -= L * k), (e.oz[d] -= z * k), (t.ox[R] += F * q), (t.oy[R] += L * q), (t.oz[R] += z * q));
+              }
             }
         }
   }
@@ -17790,12 +17944,23 @@ var Ti = new Za(),
   Li = new Za(),
   Lc = new He(0, 1, 0),
   xl = Array.from({ length: oe }, (e, t) => ur.subarray(t * 9, t * 9 + 9));
+// nodes whose every beam is still at its original length: their bone simply follows the panel
+function pdzQuiet() {
+  let k = v.nDeformed + v.nBroken * 1e6,
+    q = We.quiet;
+  if (q && q.length === J && We.quietKey === k) return q;
+  (!q || q.length !== J) && (q = We.quiet = new Uint8Array(J));
+  q.fill(1);
+  for (let e = 0; e < ke; e++) qe[e] !== 0 && (q[st[e]] = q[it[e]] = 0);
+  return ((We.quietKey = k), q);
+}
 function Ii() {
   let qs = We.qShow;
   (!qs || qs.length !== J * 4) && (qs = We.qShow = new Float32Array(J * 4));
   let fresh = !We.qShowOk;
   We.qShowOk = 1;
-  let kq = 1 - Math.exp(-pdzDt * 32);
+  let kq = 1 - Math.exp(-pdzDt * 32),
+    qa = pdzQuiet();
   for (let e = 0; e < J; e++) {
     let t = Ye[e],
       bd = V0[t] === oe,
@@ -17808,6 +17973,17 @@ function Ii() {
       l = ye[e],
       f = (0.3 + 1.4 * (d0 ? d0[e] : 0)) * Pa[e],
       nb = 0;
+    if (qa[e] && !(d0 && d0[e] > 0) && u0[e * 3] === 0 && u0[e * 3 + 1] === 0 && u0[e * 3 + 2] === 0) {
+      // intact neighbourhood: the panel's own rotation, no fit
+      let pq = bd ? v.q : H0,
+        po = bd ? 0 : t * 4,
+        e4 = e * 4;
+      ((Ct[e4] = pq[po]), (Ct[e4 + 1] = pq[po + 1]), (Ct[e4 + 2] = pq[po + 2]), (Ct[e4 + 3] = pq[po + 3]));
+      ((qs[e4] = qs[e4 + 1] = qs[e4 + 2] = 0), (qs[e4 + 3] = 1));
+      let c = xa[e];
+      (c.position.set(n, o, r), c.quaternion.set(pq[po], pq[po + 1], pq[po + 2], pq[po + 3]));
+      continue;
+    }
 
     for (let p = 0; p < 9; p++) J0[p] = f * a[p];
     for (let p = or[e]; p < or[e + 1]; p++) {
@@ -17910,6 +18086,7 @@ function Di() {
   ),
     Ti.setFromRotationMatrix(zi));
   for (let t of Je) {
+    if (pdzWbShow(t)) continue;
     let a = Math.min(Math.max(t.s, -0.04), t.sMax);
     (t.group.position.set(t.tx - e[1] * a, t.ty - e[4] * a, t.tz - e[7] * a),
       Li.setFromAxisAngle(Lc, t.front ? v.steer : 0),
@@ -18343,7 +18520,7 @@ function Wi() {
       }));
   };
   for (let t of ka) e(t);
-  for (let t of Je) e(t.group);
+  for (let t of Je) (e(t.group), t.wb && t.wb.tex.dispose());
   We.blob && (e(We.blob), (We.blob = null));
 
   for (let t of [pn, O.mesh, Xt, ea, pa, ta]) e(t);
@@ -18527,7 +18704,7 @@ function Vi(e) {
 I("q-res").addEventListener("input", (e) => Vi(+e.target.value));
 I("s-gfx").addEventListener("click", (e) => {
   let t = e.target.closest("button")?.dataset.gfx;
-  t && pdzGfxApply(t);
+  t && pdzGfxApply(t, !1, !0);
 });
 try {
   let e = +localStorage.getItem("crashlab-res");
@@ -18766,6 +18943,7 @@ function Qi(e) {
       pref: Int32Array.from(V0),
       lamps: E0.map((r) => r.cracked),
       gw: h2(),
+      wb: Je.map(pdzWbSnap),
     };
   for (let r = 0; r < J; r++)
     ((a.p[r * 3] = Z[r]), (a.p[r * 3 + 1] = Y[r]), (a.p[r * 3 + 2] = X[r]));
@@ -18875,6 +19053,14 @@ function Zi(e, t, a) {
       (o.tz = n(e.w[s + 2], t.w[s + 2])),
       (o.s = n(e.w[s + 3], t.w[s + 3])),
       (o.spin = n(e.w[s + 4], t.w[s + 4])));
+    let A = e.wb && e.wb[r],
+      B = (t.wb && t.wb[r]) || A;
+    if (A) {
+      let S = o.wbShow || (o.wbShow = { det: !1, P: new Float64Array(3), Q: new Float64Array(4), off: null, ver: 0 });
+      ((S.det = A.det), (S.off = A.off), (S.ver = A.ver));
+      for (let k = 0; k < 3; k++) S.P[k] = n(A.P[k], B.det === A.det ? B.P[k] : A.P[k]);
+      Dl(A.Q, 0, B.det === A.det ? B.Q : A.Q, 0, a, S.Q, 0);
+    } else o.wbShow = null;
   });
   for (let o = 0; o < 3; o++) O.p[o] = n(e.e[o], t.e[o]);
   (Dl(e.e, 3, t.e, 3, a, O.q, 0),
@@ -19466,10 +19652,13 @@ function Gl(e) {
   ),
     R0(
       "s-parts",
-      v.partsLoose
-        ? It`${n} \u0432\u0438\u0441\u044F\u0442 \xB7 ${v.partsLost} \u043E\u0442\u043E\u0440\u0432.`
-        : C("\u043D\u0430 \u043C\u0435\u0441\u0442\u0430\u0445"),
-      v.partsLost ? "bad" : v.partsLoose ? "warn" : "ok",
+      [
+        v.partsLoose ? It`${n} \u0432\u0438\u0441\u044F\u0442 \xB7 ${v.partsLost} \u043E\u0442\u043E\u0440\u0432.` : "",
+        v.wheelsLost ? It`\u043A\u043E\u043B\u0451\u0441\u0430 \u2212${v.wheelsLost}` : "",
+      ]
+        .filter(Boolean)
+        .join(" \xB7 ") || C("\u043D\u0430 \u043C\u0435\u0441\u0442\u0430\u0445"),
+      v.partsLost || v.wheelsLost ? "bad" : v.partsLoose ? "warn" : "ok",
     ),
     (I("bar-int").style.width = (100 * t) / ke + "%"),
     (I("bar-def").style.width = (100 * v.nDeformed) / ke + "%"),
@@ -19499,6 +19688,7 @@ addEventListener("resize", Ta);
 var $l = 0,
   Sn = 0;
 function ql(e) {
+  pdzAutoGfx(e);
   Kr ||
     ji ||
     (($l += e),
@@ -19515,21 +19705,47 @@ function ql(e) {
 }
 // ---------- graphics quality: Low / Medium / High / Ultra ----------
 var pdzGfxPresets = {
-    low: { pr: [0.6, 1], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7, trees: 0.25 },
+    low: { pr: [0.55, 1], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7, trees: 0.25 },
     medium: { pr: [0.75, 1.5], shadow: 2048, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.85, clouds: 0.8, env: 0.75, trees: 0.4 },
     high: { pr: [1, 2], shadow: 2048, pcss: !0, soft: 1, post: !0, bloom: 0.3, fx: 1, clouds: 1, env: 0.75, trees: 0.6 },
     ultra: { pr: [1, 2.5], shadow: 4096, pcss: !0, soft: 1.15, post: !0, bloom: 0.36, fx: 1.6, clouds: 1, env: 0.8, trees: 1 },
   },
   Gx = { name: "", fx: 1, env: 0.75 },
   Px = { on: !1, composer: null, bloom: null, grade: null, hit: 0, shake: 0, t: 0 };
+var pdzGfxOrder = ["low", "medium", "high", "ultra"];
+function pdzGfxUser() {
+  try {
+    return localStorage.getItem("pdz-gfx-user") === "1";
+  } catch {
+    return !1;
+  }
+}
+// the player's own pick wins; otherwise the device's level, or lower if it was stepped down before
 function pdzGfxDefault() {
+  let t = pdzWeak ? "low" : Oe ? "medium" : "high";
   try {
     let e = localStorage.getItem("pdz-gfx");
-    if (pdzGfxPresets[e]) return e;
+    if (pdzGfxPresets[e] && (pdzGfxUser() || pdzGfxOrder.indexOf(e) < pdzGfxOrder.indexOf(t))) return e;
   } catch {}
-  return Oe ? "medium" : "high";
+  return t;
 }
-function pdzGfxApply(e, t) {
+// in auto mode a steady low frame rate (resolution already at its floor) steps the preset down
+var pdzAutoT = 0,
+  pdzAutoLow = 0;
+function pdzAutoGfx(e) {
+  if (Kr || I0 !== "game" || le.on || pdzGfxUser()) {
+    pdzAutoT = pdzAutoLow = 0;
+    return;
+  }
+  if (((pdzAutoT += e), pdzAutoT < 6)) return;
+  ((pdzAutoLow = An < 34 ? pdzAutoLow + e : Math.max(0, pdzAutoLow - e * 0.5)),
+    pdzAutoLow > 4 &&
+      N0 <= ks + 0.01 &&
+      ((pdzAutoLow = pdzAutoT = 0), (e = pdzGfxOrder.indexOf(Gx.name)), e > 0) &&
+      (pdzGfxApply(pdzGfxOrder[e - 1]),
+      k0(It`\u0413\u0440\u0430\u0444\u0438\u043A\u0430 \u043F\u043E\u043D\u0438\u0436\u0435\u043D\u0430 \u0434\u043E \xAB${I("s-gfx").querySelector(`[data-gfx="${Gx.name}"]`).textContent}\xBB \u0434\u043B\u044F \u043F\u043B\u0430\u0432\u043D\u043E\u0441\u0442\u0438`, 3500)));
+}
+function pdzGfxApply(e, t, u) {
   let a = pdzGfxPresets[e] ? e : pdzGfxDefault(),
     n = pdzGfxPresets[a],
     o = devicePixelRatio || 1;
@@ -19557,7 +19773,7 @@ function pdzGfxApply(e, t) {
     document.body.classList.toggle("css-vig", !n.post),
     t || Ta());
   try {
-    localStorage.setItem("pdz-gfx", a);
+    (localStorage.setItem("pdz-gfx", a), u && localStorage.setItem("pdz-gfx-user", "1"));
   } catch {}
   pdzGfxUI();
 }
@@ -19623,6 +19839,797 @@ function pdzShakeCam() {
     fe.position.z += (Math.sin(e * 1.3 + 4) + 0.5 * Math.sin(e * 2.9 + 3)) * t,
     (Px.shake *= Math.exp(-pdzDt * 5.5)));
 }
+// ---------- soft-body wheels ----------
+// Every wheel carries a node-and-beam rim and tyre: two hub nodes on the axle and four rings of K nodes
+// (rim inner/outer, tread inner/outer). While the wheel is on the car the rings ride the suspension
+// kinematically, but they collide with walls, posts and the other car: the tyre squashes elastically, a
+// harder hit bends the rim for good, and the contact force goes into the car through the hub. Overload
+// the mount (or crush the frame it hangs from) and the wheel comes off; from then on it is a free soft
+// body of nodes and beams that bounces, tumbles and rolls away.
+var pdzWbK = 16,
+  pdzWbCfg = {
+    mass: 22, // kg, rim and tyre
+    hubM: 8, // kg of that on the two hub nodes
+    kc: 2.6e5, // N/m, contact stiffness per tread node while attached
+    cc: 4000, // N s/m, contact damping per tread node (both ways: a squashed tyre gives little back)
+    fy: 6e3, // N per node where the tyre has bottomed out and the rim starts to bend
+    fcap: 1.6e4, // N, most one node passes on
+    brk: 5.2e4, // N, filtered force that tears the mount
+    load: 6.5e4, // N, suspension load beyond which the mount takes damage (landings)
+    crush: 0.3, // m the mount is shoved relative to the passenger cell before it tears out
+    tau: 0.012, // s, stress filter
+    rc: 0.12, // m, contact radius between a tread node and a node of the other car
+  },
+  pdzWbStiff = [1, 1, 0.5, 0.92], // PBD stiffness per beam kind: hub/spoke, rim, sidewall, tread
+  pdzWbE = new Float64Array(9),
+  pdzWbA = new Float64Array(9),
+  pdzWbRot = new Float64Array(9),
+  pdzWbHalf = new Za(0, 1, 0, 0),
+  pdzWbBox = new Float64Array(6),
+  pdzWbVS = `uniform sampler2D pdzWd;
+uniform vec4 pdzWg;
+vec3 pdzWheelOff(vec3 p) {
+  float K = pdzWg.x, rho = length(p.yz), th = atan(p.z, p.y);
+  float fk = (th < 0.0 ? th + 6.2831853 : th) * K / 6.2831853, k0 = floor(fk), fr = fk - k0;
+  int i0 = int(mod(k0, K)), i1 = int(mod(k0 + 1.0, K));
+  float sd = clamp(p.x / pdzWg.y * 0.5 + 0.5, 0.0, 1.0);
+  vec3 a = mix(mix(texelFetch(pdzWd, ivec2(i0, 0), 0).xyz, texelFetch(pdzWd, ivec2(i1, 0), 0).xyz, fr),
+    mix(texelFetch(pdzWd, ivec2(i0, 1), 0).xyz, texelFetch(pdzWd, ivec2(i1, 1), 0).xyz, fr), sd);
+  vec3 b = mix(mix(texelFetch(pdzWd, ivec2(i0, 2), 0).xyz, texelFetch(pdzWd, ivec2(i1, 2), 0).xyz, fr),
+    mix(texelFetch(pdzWd, ivec2(i0, 3), 0).xyz, texelFetch(pdzWd, ivec2(i1, 3), 0).xyz, fr), sd);
+  return rho < pdzWg.z ? a * (rho / pdzWg.z) : mix(a, b, clamp((rho - pdzWg.z) / (pdzWg.w - pdzWg.z), 0.0, 1.0));
+}
+`;
+function pdzWbInit(c) {
+  if (c.wb) return c.wb;
+  let K = pdzWbK,
+    n = 2 + 4 * K,
+    hw = c.width / 2,
+    r = c.r,
+    ro = r * 0.64,
+    rest = new Float32Array(n * 3),
+    m = new Float64Array(n),
+    q = (pdzWbCfg.mass - pdzWbCfg.hubM) / (4 * K);
+  ((rest[0] = -hw * 0.45), (rest[3] = hw * 0.45), (m[0] = m[1] = pdzWbCfg.hubM / 2));
+  for (let g = 0; g < 2; g++)
+    for (let s = 0; s < 2; s++)
+      for (let k = 0; k < K; k++) {
+        let i = 2 + (g * 2 + s) * K + k,
+          a = (k / K) * Math.PI * 2,
+          R = g ? r : ro;
+        ((rest[i * 3] = (s ? 1 : -1) * hw * (g ? 0.86 : 0.8)),
+          (rest[i * 3 + 1] = R * Math.cos(a)),
+          (rest[i * 3 + 2] = R * Math.sin(a)),
+          (m[i] = q));
+      }
+  let B = [],
+    T = [],
+    id = (g, s, k) => 2 + (g * 2 + s) * K + (((k % K) + K) % K),
+    add = (a, b, t) => (B.push(a, b), T.push(t));
+  add(0, 1, 0);
+  for (let s = 0; s < 2; s++)
+    for (let k = 0; k < K; k++)
+      (add(id(0, s, k), 0, 0),
+        add(id(0, s, k), 1, 0),
+        add(id(0, s, k), id(0, s, k + 1), 1),
+        add(id(0, s, k), id(1, s, k), 2),
+        add(id(0, s, k), id(1, s, k + 1), 2),
+        add(id(0, s, k), id(1, s, k - 1), 2),
+        add(id(1, s, k), id(1, s, k + 1), 3));
+  for (let k = 0; k < K; k++)
+    (add(id(0, 0, k), id(0, 1, k), 1),
+      add(id(0, 0, k), id(0, 1, k + 1), 1),
+      add(id(0, 1, k), id(0, 0, k + 1), 1),
+      add(id(1, 0, k), id(1, 1, k), 3),
+      add(id(1, 0, k), id(1, 1, k + 1), 3),
+      add(id(1, 1, k), id(1, 0, k + 1), 3));
+  let tex = new A1(new Float32Array(K * 4 * 4), K, 4, ga.RGBAFormat, T1);
+  return (
+    (tex.needsUpdate = !0),
+    (c.wb = {
+      K,
+      n,
+      hw,
+      r,
+      ro,
+      rest,
+      rest0: rest.slice(),
+      m,
+      im: m.map((x) => 1 / x),
+      b: Int32Array.from(B),
+      kind: Uint8Array.from(T),
+      L: new Float64Array(T.length),
+      p: new Float64Array(n * 3),
+      o: new Float64Array(n * 3),
+      det: !1,
+      stress: 0,
+      ver: 1,
+      texVer: 0,
+      tex,
+      geo: new M1(K, hw, ro, r),
+      P: new Float64Array(3),
+      Q: new Float64Array([0, 0, 0, 1]),
+      off: new Float32Array(K * 4 * 3),
+      still: 0,
+      sleep: !1,
+      near: [],
+      cand: [],
+      rEff: r,
+      dent: 0,
+      grit: 0.8 + Math.random() * 0.4,
+    })
+  );
+}
+// per-wheel copies of the wheel materials, bent by the wheel's node offsets in the vertex shader
+function pdzWheelMats(c) {
+  let a = b2(),
+    w = pdzWbInit(c),
+    t = { caliper: a.caliper };
+  for (let n of ["tire", "rim", "polish", "disc"]) {
+    let o = a[n].clone();
+    ((o.onBeforeCompile = (r) => {
+      ((r.uniforms.pdzWd = { value: w.tex }),
+        (r.uniforms.pdzWg = { value: w.geo }),
+        (r.vertexShader = r.vertexShader
+          .replace("#include <common>", "#include <common>\n" + pdzWbVS)
+          .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed += pdzWheelOff(position);")));
+    }),
+      (o.customProgramCacheKey = () => "pdz-wheel"),
+      (t[n] = o));
+  }
+  return t;
+}
+// the wheel's frame: hub position and local-to-world rotation (x along the axle, outwards; the mesh frame)
+function pdzWbFrameE(c, R, E) {
+  let d = c.front ? v.steer : 0,
+    cd = Math.cos(d),
+    sd = Math.sin(d),
+    g = c.left ? 1 : -1,
+    f = c.left ? c.spin : -c.spin,
+    cf = Math.cos(f),
+    sf = Math.sin(f),
+    ex = g * (cd * R[0] - sd * R[2]),
+    ey = g * (cd * R[3] - sd * R[5]),
+    ez = g * (cd * R[6] - sd * R[8]),
+    zx = g * (sd * R[0] + cd * R[2]),
+    zy = g * (sd * R[3] + cd * R[5]),
+    zz = g * (sd * R[6] + cd * R[8]);
+  // columns: E[0..2] = x axis, E[3..5] = y axis, E[6..8] = z axis
+  ((E[0] = ex),
+    (E[1] = ey),
+    (E[2] = ez),
+    (E[3] = cf * R[1] + sf * zx),
+    (E[4] = cf * R[4] + sf * zy),
+    (E[5] = cf * R[7] + sf * zz),
+    (E[6] = -sf * R[1] + cf * zx),
+    (E[7] = -sf * R[4] + cf * zy),
+    (E[8] = -sf * R[7] + cf * zz));
+}
+// tread radius under the hub, with the dents: a bent wheel rides up and down as it turns
+function pdzWbREff(c, w, E, dx, dy, dz) {
+  if (!w.dent) return c.r;
+  let ly = E[3] * dx + E[4] * dy + E[5] * dz,
+    lz = E[6] * dx + E[7] * dy + E[8] * dz,
+    th = Math.atan2(lz, ly),
+    K = w.K,
+    fk = ((th < 0 ? th + Math.PI * 2 : th) * K) / (Math.PI * 2),
+    k0 = Math.floor(fk),
+    fr = fk - k0,
+    ct = Math.cos(th),
+    st = Math.sin(th),
+    r = c.r;
+  for (let s = 0; s < 2; s++)
+    for (let j = 0; j < 2; j++) {
+      let i = (2 + (2 + s) * K + ((k0 + j) % K)) * 3;
+      r += (j ? fr : 1 - fr) * 0.5 * ((w.rest[i + 1] - w.rest0[i + 1]) * ct + (w.rest[i + 2] - w.rest0[i + 2]) * st);
+    }
+  return Math.max(c.r * 0.55, Math.min(c.r, r));
+}
+// signed contact with the static obstacles for a point: false, or depth and normal in wt (walls and
+// sides only: a tyre resting on a block is the suspension's business)
+function pdzObstPen(x, y, z, list, m) {
+  for (let a = 0; a < list.length; a++) {
+    let n = list[a];
+    if (x < n.minx - m || x > n.maxx + m || y < n.miny - m || y > n.maxy + m || z < n.minz - m || z > n.maxz + m) continue;
+    if (n.type === 0) {
+      let i = -1 / 0,
+        l = -1,
+        d = n.planes,
+        u = !0;
+      for (let k = 0; k < d.length; k++) {
+        let P = d[k],
+          w = P[0] * x + P[1] * y + P[2] * z - P[3] - m;
+        if (w >= 0) {
+          u = !1;
+          break;
+        }
+        P[4] && w > i && ((i = w), (l = k));
+      }
+      if (!u || l < 0) continue;
+      let P = d[l];
+      return ((wt.t = -i), (wt.nx = P[0]), (wt.ny = P[1]), (wt.nz = P[2]), !0);
+    }
+    let i = x - n.x,
+      l = z - n.z,
+      f = Math.sqrt(i * i + l * l);
+    if (f >= n.r + m || y >= n.h + m || f < 1e-6) continue;
+    let c = n.r + m - f;
+    if (n.h + m - y < c) return ((wt.t = n.h + m - y), (wt.nx = 0), (wt.ny = 1), (wt.nz = 0), !0);
+    return ((wt.t = c), (wt.nx = i / f), (wt.ny = 0), (wt.nz = l / f), !0);
+  }
+  return !1;
+}
+// spread a dent (local vector) from one tread node over its neighbours; the rim behind it bends too
+function pdzWbDent(w, s, k, dx, dy, dz) {
+  let K = w.K,
+    R = w.rest,
+    W = [1, 0.45, 0.12],
+    lim = w.r * 0.42,
+    sat = !1;
+  for (let j = -2; j <= 2; j++)
+    for (let t = 0; t < 2; t++) {
+      let f = W[Math.abs(j)] * (t === s ? 1 : 0.6),
+        kk = (((k + j) % K) + K) % K;
+      for (let g = 0; g < 2; g++) {
+        let i = (2 + (g * 2 + t) * K + kk) * 3,
+          h = f * (g ? 1 : 0.85);
+        ((R[i] += dx * h), (R[i + 1] += dy * h), (R[i + 2] += dz * h));
+        // never fold the rim into the hub, nor push the tread through the far side
+        let q = Math.hypot(R[i + 1], R[i + 2]),
+          x0 = w.rest0[i],
+          c = !1;
+        (q < lim && q > 1e-6 && ((R[i + 1] *= lim / q), (R[i + 2] *= lim / q), (c = !0)),
+          Math.abs(R[i] - x0) > w.hw && ((R[i] = x0 + Math.sign(R[i] - x0) * w.hw), (c = !0)),
+          c && j === 0 && t === s && g && (sat = !0));
+      }
+    }
+  return ((w.dent = 1), w.ver++, sat);
+}
+// one tread node pressed into something: the force on the car, the dent and the mount stress
+function pdzWbPush(c, w, E, i, px, py, pz, nx, ny, nz, d, vn, vt0, vt1, vt2, dt, mu) {
+  let de = pdzWbCfg.fy / pdzWbCfg.kc,
+    F = Math.max(0, pdzWbCfg.kc * Math.min(d, de) - pdzWbCfg.cc * vn);
+  F > pdzWbCfg.fcap && (F = pdzWbCfg.fcap);
+  let t = Math.hypot(vt0, vt1, vt2),
+    f = t > 0.05 ? (mu * F) / t : 0,
+    fx = nx * F - vt0 * f,
+    fy = ny * F - vt1 * f,
+    fz = nz * F - vt2 * f;
+  yc(c, fx, fy, fz, px, py, pz);
+  let x = d - de;
+  if (x > 0.002) {
+    let e = Math.min(x, 0.05) * 0.5,
+      K = w.K,
+      s = ((i - 2) / K) & 1,
+      k = (i - 2) % K;
+    pdzWbDent(w, s, k, (E[0] * nx + E[1] * ny + E[2] * nz) * e, (E[3] * nx + E[4] * ny + E[5] * nz) * e, (E[6] * nx + E[7] * ny + E[8] * nz) * e) && x > 0.03 && (w.jam = 1);
+  }
+  return Math.hypot(fx, fy, fz);
+}
+// attached wheel: tread nodes against obstacles and the other car, force into the car, mount stress
+var pdzWbDbg = { noHit: 0, noCar: 0, noDetach: 0 };
+function pdzWbHit(c, w, R, dt) {
+  if (pdzWbDbg.noHit) return;
+  let E = pdzWbE,
+    a = Math.min(Math.max(c.s, -0.04), c.sMax),
+    Px = c.tx - R[1] * a,
+    Py = c.ty - R[4] * a,
+    Pz = c.tz - R[7] * a;
+  ((w.P[0] = Px), (w.P[1] = Py), (w.P[2] = Pz));
+  let S = 0,
+    sx = 0,
+    sy = 0,
+    sz = 0,
+    K = w.K,
+    rr = w.r + 0.1;
+  // only what stands well above the hub is a wall for the tyre: kerbs, steps and kickers are the
+  // suspension's to climb
+  let obs = w.obs || (w.obs = []),
+    oc = null;
+  obs.length = 0;
+  for (let s of ua) (s.type === 0 ? s.maxy : s.h) > Py + 0.25 && obs.push(s);
+  obs.length || (obs = null);
+  if (je.length > 1)
+    for (let C of je) {
+      if (C === We || !C.box) continue;
+      let b = C.box;
+      Px > b[0] - rr && Px < b[3] + rr && Py > b[1] - rr && Py < b[4] + rr && Pz > b[2] - rr && Pz < b[5] + rr && (oc = C);
+    }
+  if (obs || oc) {
+    let L = w.rest,
+      cand = null;
+    if (oc) {
+      cand = w.oc || (w.oc = []);
+      cand.length = 0;
+      let q = (rr + pdzWbCfg.rc) ** 2;
+      for (let j = 0; j < oc.N; j++) {
+        let x = oc.px[j] - Px,
+          y = oc.py[j] - Py,
+          z = oc.pz[j] - Pz;
+        x * x + y * y + z * z < q && cand.push(j);
+      }
+    }
+    for (let i = 2 + 2 * K; i < 2 + 4 * K; i++) {
+      let lx = L[i * 3],
+        ly = L[i * 3 + 1],
+        lz = L[i * 3 + 2],
+        px = Px + E[0] * lx + E[3] * ly + E[6] * lz,
+        py = Py + E[1] * lx + E[4] * ly + E[7] * lz,
+        pz = Pz + E[2] * lx + E[5] * ly + E[8] * lz;
+      if (obs && pdzObstPen(px, py, pz, obs, 0.01) && wt.ny < 0.65) {
+        let nx = wt.nx,
+          ny = wt.ny,
+          nz = wt.nz,
+          vn = c.vx * nx + c.vy * ny + c.vz * nz,
+          F = pdzWbPush(c, w, E, i, px, py, pz, nx, ny, nz, wt.t, vn, c.vx - vn * nx, c.vy - vn * ny, c.vz - vn * nz, dt, 0.55);
+        ((S += F), (sx += nx * F), (sy += ny * F), (sz += nz * F));
+      }
+      if (cand && cand.length) {
+        let rc = pdzWbCfg.rc;
+        for (let j of cand) {
+          let x = px - oc.px[j],
+            y = py - oc.py[j],
+            z = pz - oc.pz[j],
+            q = x * x + y * y + z * z;
+          if (q >= rc * rc || q < 1e-10) continue;
+          let D = Math.sqrt(q),
+            nx = x / D,
+            ny = y / D,
+            nz = z / D,
+            d = rc - D,
+            ux = (oc.px[j] - oc.ox[j]) / oc.curDt,
+            uy = (oc.py[j] - oc.oy[j]) / oc.curDt,
+            uz = (oc.pz[j] - oc.oz[j]) / oc.curDt,
+            vn = (c.vx - ux) * nx + (c.vy - uy) * ny + (c.vz - uz) * nz;
+          if (vn >= 0) continue;
+          // the other car's node is stopped against the tread and the car feels the same blow back: closing
+          // speed only, so two cars left tangled together are never pushed apart by it
+          let m = oc.mass[j],
+            Fi = Math.min(pdzWbCfg.fcap, (-vn * m) / dt),
+            g = (Fi * dt) / m;
+          ((oc.ox[j] += nx * g * oc.curDt), (oc.oy[j] += ny * g * oc.curDt), (oc.oz[j] += nz * g * oc.curDt));
+          yc(c, nx * Fi, ny * Fi, nz * Fi, px, py, pz);
+          let x2 = Fi / pdzWbCfg.kc - pdzWbCfg.fy / pdzWbCfg.kc;
+          if (x2 > 0.002) {
+            let e = Math.min(x2, 0.05) * 0.4;
+            pdzWbDent(w, ((i - 2) / K) & 1, (i - 2) % K, (E[0] * nx + E[1] * ny + E[2] * nz) * e, (E[3] * nx + E[4] * ny + E[5] * nz) * e, (E[6] * nx + E[7] * ny + E[8] * nz) * e) && (w.jam = 1);
+          }
+          ((S += Fi), (sx += nx * Fi), (sy += ny * Fi), (sz += nz * Fi));
+        }
+      }
+    }
+  }
+  let F = Math.max(Math.hypot(sx, sy, sz), S * 0.6) + Math.max(0, c.load - pdzWbCfg.load);
+  if (w.jam) {
+    ((w.jam = 0), (w.why = "jam"), pdzWbDetach(c, w, R, dt, sx, sy, sz));
+    return;
+  }
+  ((w.stress += (F - w.stress) * Math.min(1, dt / pdzWbCfg.tau)),
+    (w.stress > pdzWbCfg.brk * w.grit || F > pdzWbCfg.brk * 2.6 * w.grit) && ((w.why = "hit " + Math.round(w.stress) + "/" + Math.round(F)), pdzWbDetach(c, w, R, dt, sx, sy, sz)));
+}
+// the passenger cell's pose (centroid and rotation, left in pdzWbRot), refitted once per frame per car
+function pdzWbCell() {
+  let k = We.wbCell;
+  if (!k) {
+    let zf = Math.max(...Je.map((c) => c.cz)) - 0.55,
+      zr = Math.min(...Je.map((c) => c.cz)) + 0.55,
+      y0 = Math.min(...ge) + 0.45,
+      ids = [];
+    for (let i = 0; i < J; i++) Ye[i] === _.FRAME && ye[i] < zf && ye[i] > zr && ge[i] < y0 && ids.push(i);
+    ids.length < 8 && (ids = Array.from({ length: J }, (e, i) => i).filter((i) => Ye[i] === _.FRAME));
+    let c0 = [0, 0, 0];
+    for (let i of ids) ((c0[0] += ve[i]), (c0[1] += ge[i]), (c0[2] += ye[i]));
+    ((c0[0] /= ids.length), (c0[1] /= ids.length), (c0[2] /= ids.length));
+    k = We.wbCell = { ids: Int32Array.from(ids), c0, c: [0, 0, 0], q: Float64Array.from(v.q), t: -1 };
+  }
+  if (k.t !== qr) {
+    // only the floor that is still undamaged: a post driven into the footwell must not drag the reference
+    let A = pdzWbA,
+      qa = pdzQuiet(),
+      ids = k.ids,
+      n = 0,
+      cx = 0,
+      cy = 0,
+      cz = 0,
+      rx = 0,
+      ry = 0,
+      rz = 0;
+    for (let i of ids) qa[i] && n++;
+    let use = n >= 8 ? (i) => qa[i] : () => 1;
+    n = 0;
+    for (let i of ids) use(i) && ((cx += Z[i]), (cy += Y[i]), (cz += X[i]), (rx += ve[i]), (ry += ge[i]), (rz += ye[i]), n++);
+    ((cx /= n), (cy /= n), (cz /= n), (k.c0[0] = rx / n), (k.c0[1] = ry / n), (k.c0[2] = rz / n), A.fill(0));
+    for (let i of ids) {
+      if (!use(i)) continue;
+      let x = Z[i] - cx,
+        y = Y[i] - cy,
+        z = X[i] - cz,
+        a = ve[i] - k.c0[0],
+        b = ge[i] - k.c0[1],
+        e = ye[i] - k.c0[2];
+      ((A[0] += x * a), (A[1] += x * b), (A[2] += x * e), (A[3] += y * a), (A[4] += y * b), (A[5] += y * e), (A[6] += z * a), (A[7] += z * b), (A[8] += z * e));
+    }
+    // seeded from the whole body's rotation, so a reset or a spin never leaves the fit stuck half a turn off
+    (k.q.set(v.q), Zo(A, k.q, 0, 4), (k.c[0] = cx), (k.c[1] = cy), (k.c[2] = cz), (k.t = qr));
+  }
+  return (ba(k.q, 0, pdzWbRot), k);
+}
+// rotation matrix (row-major, local to world) to quaternion
+function pdzM2Q(m, q) {
+  let t = m[0] + m[4] + m[8];
+  if (t > 0) {
+    let s = 0.5 / Math.sqrt(t + 1);
+    ((q[3] = 0.25 / s), (q[0] = (m[7] - m[5]) * s), (q[1] = (m[2] - m[6]) * s), (q[2] = (m[3] - m[1]) * s));
+  } else if (m[0] > m[4] && m[0] > m[8]) {
+    let s = 2 * Math.sqrt(1 + m[0] - m[4] - m[8]);
+    ((q[3] = (m[7] - m[5]) / s), (q[0] = 0.25 * s), (q[1] = (m[1] + m[3]) / s), (q[2] = (m[2] + m[6]) / s));
+  } else if (m[4] > m[8]) {
+    let s = 2 * Math.sqrt(1 + m[4] - m[0] - m[8]);
+    ((q[3] = (m[2] - m[6]) / s), (q[0] = (m[1] + m[3]) / s), (q[1] = 0.25 * s), (q[2] = (m[5] + m[7]) / s));
+  } else {
+    let s = 2 * Math.sqrt(1 + m[8] - m[0] - m[4]);
+    ((q[3] = (m[3] - m[1]) / s), (q[0] = (m[2] + m[6]) / s), (q[1] = (m[5] + m[7]) / s), (q[2] = 0.25 * s));
+  }
+}
+function pdzWbDetach(c, w, R, dt, fx, fy, fz) {
+  if (w.det || pdzWbDbg.noDetach) return;
+  ((w.det = !0), (w.sleep = !1), (w.still = 0), (w.grace = 0.35), (c.contact = !1), (c.comp = 0), (c.load = 0), (c.omega = Math.max(-70, Math.min(70, c.omega))));
+  let E = pdzWbE,
+    L = w.rest,
+    p = w.p,
+    o = w.o,
+    n = w.n;
+  pdzWbFrameE(c, R, E);
+  for (let j = 0; j < w.kind.length; j++) {
+    let a = w.b[j * 2] * 3,
+      b = w.b[j * 2 + 1] * 3;
+    w.L[j] = Math.hypot(L[a] - L[b], L[a + 1] - L[b + 1], L[a + 2] - L[b + 2]);
+  }
+  // node velocities: the hub's, the car's turn, the wheel's spin, and a shove out of the wheel arch
+  let g = c.left ? 1 : -1,
+    Wx = v.wx + c.omega * R[0],
+    Wy = v.wy + c.omega * R[3],
+    Wz = v.wz + c.omega * R[6],
+    ox = c.ax - w.P[0],
+    oy = c.ay - w.P[1],
+    oz = c.az - w.P[2],
+    hx = c.vx - (v.wy * oz - v.wz * oy),
+    hy = c.vy - (v.wz * ox - v.wx * oz),
+    hz = c.vz - (v.wx * oy - v.wy * ox),
+    k = Math.min(1, Math.hypot(fx, fy, fz) / pdzWbCfg.brk),
+    tx = (ze() - 0.5) * 3,
+    tz = (ze() - 0.5) * 3;
+  ((hx += g * R[0] * (1.2 + k) + R[1] * (0.8 + k)), (hy += g * R[3] * (1.2 + k) + R[4] * (0.8 + k)), (hz += g * R[6] * (1.2 + k) + R[7] * (0.8 + k)));
+  ((Wx += tx * R[2] + tz * R[1]), (Wy += tx * R[5] + tz * R[4]), (Wz += tx * R[8] + tz * R[7]));
+  for (let i = 0; i < n; i++) {
+    let lx = L[i * 3],
+      ly = L[i * 3 + 1],
+      lz = L[i * 3 + 2],
+      rx = E[0] * lx + E[3] * ly + E[6] * lz,
+      ry = E[1] * lx + E[4] * ly + E[7] * lz,
+      rz = E[2] * lx + E[5] * ly + E[8] * lz;
+    ((p[i * 3] = w.P[0] + rx), (p[i * 3 + 1] = w.P[1] + ry), (p[i * 3 + 2] = w.P[2] + rz));
+    ((o[i * 3] = p[i * 3] - (hx + Wy * rz - Wz * ry) * dt),
+      (o[i * 3 + 1] = p[i * 3 + 1] - (hy + Wz * rx - Wx * rz) * dt),
+      (o[i * 3 + 2] = p[i * 3 + 2] - (hz + Wx * ry - Wy * rx) * dt));
+  }
+  // the wheel was pressed into whatever tore it off: lift it out whole before it starts to move on its own
+  for (let it = 0; it < 6 && ua.length; it++) {
+    let d = 0,
+      nx = 0,
+      ny = 0,
+      nz = 0;
+    for (let i = 0; i < n; i++) pdzObstPen(p[i * 3], p[i * 3 + 1], p[i * 3 + 2], ua, 0.02) && wt.t > d && ((d = wt.t), (nx = wt.nx), (ny = wt.ny), (nz = wt.nz));
+    if (d < 0.005) break;
+    for (let i = 0; i < n * 3; i += 3) ((p[i] += nx * d), (p[i + 1] += ny * d), (p[i + 2] += nz * d), (o[i] += nx * d), (o[i + 1] += ny * d), (o[i + 2] += nz * d));
+    ((w.P[0] += nx * d), (w.P[1] += ny * d), (w.P[2] += nz * d));
+  }
+  // the pose the fit starts from
+  for (let j = 0; j < 9; j++) pdzWbRot[j] = E[[0, 3, 6, 1, 4, 7, 2, 5, 8][j]];
+  pdzM2Q(pdzWbRot, w.Q);
+  (v.wheelsLost = (v.wheelsLost || 0) + 1),
+    xo(w.P[0], w.P[1], w.P[2], 0, 1, 0, 16, 5, v.vx, v.vy, v.vz),
+    bl(w.P[0], w.P[1], w.P[2], 6, 0, v.vx * dt, v.vy * dt, v.vz * dt),
+    pdzPuff(w.P[0], w.P[1] - w.r * 0.6, w.P[2], v.vx * 0.2, 0.6, v.vz * 0.2, 1.6, 1.2, 0.5, 0.48, 0.45, 0.5, 2.2),
+    (!Bt.hit || Bt.hit[3] < 6) && (Bt.hit = [w.P[0], w.P[1], w.P[2], 6]);
+}
+// per frame, before the substeps: the car's bounding box, nearby obstacles and car nodes for loose wheels
+function pdzWbPrep() {
+  (We.box || (We.box = new Float64Array(6)), wl(We, We.box));
+  for (let c of Je) {
+    let w = c.wb;
+    if (!w || !w.det) continue;
+    let P = w.P,
+      R = w.r + 0.7;
+    w.near = jn.filter((s) => s.maxx > P[0] - R && s.minx < P[0] + R && s.maxy > P[1] - R && s.miny < P[1] + R && s.maxz > P[2] - R && s.minz < P[2] + R);
+    ((w.cand.length = 0), (w.grace -= pdzDtF));
+    for (let C of je) {
+      let b = C.box;
+      if (C === We && w.grace > 0) continue;
+      if (!b || P[0] < b[0] - R || P[0] > b[3] + R || P[1] < b[1] - R || P[1] > b[4] + R || P[2] < b[2] - R || P[2] > b[5] + R) continue;
+      let ids = [],
+        q = (w.r + 0.25) ** 2,
+        fast = 0;
+      for (let j = 0; j < C.N; j++) {
+        let x = C.px[j] - P[0],
+          y = C.py[j] - P[1],
+          z = C.pz[j] - P[2];
+        x * x + y * y + z * z < q && ids.push(j);
+      }
+      if (!ids.length) continue;
+      (C.sim.speed > 0.3 && (fast = 1), w.cand.push({ C, ids }), fast && (w.sleep = !1), w.sleep || (C.wake = 1));
+    }
+  }
+}
+function pdzWbStep(dt) {
+  for (let c of Je) {
+    let w = c.wb;
+    w && w.det && !w.sleep && pdzWbSim(c, w, dt);
+  }
+}
+// the loose wheel: Verlet nodes, beams as distance constraints (the rim bends for good, the tyre springs
+// back), then the ground, the obstacles and the cars
+function pdzWbSim(c, w, dt) {
+  let p = w.p,
+    o = w.o,
+    n = w.n,
+    im = w.im,
+    b = w.b,
+    L = w.L,
+    T = w.kind,
+    nb = T.length,
+    g = F0 * dt * dt,
+    K = w.K,
+    mx = 0;
+  for (let i = 0; i < n * 3; i += 3) {
+    let x = (p[i] - o[i]) * 0.9996,
+      y = (p[i + 1] - o[i + 1]) * 0.9996,
+      z = (p[i + 2] - o[i + 2]) * 0.9996;
+    ((o[i] = p[i]), (o[i + 1] = p[i + 1]), (o[i + 2] = p[i + 2]), (p[i] += x), (p[i + 1] += y - g), (p[i + 2] += z));
+  }
+  for (let it = 0; it < 2; it++)
+    for (let j = 0; j < nb; j++) {
+      let a = b[j * 2],
+        e = b[j * 2 + 1],
+        A = a * 3,
+        B = e * 3,
+        x = p[B] - p[A],
+        y = p[B + 1] - p[A + 1],
+        z = p[B + 2] - p[A + 2],
+        l = Math.sqrt(x * x + y * y + z * z);
+      if (l < 1e-9) continue;
+      let t = T[j],
+        r = L[j];
+      // rim and spokes yield past 6% strain
+      if (it === 0 && t < 2) {
+        let q = l / r - 1;
+        q > 0.06 ? (L[j] = r = l / 1.06) : q < -0.06 && (L[j] = r = l / 0.94);
+      }
+      let wa = im[a],
+        wb = im[e],
+        s = (pdzWbStiff[t] * (l - r)) / (l * (wa + wb));
+      ((p[A] += x * s * wa), (p[A + 1] += y * s * wa), (p[A + 2] += z * s * wa), (p[B] -= x * s * wb), (p[B + 1] -= y * s * wb), (p[B + 2] -= z * s * wb));
+    }
+  let rad = 0.02,
+    ground = 0;
+  for (let i = 0; i < n; i++) {
+    let I = i * 3,
+      x = p[I],
+      y = p[I + 1],
+      z = p[I + 2],
+      tr = i >= 2 + 2 * K,
+      out = x * x + z * z > Ze.R0 * Ze.R0,
+      h = out ? Ra(x, z) : 0;
+    if (y < h + rad) {
+      let N = out ? ho(x, z) : null,
+        s = sl(x, z);
+      (pdzWbContact(p, o, I, N ? N[0] : 0, N ? N[1] : 1, N ? N[2] : 0, (h + rad - y) * (N ? N[1] : 1), tr ? 0.95 * (s.mu || 1) : 0.35, tr ? 0.28 : 0.12), (ground = 1));
+    }
+    if (w.near.length && pdzObstPen(p[I], p[I + 1], p[I + 2], w.near, rad)) pdzWbContact(p, o, I, wt.nx, wt.ny, wt.nz, Math.min(wt.t, 0.03), tr ? 0.8 : 0.3, 0.2);
+  }
+  // against the cars: wheel and car nodes pushed apart by mass, the closing speed taken out
+  if (!pdzWbDbg.noCar) for (let { C, ids } of w.cand) {
+    let rc = 0.14,
+      cdt = C.curDt;
+    for (let j of ids) {
+      let J3 = j;
+      for (let i = 2; i < n; i++) {
+        let I = i * 3,
+          x = p[I] - C.px[J3],
+          y = p[I + 1] - C.py[J3],
+          z = p[I + 2] - C.pz[J3],
+          q = x * x + y * y + z * z;
+        if (q >= rc * rc || q < 1e-10) continue;
+        let D = Math.sqrt(q),
+          nx = x / D,
+          ny = y / D,
+          nz = z / D,
+          d = rc - D,
+          wa = im[i],
+          wc = C.invM[J3],
+          vx = (p[I] - o[I]) / dt - (C.px[J3] - C.ox[J3]) / cdt,
+          vy = (p[I + 1] - o[I + 1]) / dt - (C.py[J3] - C.oy[J3]) / cdt,
+          vz = (p[I + 2] - o[I + 2]) / dt - (C.pz[J3] - C.oz[J3]) / cdt,
+          vn = vx * nx + vy * ny + vz * nz;
+        // the light wheel gives way; the car is never shoved by an overlap, only by a closing speed
+        let h = Math.min(d, 0.02);
+        ((p[I] += nx * h), (p[I + 1] += ny * h), (p[I + 2] += nz * h), (o[I] += nx * h), (o[I + 1] += ny * h), (o[I + 2] += nz * h));
+        if (vn < 0) {
+          let J = -vn / (wa + wc);
+          ((o[I] -= nx * J * wa * dt), (o[I + 1] -= ny * J * wa * dt), (o[I + 2] -= nz * J * wa * dt));
+          ((C.ox[J3] += nx * J * wc * cdt), (C.oy[J3] += ny * J * wc * cdt), (C.oz[J3] += nz * J * wc * cdt));
+        }
+      }
+    }
+  }
+  for (let i = 0; i < n * 3; i += 3) {
+    let x = p[i] - o[i],
+      y = p[i + 1] - o[i + 1],
+      z = p[i + 2] - o[i + 2],
+      q = x * x + y * y + z * z;
+    q > mx && (mx = q);
+  }
+  // fall asleep once it has stopped on the ground
+  ((w.still = ground && mx < (0.05 * dt) ** 2 ? w.still + 1 : 0), w.still > 240 && (w.sleep = !0));
+}
+// a node pushed out along a normal: closing speed reflected by e, sliding cut by mu (as Mr does for the car)
+function pdzWbContact(p, o, I, nx, ny, nz, d, mu, e) {
+  let x = p[I] - o[I],
+    y = p[I + 1] - o[I + 1],
+    z = p[I + 2] - o[I + 2],
+    c = x * nx + y * ny + z * nz;
+  ((p[I] += nx * d), (p[I + 1] += ny * d), (p[I + 2] += nz * d));
+  let u = x - c * nx,
+    h = y - c * ny,
+    f = z - c * nz,
+    q = c;
+  if (c < 0) {
+    q = -c > 0.25 * ht ? -c * e : 0;
+    let m = Math.sqrt(u * u + h * h + f * f),
+      s = mu * -c;
+    if (m <= s) u = h = f = 0;
+    else {
+      let k = (m - s) / m;
+      ((u *= k), (h *= k), (f *= k));
+    }
+  }
+  ((o[I] = p[I] - (u + q * nx)), (o[I + 1] = p[I + 1] - (h + q * ny)), (o[I + 2] = p[I + 2] - (f + q * nz)));
+}
+// per frame, after the substeps: crushed mounts let go; loose wheels get their pose and shape
+var pdzDtF = 1 / 60;
+function pdzWbFrame() {
+  let R = v.R;
+  for (let c of Je) {
+    let w = c.wb;
+    if (!w) continue;
+    if (!w.det) {
+      // how far the mount has been shoved relative to the passenger cell: the suspension is torn out
+      let k = pdzWbCell(),
+        Q = pdzWbRot,
+        x = 0,
+        y = 0,
+        z = 0,
+        X0 = 0,
+        Y0 = 0,
+        Z0 = 0;
+      for (let j = 0; j < c.anc.length; j++) {
+        let e = c.anc[j],
+          a = c.aw[j];
+        ((x += a * Z[e]), (y += a * Y[e]), (z += a * X[e]), (X0 += a * ve[e]), (Y0 += a * ge[e]), (Z0 += a * ye[e]));
+      }
+      ((x -= k.c[0]), (y -= k.c[1]), (z -= k.c[2]), (X0 -= k.c0[0]), (Y0 -= k.c0[1]), (Z0 -= k.c0[2]));
+      let q = Math.hypot(Q[0] * x + Q[3] * y + Q[6] * z - X0, Q[1] * x + Q[4] * y + Q[7] * z - Y0, Q[2] * x + Q[5] * y + Q[8] * z - Z0);
+      // only a lasting shove counts, not the elastic ringing of the hit
+      ((w.cr = (w.cr || 0) + (q - (w.cr || 0)) * Math.min(1, pdzDtF / 0.08)),
+        (w.crush = Math.max(w.crush || 0, w.cr)),
+        w.cr > pdzWbCfg.crush * w.grit && ((w.why = "crush " + w.cr.toFixed(3)), pdzWbDetach(c, w, R, v.dtPrev, 0, 0, 0)));
+      continue;
+    }
+    if (w.sleep && w.posed) continue;
+    let p = w.p,
+      m = w.m,
+      L = w.rest,
+      A = pdzWbA,
+      M = 0,
+      cx = 0,
+      cy = 0,
+      cz = 0;
+    for (let i = 0; i < w.n; i++) ((cx += m[i] * p[i * 3]), (cy += m[i] * p[i * 3 + 1]), (cz += m[i] * p[i * 3 + 2]), (M += m[i]));
+    ((cx /= M), (cy /= M), (cz /= M), A.fill(0));
+    for (let i = 0; i < w.n; i++) {
+      let x = (p[i * 3] - cx) * m[i],
+        y = (p[i * 3 + 1] - cy) * m[i],
+        z = (p[i * 3 + 2] - cz) * m[i],
+        a = L[i * 3],
+        b = L[i * 3 + 1],
+        e = L[i * 3 + 2];
+      ((A[0] += x * a), (A[1] += x * b), (A[2] += x * e), (A[3] += y * a), (A[4] += y * b), (A[5] += y * e), (A[6] += z * a), (A[7] += z * b), (A[8] += z * e));
+    }
+    (Zo(A, w.Q, 0, 6), ba(w.Q, 0, pdzWbRot), (w.P[0] = cx), (w.P[1] = cy), (w.P[2] = cz));
+    // shape in the wheel's own frame, relative to the new wheel
+    let Q = pdzWbRot,
+      f = w.off,
+      K = w.K;
+    for (let r = 0; r < 4; r++)
+      for (let k = 0; k < K; k++) {
+        let i = 2 + r * K + k,
+          x = p[i * 3] - cx,
+          y = p[i * 3 + 1] - cy,
+          z = p[i * 3 + 2] - cz,
+          j = (r * K + k) * 3;
+        ((f[j] = Q[0] * x + Q[3] * y + Q[6] * z - w.rest0[i * 3]), (f[j + 1] = Q[1] * x + Q[4] * y + Q[7] * z - w.rest0[i * 3 + 1]), (f[j + 2] = Q[2] * x + Q[5] * y + Q[8] * z - w.rest0[i * 3 + 2]));
+      }
+    ((w.posed = 1), w.ver++);
+  }
+}
+// render side: the loose wheel's pose, and the bend written to its offset texture
+function pdzWbShow(t) {
+  let w = t.wb;
+  if (!w) return !1;
+  let s = le.on ? t.wbShow : null,
+    det = s ? s.det : w.det;
+  if (det) {
+    let P = s ? s.P : w.P,
+      Q = s ? s.Q : w.Q;
+    (t.group.position.set(P[0], P[1], P[2]),
+      t.group.quaternion.set(Q[0], Q[1], Q[2], Q[3]),
+      t.left || t.group.quaternion.multiply(pdzWbHalf),
+      (t.spinner.rotation.x = 0));
+  }
+  t.fixedG && (t.fixedG.visible = !det);
+  let ver = s ? s.ver : w.ver;
+  if (w.texVer !== ver) {
+    w.texVer = ver;
+    let d = w.tex.image.data,
+      K = w.K;
+    if (s) for (let j = 0; j < K * 4; j++) ((d[j * 4] = s.off[j * 3]), (d[j * 4 + 1] = s.off[j * 3 + 1]), (d[j * 4 + 2] = s.off[j * 3 + 2]));
+    else if (w.det) for (let j = 0; j < K * 4; j++) ((d[j * 4] = w.off[j * 3]), (d[j * 4 + 1] = w.off[j * 3 + 1]), (d[j * 4 + 2] = w.off[j * 3 + 2]));
+    else
+      for (let j = 0; j < K * 4; j++) {
+        let i = (2 + j) * 3;
+        ((d[j * 4] = w.rest[i] - w.rest0[i]), (d[j * 4 + 1] = w.rest[i + 1] - w.rest0[i + 1]), (d[j * 4 + 2] = w.rest[i + 2] - w.rest0[i + 2]));
+      }
+    w.tex.needsUpdate = !0;
+  }
+  return det;
+}
+// the shape as offsets (what the texture shows): for the recorder
+function pdzWbOff(w) {
+  if (w.det) return w.off;
+  let f = w.off,
+    K = w.K;
+  for (let j = 0; j < K * 4; j++) {
+    let i = (2 + j) * 3;
+    ((f[j * 3] = w.rest[i] - w.rest0[i]), (f[j * 3 + 1] = w.rest[i + 1] - w.rest0[i + 1]), (f[j * 3 + 2] = w.rest[i + 2] - w.rest0[i + 2]));
+  }
+  return f;
+}
+function pdzWbSnap(c) {
+  let w = c.wb;
+  if (!w) return null;
+  return (
+    w.recVer !== w.ver && ((w.rec = Float32Array.from(pdzWbOff(w))), (w.recVer = w.ver)),
+    { det: w.det, P: Float64Array.from(w.P), Q: Float64Array.from(w.Q), off: w.rec, ver: w.ver }
+  );
+}
+function pdzWbReset(c) {
+  let w = c.wb;
+  w &&
+    (w.rest.set(w.rest0),
+    (w.det = !1),
+    (w.sleep = !1),
+    (w.posed = 0),
+    (w.stress = 0),
+    (w.dent = 0),
+    (w.why = ""),
+    (w.grit = 0.8 + Math.random() * 0.4),
+    (w.crush = 0),
+    (w.cr = 0),
+    w.off.fill(0),
+    w.ver++,
+    (c.wbShow = null));
+}
+
 // ---------- impact effects: dust and smoke, tyre smoke, the flash of a hard hit ----------
 var Dz = { N: Oe ? 200 : 520, head: 0, live: 0 },
   pdzFlash = null,
@@ -20289,13 +21296,38 @@ function pdzBlobTick() {
     (b.material.opacity = 0.72 * al));
 }
 function Eo(e) {
+  if (pdzProf.on) {
+    let t = performance.now();
+    (pdzEo(e), (pdzProf.t.render = (pdzProf.t.render || 0) + performance.now() - t));
+    return;
+  }
+  pdzEo(e);
+}
+function pdzEo(e) {
   pdzDt = Math.min(0.1, Math.max(1e-3, e));
-  (v0(() => {
-    (Ii(), Di(), Ps(), Ds(), Pi(), Oi(), Bi(), Ei(), pdzBlobTick(), M0 > 0 && Pc());
-  }),
+  (pdzTic(),
+    v0(() => {
+      let z = !le.on && We.calm > 1.5 && We.calmDrawn;
+      ((We.calmDrawn = !le.on && We.calm > 1.5),
+        z || Ii(),
+        pdzToc("r.Ii"),
+        Di(),
+        Ps(),
+        Ds(),
+        Pi(),
+        Oi(),
+        Bi(),
+        pdzToc("r.misc"),
+        z || Ei(),
+        pdzToc("r.Ei"),
+        pdzBlobTick(),
+        M0 > 0 && Pc());
+    }),
     Nc(e),
     pdzShakeCam(),
-    pdzRender());
+    pdzToc("r.cam"),
+    pdzRender(),
+    pdzToc("r.gl"));
 }
 
 var To = performance.now();
@@ -20450,6 +21482,19 @@ async function Kc() {
       swapCar: Ro,
       removeCar2: Tl,
       useCar: Zt,
+      saveCar: go,
+      obst: () => jn,
+      wbDbg: pdzWbDbg,
+      dentWheel(t, a, n, o, r, s) {
+        let l = Je[t];
+        l && l.wb && pdzWbDent(l.wb, a, n, o, r, s);
+      },
+      knockWheel(t) {
+        let a = Je[t];
+        a && a.wb && !a.wb.det && ((a.wb.why = "test"), pdzWbDetach(a, a.wb, v.R, v.dtPrev, 0, 0, 0));
+      },
+      prof: pdzProf,
+      wcfg: wa,
       get N() {
         return J;
       },
@@ -20506,6 +21551,7 @@ async function Kc() {
           Rn());
       },
       launch(t, a, n, o, r, s, i) {
+        ((We.calm = 0), (We.wake = 1));
         for (let l = 0; l < J; l++) {
           ((Y[l] += t), (tt[l] += t));
           let f = Z[l] - v.cx,
@@ -20569,7 +21615,13 @@ async function Kc() {
           c: t.contact,
           s: t.s,
           load: Math.round(t.load),
+          det: !!(t.wb && t.wb.det),
+          stress: t.wb ? Math.round(t.wb.stress) : 0,
+          dent: t.wb ? t.wb.dent : 0,
+          why: t.wb && t.wb.why,
+          crush: t.wb && t.wb.crush,
         })),
+        wheelsLost: v.wheelsLost || 0,
       }),
     }),
     Kr
@@ -20887,6 +21939,9 @@ function Qc() {
     "{} \u0432\u0438\u0441\u044F\u0442 \xB7 {} \u043E\u0442\u043E\u0440\u0432.":
       "{} hanging \xB7 {} torn off",
     "\u043D\u0430 \u043C\u0435\u0441\u0442\u0430\u0445": "all attached",
+    "\u043A\u043E\u043B\u0451\u0441\u0430 \u2212{}": "wheels \u2212{}",
+    "\u0413\u0440\u0430\u0444\u0438\u043A\u0430 \u043F\u043E\u043D\u0438\u0436\u0435\u043D\u0430 \u0434\u043E \xAB{}\xBB \u0434\u043B\u044F \u043F\u043B\u0430\u0432\u043D\u043E\u0441\u0442\u0438":
+      "Graphics lowered to \u201C{}\u201D for a smoother frame rate",
     "{} \u0432\u0435\u0440\u0448\u0438\u043D glTF \u2192 {} \u0443\u0437\u043B\u043E\u0432 \xB7 {} \u0431\u0430\u043B\u043E\u043A (\u0440\u0451\u0431\u0440\u0430 {}, structural {}, shear {}, \u043F\u0435\u0442\u043B\u0438 \u0438 \u0437\u0430\u043C\u043A\u0438 {}, \u0443\u043F\u043B\u043E\u0442\u043D\u0438\u0442\u0435\u043B\u0438 {}) \xB7 \u043A\u0443\u0437\u043E\u0432 {} \u0442\u0440\u0435\u0443\u0433. \u0437\u0430 {} draw call \xB7 \u043C\u043E\u0442\u043E\u0440 {} \u0442\u0440\u0435\u0443\u0433.":
       "{} glTF vertices \u2192 {} nodes \xB7 {} beams (edges {}, structural {}, shear {}, hinges and latches {}, seals {}) \xB7 body {} tris in {} draw call \xB7 engine {} tris",
     "\u043C\u043E\u0434\u0435\u043B\u044C {} \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u043B\u0430\u0441\u044C ({}); \u0431\u0435\u0437 \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u043E\u0439 \u043A\u043E\u043F\u0438\u0438 \u0435\u0451 \u043D\u0443\u0436\u043D\u043E \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u0442\u044C \u0447\u0435\u0440\u0435\u0437 \u0432\u0435\u0431-\u0441\u0435\u0440\u0432\u0435\u0440 \u0440\u044F\u0434\u043E\u043C \u0441 \u043F\u0430\u043F\u043A\u043E\u0439 \u043C\u043E\u0434\u0435\u043B\u0438":
