@@ -1566,7 +1566,10 @@ body.touch .rs .kb {
   <div><h3>Звук</h3><div class="row"><button class="btn" id="s-sound" type="button" aria-pressed="true">Звук вкл<kbd>M</kbd></button>
     <label class="btn res" for="s-vol" style="flex: 2 1 160px">Громкость <input id="s-vol" type="range" min="0" max="100" step="1" value="70"></label></div>
     <div class="note">Мотор слышно по расстоянию: в салоне громко, снаружи — тише и глуше с удалением.</div></div>
-  <div><h3>Графика</h3><label class="btn res" for="q-res" title="Чёткость: выше — больше пикселей рендера, картинка резче">Чёткость <input id="q-res" type="range" min="0" max="8" step="1" value="0"><output id="q-out">авто</output></label></div>
+  <div><h3>Графика</h3><div class="row gfx-row" id="s-gfx"><button class="btn" type="button" data-gfx="low">Низкая</button><button class="btn" type="button" data-gfx="medium">Средняя</button><button class="btn" type="button" data-gfx="high">Высокая</button><button class="btn" type="button" data-gfx="ultra">Ультра</button></div>
+    <div class="note">Низкая — для слабых телефонов. Высокая — мягкие тени, свечение, отражения неба. Ультра — тени 4K, больше осколков и обломков, суперсэмплинг.</div>
+    <label class="btn res" for="q-res"
+ title="Чёткость: выше — больше пикселей рендера, картинка резче">Чёткость <input id="q-res" type="range" min="0" max="8" step="1" value="0"><output id="q-out">авто</output></label></div>
   <div class="note set-tip">Запись заезда, вторая машина, смена машины, телепорт, камера и вид — в меню действий: клавиша <b>Q</b> или кнопка «Действия».</div>
 </section>
 <div id="legacy" hidden>
@@ -1651,6 +1654,11 @@ import { GLTFLoader as i1 } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder as Zl } from "three/addons/libs/meshopt_decoder.module.js";
 import { RoomEnvironment as u1 } from "three/addons/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry as c1 } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { EffectComposer as PdzComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass as PdzRenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass as PdzBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass as PdzOutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { ShaderPass as PdzShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 window.__pdzBoot = 1;
 const ga = Jl,
   Xl = i1,
@@ -2407,47 +2415,172 @@ var bu = 7.5,
 (gt.setPixelRatio(N0),
   (gt.shadowMap.enabled = !0),
   (gt.shadowMap.type = Oe ? _1 : g1),
-  (gt.toneMapping = j1),
+  (gt.toneMapping = ga.NeutralToneMapping),
   (gt.toneMappingExposure = 1));
+// Soft sun shadows (PCSS): a blocker search measures how far the occluder sits above the receiver and the
+// filter widens with that gap, so shadows are crisp where a tyre meets the ground and soft further out.
+// Receiver-plane depth bias keeps flat and sloped ground from shadowing itself under the wide filter.
+// Used for the sun when the shadow map type is PCFShadowMap (High and Ultra); PCFSoftShadowMap keeps three's filter.
+{
+  let e = ga.ShaderChunk;
+  ((e.shadowmap_pars_fragment += `
+#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+#define PDZ_FRUSTUM_M 36.0
+#define PDZ_DEPTH_M 139.0
+#define PDZ_SEARCH_M 0.85
+#define PDZ_SUN 0.05
+#define PDZ_BLOCKER 12
+#define PDZ_FILTER 20
+float pdzIGN( vec2 p ) { return fract( 52.9829189 * fract( dot( p, vec2( 0.06711056, 0.00583715 ) ) ) ); }
+vec2 pdzVogel( int i, int n, float phi ) {
+	float r = sqrt( ( float( i ) + 0.5 ) / float( n ) ), th = float( i ) * 2.39996323 + phi;
+	return vec2( cos( th ), sin( th ) ) * r;
+}
+float pdzDirShadow( sampler2D sm, vec2 size, float intensity, float bias, float radius, vec4 sc ) {
+#if defined( SHADOWMAP_TYPE_PCF )
+	vec3 p = sc.xyz / sc.w;
+	p.z += bias;
+	vec3 ddx = dFdx( p ), ddy = dFdy( p );
+	float det = ddx.x * ddy.y - ddx.y * ddy.x;
+	vec2 g = abs( det ) > 1e-14 ? vec2( ddy.y * ddx.z - ddx.y * ddy.z, ddx.x * ddy.z - ddy.x * ddx.z ) / det : vec2( 0.0 );
+	float gl = length( g );
+	if ( gl > 1.0 ) g /= gl;
+	if ( p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0 ) return 1.0;
+	float texel = 1.0 / size.x, phi = pdzIGN( gl_FragCoord.xy ) * 6.2831853;
+	float search = PDZ_SEARCH_M / PDZ_FRUSTUM_M, gap = 0.0, nb = 0.0;
+	for ( int i = 0; i < PDZ_BLOCKER; i ++ ) {
+		vec2 o = pdzVogel( i, PDZ_BLOCKER, phi ) * search;
+		float zr = p.z + dot( g, o ) - 2e-4, d = unpackRGBAToDepth( texture2D( sm, p.xy + o ) );
+		if ( d < zr ) { gap += zr - d; nb += 1.0; }
+	}
+	if ( nb == 0.0 ) return 1.0;
+	float pen = gap / nb * PDZ_DEPTH_M * PDZ_SUN * radius / PDZ_FRUSTUM_M;
+	float fr = clamp( pen, texel * 1.6, search ), s = 0.0;
+	for ( int i = 0; i < PDZ_FILTER; i ++ ) {
+		vec2 o = pdzVogel( i, PDZ_FILTER, phi + 1.3 ) * fr;
+		s += step( p.z + dot( g, o ) - 2e-4, unpackRGBAToDepth( texture2D( sm, p.xy + o ) ) );
+	}
+	return mix( 1.0, s / float( PDZ_FILTER ), intensity );
+#else
+	return getShadow( sm, size, intensity, bias, radius, sc );
+#endif
+}
+#endif
+`),
+    (e.lights_fragment_begin = e.lights_fragment_begin.replace(
+      "getShadow( directionalShadowMap[ i ]",
+      "pdzDirShadow( directionalShadowMap[ i ]",
+    )));
+}
 var ie = new B1();
-ie.fog = new D1(12963026, 140, 520);
+// sky palette (linear); the fog takes the horizon colour so the far mountains melt into the sky
+var Sk = {
+  sun: new He(0.52, 0.66, 0.54).normalize(),
+  sunCol: new xt(1, 0.93, 0.82),
+  zenith: new xt(0.07, 0.2, 0.52),
+  horizon: new xt(0.56, 0.67, 0.8),
+  ground: new xt(0.2, 0.21, 0.19),
+  clouds: { value: 1 },
+  time: { value: 0 },
+};
+ie.fog = new D1(Sk.horizon.clone(), 140, 520);
 var fe = new U1(58, 1, 0.1, 1500);
 fe.position.set(-6, 3, -8);
 var xu = new C1(gt);
-((ie.environment = xu.fromScene(new d1(), 0.04).texture),
-  (ie.environmentIntensity = 0.5));
-var As = new ce(
-  new Do(900, 32, 16),
-  new Dn({
+function pdzSkyMat(e) {
+  return new Dn({
     side: y1,
     depthWrite: !1,
+    fog: !1,
     uniforms: {
-      top: { value: new xt(7181245) },
-      mid: { value: new xt(13226972) },
-      bot: { value: new xt(12170410) },
+      uSun: { value: Sk.sun },
+      uSunCol: { value: Sk.sunCol },
+      uZenith: { value: Sk.zenith },
+      uHorizon: { value: Sk.horizon },
+      uGround: { value: Sk.ground },
+      uClouds: Sk.clouds,
+      uTime: Sk.time,
+      uDisk: { value: e ? 0 : 1 },
     },
     vertexShader:
-      "varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }",
-    fragmentShader:
-      "uniform vec3 top; uniform vec3 mid; uniform vec3 bot; varying vec3 vP; void main(){ float h = vP.y; vec3 c = h > 0.0 ? mix(mid, top, pow(clamp(h*1.6,0.0,1.0),0.7)) : mix(mid, bot, clamp(-h*6.0,0.0,1.0)); gl_FragColor = vec4(c,1.0); }",
-  }),
-);
-((As.frustumCulled = !1), ie.add(As), ie.add(new O1(14871541, 6248268, 0.95)));
-var m0 = new I1(16773336, 2.5);
+      "varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }",
+    fragmentShader: `uniform vec3 uSun, uSunCol, uZenith, uHorizon, uGround; uniform float uClouds, uTime, uDisk;
+varying vec3 vW;
+float skH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float skN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(skH(i), skH(i + vec2(1.0, 0.0)), f.x), mix(skH(i + vec2(0.0, 1.0)), skH(i + vec2(1.0, 1.0)), f.x), f.y); }
+float skF(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * skN(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s; }
+void main() {
+  vec3 d = normalize(vW - cameraPosition);
+  float h = d.y, mu = max(dot(d, uSun), 0.0);
+  vec3 c = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.38));
+
+  c += uSunCol * (0.3 * pow(mu, 6.0) + 0.9 * pow(mu, 48.0)) ;          // glow round the sun
+  c += uSunCol * 0.12 * pow(1.0 - abs(h), 8.0) * (0.5 + 0.5 * mu);     // brighter haze at the horizon
+  if (uClouds > 0.0 && h > 0.0) {                                       // a layer of soft cumulus
+    vec2 uv = d.xz / (h + 0.08) * 0.9 + vec2(uTime * 0.006, uTime * 0.002);
+    float n = skF(uv * 1.6), cov = smoothstep(0.52, 0.82, n) * smoothstep(0.0, 0.22, h) * uClouds;
+    float lit = 0.75 + 0.45 * pow(mu, 3.0) - 0.25 * smoothstep(0.6, 0.95, n);
+    c = mix(c, mix(uHorizon, vec3(1.0), 0.65) * lit, cov * 0.85);
+  }
+  c += uSunCol * uDisk * 40.0 * smoothstep(0.99975, 0.9999, mu);       // the disk itself, far above white so it blooms
+  c = mix(c, uGround, smoothstep(0.0, -0.06, h));
+  gl_FragColor = vec4(c, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`,
+  });
+}
+var As = new ce(new Do(900, 48, 24), pdzSkyMat(0));
+((As.frustumCulled = !1), (As.renderOrder = -1), ie.add(As));
+// image-based light: the car paint reflects this sky and a dark ground, not a studio
+var pdzEnvStudio = xu.fromScene(new d1(), 0.04).texture,
+  pdzEnvSky = (() => {
+    let e = new B1(),
+      t = new ce(new Do(50, 48, 24), pdzSkyMat(1));
+    e.add(t);
+    let a = xu.fromScene(e, 0.02, 0.1, 200).texture;
+    return (t.geometry.dispose(), t.material.dispose(), a);
+  })();
+((ie.environment = pdzEnvSky), (ie.environmentIntensity = 0.75));
+var pdzHemi = new O1(14871541, 6248268, 0.5);
+ie.add(pdzHemi);
+var m0 = new I1(16773336, 2.7),
+  pdzSunOff = Sk.sun.clone().multiplyScalar(48);
 ((m0.castShadow = !0),
   m0.shadow.mapSize.set(Oe ? 1024 : 2048, Oe ? 1024 : 2048),
   Object.assign(m0.shadow.camera, {
-    left: -16,
-    right: 16,
-    top: 16,
-    bottom: -16,
+    left: -18,
+    right: 18,
+    top: 18,
+    bottom: -18,
     near: 1,
     far: 140,
   }),
-  (m0.shadow.bias = -4e-4),
-  (m0.shadow.normalBias = 0.03),
+  (m0.shadow.bias = -3e-4),
+  (m0.shadow.normalBias = 0.025),
   ie.add(m0, m0.target));
+
+var pdzSunR = new He(),
+  pdzSunU = new He();
+// the sun follows the car, but its shadow frustum moves in whole shadow-map texels so edges do not crawl
+function pdzSunAt(e, t, a) {
+  let n = Sk.sun,
+    o = (2 * m0.shadow.camera.right) / m0.shadow.mapSize.x;
+  (pdzSunR.set(n.z, 0, -n.x).normalize(), pdzSunU.crossVectors(n, pdzSunR));
+  let r = e * pdzSunR.x + a * pdzSunR.z,
+    s = e * pdzSunU.x + t * pdzSunU.y + a * pdzSunU.z,
+    i = e * n.x + t * n.y + a * n.z;
+  ((r = Math.round(r / o) * o), (s = Math.round(s / o) * o));
+  (m0.target.position
+    .copy(pdzSunR)
+    .multiplyScalar(r)
+    .addScaledVector(pdzSunU, s)
+    .addScaledVector(n, i),
+    m0.position.copy(m0.target.position).add(pdzSunOff));
+}
 var ku = gt.capabilities.getMaxAnisotropy();
+
 function St(e, t, a, n = 1, o = 1) {
   let r = document.createElement("canvas");
   ((r.width = e), (r.height = t), a(r.getContext("2d"), e, t));
@@ -5403,7 +5536,8 @@ function rl(e, t, a = 0, n = 0, o = 0, r = !1) {
       (t.lam
         ? Math.min(Oe ? 50 : 110, Math.max(12, t.area * (Oe ? 70 : 140)))
         : Math.min(Oe ? 90 : 230, Math.max(20, t.area * (Oe ? 260 : 620)))) *
-        Ue.shards,
+        Ue.shards *
+        Gx.fx,
     ),
     i = v,
     l = i.cx,
@@ -5552,8 +5686,8 @@ varying float vSA;`,
     }
   );
 }
-var Ns = Oe ? 640 : 1600,
-  l2 = Oe ? 260 : 620,
+var Ns = Oe ? 900 : 2400,
+  l2 = Oe ? 600 : 1800,
   Or = null,
   hr = null,
   Gs = new mt().makeScale(0, 0, 0),
@@ -6003,8 +6137,12 @@ void main() {
 }`,
     fragmentShader: `varying vec4 vC; varying vec2 vUv;
 void main() {
-  float core = exp(-vUv.x * vUv.x * 5.0), along = mix(0.08, 1.0, vUv.y * vUv.y);
-  gl_FragColor = vec4(vC.rgb * core * along * vC.a, 1.0);
+  float core = exp(-vUv.x * vUv.x * 5.0), hot = exp(-vUv.x * vUv.x * 22.0), along = mix(0.08, 1.0, vUv.y * vUv.y);
+  // white-hot centre line inside an orange glow; values above 1 feed the bloom
+  vec3 c = vC.rgb * core * 2.2 + vec3(1.0, 0.85, 0.6) * hot * vC.a * 2.5;
+  gl_FragColor = vec4(c * along * vC.a, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
 }`,
   });
   ((Y0 = new ce(t, o)),
@@ -6015,7 +6153,7 @@ void main() {
 }
 var ol = new Vr();
 function g2() {
-  if (((Ur = Oe ? 8 : 18), !Y0)) return;
+  if (((Ur = Math.round((Oe ? 14 : 36) * Gx.fx)), !Y0)) return;
   let e = Y0.geometry,
     t = e.attributes.position.array,
     a = e.attributes.aTail.array,
@@ -6080,9 +6218,9 @@ function v2(e, t, a, n, o, r, s, i, l, f, c, u) {
       ).color.clone()),
     p = Math.random,
     m = Math.min(
-      Oe ? 3 : 7,
+      Math.round((Oe ? 5 : 12) * Gx.fx),
       Ur,
-      Math.floor(Math.max(0, a - 2) * 0.3 + Math.max(0, t - 2.5) * 0.5 + p()),
+      Math.floor((Math.max(0, a - 2) * 0.3 + Math.max(0, t - 2.5) * 0.5) * 1.8 * Gx.fx + p()),
     );
   Ur -= m;
   for (let y = 0; y < m; y++) {
@@ -6100,14 +6238,16 @@ function v2(e, t, a, n, o, r, s, i, l, f, c, u) {
       p() - 0.5,
       0.006 + p() * 0.012,
       null,
-      2.5 + p() * 2.5,
+      5 + p() * 5,
       p() < 0.2 ? w2 : Js.copy(h).multiplyScalar(0.85 + p() * 0.3),
     );
   }
-  if ((d === _.BUMPER_F || d === _.BUMPER_R || d < 0) && t > 3.5) {
+  // bits of plastic: bumpers and the frame shed plenty, any other panel a few on a hard hit
+  let pb = d === _.BUMPER_F || d === _.BUMPER_R || d < 0;
+  if ((pb && t > 3.5) || t > 6) {
     let y = Math.max(
       0,
-      Math.min(Oe ? 3 : 6, Ur, Math.floor((t - 3) * 0.6 + p())),
+      Math.min(Math.round((Oe ? 5 : 10) * Gx.fx), Ur, Math.floor((t - (pb ? 3 : 5)) * (pb ? 1.1 : 0.5) * Gx.fx + p())),
     );
     Ur -= y;
     for (let w = 0; w < y; w++)
@@ -7308,7 +7448,8 @@ varying vec3 vFloorW;`,
       vertexShader:
         "varying float vH; varying vec3 vN; varying vec3 vV; void main(){ vH = position.y / 7.0 + 0.5; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = normalize(-mv.xyz); vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * mv; }",
       fragmentShader:
-        "uniform float uI; varying float vH; varying vec3 vN; varying vec3 vV; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 2.0); float a = uI * e * (0.3 + 0.7 * vH) * smoothstep(0.0, 0.35, vH); gl_FragColor = vec4(vec3(1.0, 0.94, 0.84) * a, 1.0); }",
+        "uniform float uI; varying float vH; varying vec3 vN; varying vec3 vV; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 2.0); float a = uI * e * (0.3 + 0.7 * vH) * smoothstep(0.0, 0.35, vH); gl_FragColor = vec4(vec3(1.0, 0.94, 0.84) * a, 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}",
+
     }),
     c = new e.Mesh(new e.ConeGeometry(2.8, 7, 48, 1, !0), f);
   (c.position.set(0.5, 3.9, 1.1), (c.renderOrder = 6), t.add(c), (pe.beam = c));
@@ -7352,7 +7493,8 @@ function ei(e) {
   ((pe.group.visible = e),
     (ie.fog = e ? pe.fog : pe.worldFog),
     (ie.background = e ? pe.bg : null),
-    (ie.environmentIntensity = e ? 0.32 : 0.5),
+    (ie.environment = e ? pdzEnvStudio : pdzEnvSky),
+    (ie.environmentIntensity = e ? 0.32 : Gx.env || 0.75),
     e || fe.clearViewOffset(),
     Ta());
 }
@@ -7366,7 +7508,7 @@ function ti(e) {
       Object.assign(Te, { throttle: 0, brake: 0, steer: 0, handbrake: !0 }),
       yl(1 / 60)),
     v0(() => {
-      (Ii(), Di(), Ps(), Ds(), Pi(), Oi(), Bi(), Ei());
+      (Ii(), Di(), Ps(), Ds(), Pi(), Oi(), Bi(), Ei(), pdzBlobTick());
     }));
   let t = innerWidth,
     a = innerHeight,
@@ -7422,7 +7564,7 @@ function ti(e) {
     gt.setRenderTarget(null),
     (gt.shadowMap.autoUpdate = !0),
     (pe.floor.visible = pe.dust.visible = pe.beam.visible = !0),
-    gt.render(ie, fe));
+    pdzRender());
 }
 function ai() {
   let e = We && We.glass;
@@ -8759,7 +8901,7 @@ window.__pdzShot = (e, t, a = 58) => {
     fe.updateProjectionMatrix(),
     fe.position.set(...e),
     fe.lookAt(...t),
-    gt.render(ie, fe),
+    pdzRender(),
     (fe.fov = n),
     fe.updateProjectionMatrix());
 };
@@ -11346,7 +11488,7 @@ function gl(e) {
         Z[r],
         Y[r],
         X[r],
-        s ? 10 : 6,
+        s ? 14 : 10,
         s ? 1 : 0,
         Z[r] - Ve[r],
         Y[r] - tt[r],
@@ -11846,7 +11988,7 @@ function gc(e, t, a) {
       R = c.nx * w - c.ny * y,
       S = c.vx * y + c.vy * w + c.vz * k,
       E = c.vx * x + c.vy * A + c.vz * R;
-    c.vLong = S;
+    ((c.vLong = S), (c.vLat = E));
     let D = Te.handbrake && !c.front,
       B = (0.5 * c.ancMass) / e,
       P = l / 4 - Math.min(B, 200) * S * 0.02,
@@ -12036,7 +12178,7 @@ function yl(e) {
   ((e = Math.min(e, No)), v0(() => wc(e)));
   let t = e / Uo;
   for (let a = 0; a < Uo; a++) (v0(() => hc(t)), je.length > 1 && Mc());
-  (v0(() => vc(e)), Fi(e), g2(), Vs(e), Pu(e));
+  (v0(() => vc(e)), Fi(e), g2(), Vs(e), Pu(e), v0(() => pdzWheelFx(e)), pdzFxTick(e));
 }
 var bc = 0.2,
   xr = new Float64Array(6),
@@ -12161,8 +12303,8 @@ function xc(e, t) {
 var bo = 4.5,
   vl = 2.5,
   bi = 7,
-  o0 = Oe ? 800 : 1400,
-  X0 = Oe ? 140 : 240,
+  o0 = Oe ? 1100 : 2600,
+  X0 = Oe ? 260 : 700,
   Mo = 96,
   ze = y0(99),
   ee = {
@@ -12181,6 +12323,7 @@ var bo = 4.5,
     w: new Float32Array(X0 * 3),
     life: new Float32Array(X0),
     s: new Float32Array(X0),
+    k: new Float32Array(X0 * 2).fill(1),
     head: 0,
     live: 0,
   },
@@ -12206,7 +12349,7 @@ function kc() {
         vertexShader:
           "attribute vec4 color; attribute float size; uniform float pxScale; varying vec4 vC; void main(){ vC = color; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = size * pxScale / max(0.1, -mv.z); }",
         fragmentShader:
-          "varying vec4 vC; void main(){ vec2 d = gl_PointCoord - 0.5; float r = dot(d, d) * 4.0; if (r > 1.0) discard; float a = 1.0 - r; gl_FragColor = vec4(vC.rgb, vC.a * a * a); }",
+          "varying vec4 vC; void main(){ vec2 d = gl_PointCoord - 0.5; float r = dot(d, d) * 4.0; if (r > 1.0) discard; float a = 1.0 - r; gl_FragColor = vec4(vC.rgb * (1.0 + 2.5 * a * a * a), vC.a * a * a);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}",
       }),
     )));
   let t = new Lt();
@@ -12220,7 +12363,7 @@ function kc() {
         blending: _o,
         vertexShader:
           "attribute vec4 color; varying vec4 vC; void main(){ vC = color; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-        fragmentShader: "varying vec4 vC; void main(){ gl_FragColor = vC; }",
+        fragmentShader: "varying vec4 vC; void main(){ gl_FragColor = vC;\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}",
       }),
     )));
   for (let c of [Fa, qa])
@@ -12262,11 +12405,13 @@ function kc() {
   let l = new mt().makeScale(0, 0, 0),
     f = new xt(1, 1, 1);
   for (let c = 0; c < X0; c++) (l0.setMatrixAt(c, l), l0.setColorAt(c, f));
-  ((l0.frustumCulled = !1), (l0.castShadow = !Oe), ie.add(l0), i2(), m2());
+  ((l0.frustumCulled = !1), (l0.castShadow = !Oe), ie.add(l0), i2(), m2(), pdzFxInit());
 }
 function ki() {
   if (
     (u2(),
+    pdzFxReset(),
+
     ee.life.fill(0),
     (ee.live = 1),
     de.life.fill(0),
@@ -12373,8 +12518,8 @@ function Rc() {
       (!Bt.hit || o > Bt.hit[3]) &&
       (Bt.hit = [Fe[n], Fe[n + 1], Fe[n + 2], o]);
   }
-  let t = Oe ? 90 : 190,
-    a = 6;
+  let t = Math.round((Oe ? 120 : 280) * Gx.fx),
+    a = Math.round(10 * Gx.fx);
   for (let n = 0; n < Math.min(e.length, 10) && t > 0; n++) {
     let o = e[n] * 9,
       r = Fe[o + 8],
@@ -12413,8 +12558,9 @@ ve[r], ge[r], ye[r], Math.min(1, (u - 3) / 8), 0.45),
     if (d && i < bi) continue;
     let h = Math.min(
       t,
-      Math.round(d ? 3 + i * 0.7 : 5 + (u - bo) * 2.6 + i * 0.4),
+      Math.round((d ? 3 + i * 0.7 : 5 + (u - bo) * 2.6 + i * 0.4) * 0.95),
     );
+    pdzImpactPuff(Fe[o], Fe[o + 1], Fe[o + 2], Fe[o + 3], Fe[o + 4], Fe[o + 5], u, i, l, f, c);
     if (
       (xo(
         Fe[o],
@@ -12430,11 +12576,11 @@ ve[r], ge[r], ye[r], Math.min(1, (u - 3) / 8), 0.45),
         c,
       ),
       (t -= h),
-      !d && u > 7 && a > 0 && ze() < 0.55)
+      !d && u > 6.5 && a > 0 && ze() < 0.8)
     ) {
       let p = r >= 0 ? Ye[r] : -1,
         m = p === _.LAMP_L || p === _.LAMP_R,
-        y = 1 + (u > 13 ? 1 : 0);
+        y = 1 + (u > 10 ? 1 : 0) + (u > 16 ? 1 : 0);
       ((a -= y),
         bl(
           Fe[o],
@@ -12532,7 +12678,9 @@ function bl(e, t, a, n, o, r, s, i) {
       (de.w[d * 3] = (ze() - 0.5) * 30),
       (de.w[d * 3 + 1] = (ze() - 0.5) * 30),
       (de.w[d * 3 + 2] = (ze() - 0.5) * 30),
-      (de.life[d] = 5 + ze() * 3),
+      (de.life[d] = (9 + ze() * 7) * (0.6 + 0.4 * Gx.fx)),
+      (de.k[d * 2] = 0.5 + ze() * 1.3),
+      (de.k[d * 2 + 1] = 0.5 + ze() * 1.3),
       (de.s[d] = o === 1 ? 0.018 + ze() * 0.03 : 0.03 + ze() * 0.05),
       l0.setColorAt(d, Cc.set(Sc[o][Math.floor(ze() * 3)])));
   }
@@ -12669,7 +12817,7 @@ function Fi(e) {
       Fc.compose(
         Tc.set(de.p[f], de.p[f + 1], de.p[f + 2]),
         Ec.set(d[h], d[h + 1], d[h + 2], d[h + 3]),
-        zc.set(R, R, R),
+        zc.set(R * de.k[l * 2], R, R * de.k[l * 2 + 1]),
       ),
     );
   }
@@ -13223,15 +13371,11 @@ function Nc(e) {
       ($.heading += l * (1 - Math.exp(-e * 3.5))));
   }
   if ((($.idle += e), $.mode === ja)) {
-    (Oc(e),
-      m0.position.set(fe.position.x + 22, 40, fe.position.z + 14),
-      m0.target.position.set(fe.position.x, 0, fe.position.z));
+    (Oc(e), pdzSunAt(fe.position.x, 0, fe.position.z));
     return;
   }
   if ($.mode === 2) {
-    (Uc(e),
-      m0.position.set(v.cx + 22, v.cy + 40, v.cz + 14),
-      m0.target.position.set(v.cx, v.cy, v.cz));
+    (Uc(e), pdzSunAt(v.cx, v.cy, v.cz));
     return;
   }
   (fe.up.set(0, 1, 0),
@@ -13254,8 +13398,7 @@ function Nc(e) {
     fe.position.y < Ra(fe.position.x, fe.position.z) + 0.35 &&
       (fe.position.y = Ra(fe.position.x, fe.position.z) + 0.35),
     fe.lookAt($.target),
-    m0.position.set(v.cx + 22, v.cy + 40, v.cz + 14),
-    m0.target.position.set(v.cx, v.cy, v.cz));
+    pdzSunAt(v.cx, v.cy, v.cz));
 }
 var qt = new Set();
 function Gc() {
@@ -13360,6 +13503,8 @@ function Wi() {
   };
   for (let t of ka) e(t);
   for (let t of Je) e(t.group);
+  We.blob && (e(We.blob), (We.blob = null));
+
   for (let t of [pn, O.mesh, Xt, ea, pa, ta]) e(t);
   if (q.v) {
     for (let t of q.v.src) t.stop();
@@ -13539,6 +13684,10 @@ function Vi(e) {
   } catch {}
 }
 I("q-res").addEventListener("input", (e) => Vi(+e.target.value));
+I("s-gfx").addEventListener("click", (e) => {
+  let t = e.target.closest("button")?.dataset.gfx;
+  t && pdzGfxApply(t);
+});
 try {
   let e = +localStorage.getItem("crashlab-res");
   e > 0 && e < Hi.length && Vi(e);
@@ -14269,6 +14418,7 @@ function r1() {
   let e = Bt.hit;
   e &&
     (Ol(e[0], e[1], e[2], e[3], 0.4 + 0.6 * ot.cur),
+    pdzImpactFx(e[3]),
     (!Bt.rec || e[3] > Bt.rec[3]) && (Bt.rec = e),
     (Bt.hit = null));
 }
@@ -14488,7 +14638,8 @@ function Ta() {
       ($.mode >= 2 ? Be.fovK : 1)),
     (fe.near = $.mode === 2 ? 0.03 : 0.1),
     fe.updateProjectionMatrix(),
-    (xi.value = (t * N0 * 0.5) / Math.tan((fe.fov * Math.PI) / 360)));
+    (xi.value = (t * N0 * 0.5) / Math.tan((fe.fov * Math.PI) / 360)),
+    pdzPostSize());
 }
 addEventListener("resize", Ta);
 var $l = 0,
@@ -14508,14 +14659,418 @@ function ql(e) {
               ((N0 = Math.min(Wn, N0 * 1.1)), (Sn = 0), Ta()))
           : (Sn = 0)));
 }
+// ---------- graphics quality: Low / Medium / High / Ultra ----------
+var pdzGfxPresets = {
+    low: { pr: [0.6, 1], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7 },
+    medium: { pr: [0.75, 1.5], shadow: 2048, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.85, clouds: 0.8, env: 0.75 },
+    high: { pr: [1, 2], shadow: 2048, pcss: !0, soft: 1, post: !0, bloom: 0.3, fx: 1, clouds: 1, env: 0.75 },
+    ultra: { pr: [1, 2.5], shadow: 4096, pcss: !0, soft: 1.15, post: !0, bloom: 0.36, fx: 1.6, clouds: 1, env: 0.8 },
+  },
+  Gx = { name: "", fx: 1, env: 0.75 },
+  Px = { on: !1, composer: null, bloom: null, grade: null, hit: 0, shake: 0, t: 0 };
+function pdzGfxDefault() {
+  try {
+    let e = localStorage.getItem("pdz-gfx");
+    if (pdzGfxPresets[e]) return e;
+  } catch {}
+  return Oe ? "medium" : "high";
+}
+function pdzGfxApply(e, t) {
+  let a = pdzGfxPresets[e] ? e : pdzGfxDefault(),
+    n = pdzGfxPresets[a],
+    o = devicePixelRatio || 1;
+  ((Gx = Object.assign({ name: a }, n)),
+    (Wn = Math.min(Math.max(o, a === "ultra" ? 1.5 : 0), n.pr[1])),
+    (ks = Math.min(Wn, n.pr[0])),
+    ji || (N0 = Wn));
+  let r = n.pcss ? _1 : g1;
+  if (gt.shadowMap.type !== r || m0.shadow.mapSize.x !== n.shadow) {
+    ((gt.shadowMap.type = r),
+      m0.shadow.mapSize.set(n.shadow, n.shadow),
+      m0.shadow.map && (m0.shadow.map.dispose(), (m0.shadow.map = null)));
+    t ||
+      ie.traverse((s) => {
+        if (s.material) for (let i of [].concat(s.material)) i.needsUpdate = !0;
+      });
+  }
+  ((m0.shadow.radius = n.soft),
+    (Sk.clouds.value = n.clouds),
+    I0 === "game" && (ie.environmentIntensity = n.env),
+    (Px.on = n.post),
+    n.post && pdzPostInit(),
+    Px.bloom && (Px.bloom.strength = n.bloom),
+    document.body.classList.toggle("css-vig", !n.post),
+    t || Ta());
+  try {
+    localStorage.setItem("pdz-gfx", a);
+  } catch {}
+  pdzGfxUI();
+}
+function pdzGfxUI() {
+  let e = I("s-gfx");
+  if (e)
+    for (let t of e.querySelectorAll("button"))
+      t.setAttribute("aria-pressed", String(t.dataset.gfx === Gx.name));
+}
+function pdzPostInit() {
+  if (Px.composer) return;
+  let e = new Vr();
+  gt.getDrawingBufferSize(e);
+  let t = new ga.WebGLRenderTarget(Math.max(2, e.x), Math.max(2, e.y), {
+    type: ga.HalfFloatType,
+    samples: 4,
+  });
+  ((Px.composer = new PdzComposer(gt, t)),
+    Px.composer.addPass(new PdzRenderPass(ie, fe)),
+    (Px.bloom = new PdzBloomPass(new Vr(e.x, e.y), 0.3, 0.45, 0.92)),
+    Px.composer.addPass(Px.bloom),
+    Px.composer.addPass(new PdzOutputPass()),
+    (Px.grade = new PdzShaderPass({
+      uniforms: { tDiffuse: { value: null }, uHit: { value: 0 } },
+      vertexShader:
+        "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float uHit; varying vec2 vUv;
+void main() {
+  vec2 c = vUv - 0.5;
+  float r = length(c);
+  vec2 off = c * r * (0.006 + 0.03 * uHit);                     // faint lens fringe, a hard hit splits it wide
+  vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+  col = mix(col, col * col * (3.0 - 2.0 * col), 0.16 + 0.22 * uHit); // soft S-curve, punchier on impact
+  float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = mix(vec3(l), col, 1.1);
+  col *= 1.0 - (0.3 + 0.25 * uHit) * smoothstep(0.32, 0.85, r);   // vignette
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`,
+    })),
+    Px.composer.addPass(Px.grade),
+    pdzPostSize());
+}
+function pdzPostSize() {
+  Px.composer && (Px.composer.setPixelRatio(N0), Px.composer.setSize(innerWidth, innerHeight));
+}
+function pdzRender() {
+  ((Px.t += pdzDt), (Sk.time.value = Px.t), (Px.hit *= Math.exp(-pdzDt * 4.5)));
+  Px.on && Px.composer
+    ? ((Px.grade.uniforms.uHit.value = Px.hit), Px.composer.render(pdzDt))
+    : gt.render(ie, fe);
+}
+// a hard hit: short camera shake and a lens pulse, scaled by impact speed in m/s
+function pdzImpactFx(e) {
+  let t = Math.min(1, Math.max(0, (e - 4) / 12));
+  ((Px.hit = Math.max(Px.hit, t)), (Px.shake = Math.max(Px.shake, t)));
+}
+function pdzShakeCam() {
+  if (Px.shake < 0.004 || $.mode === ja) return;
+  let e = Px.t * 41,
+    t = Px.shake * Px.shake * ($.mode === 2 ? 0.035 : 0.14);
+  (fe.position.x += (Math.sin(e) + 0.5 * Math.sin(e * 2.3 + 1.1)) * t,
+    fe.position.y += (Math.sin(e * 1.7 + 2) + 0.5 * Math.sin(e * 3.1)) * t * 0.7,
+    fe.position.z += (Math.sin(e * 1.3 + 4) + 0.5 * Math.sin(e * 2.9 + 3)) * t,
+    (Px.shake *= Math.exp(-pdzDt * 5.5)));
+}
+// ---------- impact effects: dust and smoke, tyre smoke, the flash of a hard hit ----------
+var Dz = { N: Oe ? 200 : 520, head: 0, live: 0 },
+  pdzFlash = null,
+  pdzGlow = null,
+  pdzFlashI = 0;
+function pdzFxInit() {
+  if (Dz.pts) return;
+  let e = Dz.N;
+  Object.assign(Dz, {
+    p: new Float32Array(e * 3),
+    v: new Float32Array(e * 3),
+    life: new Float32Array(e),
+    max: new Float32Array(e),
+    s0: new Float32Array(e),
+    s1: new Float32Array(e),
+    a: new Float32Array(e),
+    c: new Float32Array(e * 3),
+  });
+  let t = new Lt();
+  (t.setAttribute("position", new Mt(new Float32Array(e * 3), 3).setUsage(Kt)),
+    t.setAttribute("aC", new Mt(new Float32Array(e * 4), 4).setUsage(Kt)),
+    t.setAttribute("aS", new Mt(new Float32Array(e * 2), 2).setUsage(Kt)));
+  for (let a = 0; a < e; a++) t.attributes.aS.array[a * 2 + 1] = Math.random();
+  ((Dz.pts = new os(
+    t,
+    new Dn({
+      uniforms: { pxScale: xi },
+      transparent: !0,
+      depthWrite: !1,
+      vertexShader: `attribute vec4 aC; attribute vec2 aS; uniform float pxScale; varying vec4 vC; varying float vSeed;
+void main() {
+  vC = aC; vSeed = aS.y;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = aC.a <= 0.0 ? 0.0 : aS.x * pxScale / max(0.1, -mv.z);
+}`,
+      fragmentShader: `varying vec4 vC; varying float vSeed;
+float dzH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float dzN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(dzH(i), dzH(i + vec2(1.0, 0.0)), f.x), mix(dzH(i + vec2(0.0, 1.0)), dzH(i + vec2(1.0, 1.0)), f.x), f.y); }
+void main() {
+  vec2 d = gl_PointCoord - 0.5;
+  float r = length(d) * 2.0;
+  if (r > 1.0) discard;
+  // a billowy puff: soft disc broken up by two octaves of noise, lit a little from above
+  float n = dzN(d * 4.5 + vSeed * 31.0) * 0.6 + dzN(d * 9.0 - vSeed * 17.0) * 0.4;
+  float a = smoothstep(1.0, 0.25, r) * smoothstep(0.18, 0.62, n + 0.42 * (1.0 - r));
+  gl_FragColor = vec4(vC.rgb * (0.9 - 0.35 * d.y), vC.a * a);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`,
+    }),
+  )),
+    (Dz.pts.frustumCulled = !1),
+    (Dz.pts.renderOrder = 4),
+    ie.add(Dz.pts),
+    (pdzFlash = new ga.PointLight(16757840, 0, 10, 2)),
+    ie.add(pdzFlash));
+  let a = St(64, 64, (n, o, r) => {
+    let s = n.createRadialGradient(32, 32, 0, 32, 32, 32);
+    (s.addColorStop(0, "rgba(255,255,255,1)"),
+      s.addColorStop(0.25, "rgba(255,255,255,0.45)"),
+      s.addColorStop(1, "rgba(255,255,255,0)"),
+      (n.fillStyle = s),
+      n.fillRect(0, 0, o, r));
+  });
+  ((pdzGlow = new ga.Sprite(
+    new ga.SpriteMaterial({ map: a, blending: _o, depthWrite: !1, transparent: !0, opacity: 0 }),
+  )),
+    pdzGlow.material.color.setRGB(3.2, 1.7, 0.7),
+    (pdzGlow.visible = !1),
+    (pdzGlow.renderOrder = 7),
+    ie.add(pdzGlow));
+}
+// n puffs of colour (r,g,b) at (x,y,z) drifting with (vx,vy,vz); size is the final diameter in metres
+function pdzPuff(e, t, a, n, o, r, s, i, l, f, c, u, d) {
+  if (!Dz.pts) return;
+  let h = Math.random;
+  s = Math.min(24, s * Gx.fx);
+  for (s = Math.floor(s) + (h() < s % 1 ? 1 : 0); s-- > 0; ) {
+    let p = Dz.head;
+    Dz.head = (p + 1) % Dz.N;
+    let m = p * 3;
+    ((Dz.p[m] = e + (h() - 0.5) * i * 0.4),
+      (Dz.p[m + 1] = t + (h() - 0.3) * i * 0.25),
+      (Dz.p[m + 2] = a + (h() - 0.5) * i * 0.4),
+      (Dz.v[m] = n * (0.25 + 0.5 * h()) + (h() - 0.5) * 1.6),
+      (Dz.v[m + 1] = o * (0.25 + 0.5 * h()) + 0.3 + h() * 0.7),
+      (Dz.v[m + 2] = r * (0.25 + 0.5 * h()) + (h() - 0.5) * 1.6),
+      (Dz.max[p] = Dz.life[p] = d * (0.7 + 0.6 * h())),
+      (Dz.s0[p] = i * (0.25 + 0.2 * h())),
+      (Dz.s1[p] = i * (0.8 + 0.5 * h())));
+    let y = 0.9 + 0.2 * h();
+    ((Dz.c[m] = l * y), (Dz.c[m + 1] = f * y), (Dz.c[m + 2] = c * y), (Dz.a[p] = u));
+  }
+}
+// what a contact patch kicks up on each surface: [r, g, b, alpha] or null
+function pdzDustOf(e) {
+  return e === mr.ice
+    ? null
+    : e === mr.snow
+      ? [0.92, 0.94, 0.97, 0.5]
+      : e === mr.sand
+        ? [0.74, 0.64, 0.48, 0.5]
+        : e === mr.dirt || e === mr.gravel
+          ? [0.46, 0.38, 0.29, 0.5]
+          : e === mr.grass
+            ? [0.36, 0.34, 0.25, 0.4]
+            : [0.72, 0.71, 0.69, 0.32];
+}
+function pdzFlashAt(e, t, a, n) {
+  pdzFlash &&
+    ((pdzFlashI = Math.max(pdzFlashI, n)),
+    pdzFlash.position.set(e, t + 0.15, a),
+    pdzGlow.position.set(e, t, a));
+}
+// one impact from the contact list: dust from the ground or grit from the wall, and a flash on the hard ones
+function pdzImpactPuff(e, t, a, n, o, r, s, i, l, f, c) {
+  let u = t < 0.35 ? pdzDustOf(e * e + a * a > Ze.R0 * Ze.R0 ? mr.grass : sl(e, a)) : [0.62, 0.6, 0.57, 0.3];
+  (u &&
+    (s >= 4.5 || i >= 6) &&
+    pdzPuff(
+      e,
+      t,
+      a,
+      l * 0.4 + n * 1.5,
+      f * 0.4 + o * 1.5,
+      c * 0.4 + r * 1.5,
+      Math.min(5, (s - 3) * 0.32 + (i >= 6 ? 0.5 : 0)),
+      0.7 + Math.min(1.3, s * 0.07),
+      u[0],
+      u[1],
+      u[2],
+      u[3],
+      1.4 + Math.min(1.6, s * 0.08),
+    ),
+    s > 6.5 && pdzFlashAt(e, t, a, Math.min(1, (s - 5.5) / 9)));
+}
+// tyres: smoke on tarmac, dust or spray elsewhere, wherever a wheel slides
+function pdzWheelFx(e) {
+  if (!(e <= 0))
+    for (let t of Je) {
+      if (!t.contact) {
+        t.smk = 0;
+        continue;
+      }
+      let a = Math.hypot(t.omega * t.r - (t.vLong || 0), t.vLat || 0);
+      if (a < 3.2) continue;
+      let n = pdzDustOf(t.surf || mr.asphalt);
+      if (!n) continue;
+      t.smk = (t.smk || 0) + e * Math.min(28, (a - 3.2) * 3.2);
+      let o = v.R;
+      for (; t.smk >= 1; t.smk--)
+        pdzPuff(
+          t.tx - o[1] * (t.s + t.r * 0.9),
+          t.ty - o[4] * (t.s + t.r * 0.9),
+          t.tz - o[7] * (t.s + t.r * 0.9),
+          t.vx * 0.3,
+          0.2,
+          t.vz * 0.3,
+          0.7,
+          1.1 + Math.min(1.4, a * 0.06),
+          n[0],
+          n[1],
+          n[2],
+          n[3] * Math.min(1, (a - 2.5) / 5),
+          1.6 + Math.min(1.8, a * 0.08),
+        );
+    }
+}
+function pdzFxTick(e) {
+  if (pdzFlash) {
+    let r = pdzFlashI;
+    ((pdzFlash.intensity = 70 * r * r),
+      (pdzGlow.visible = r > 0.02),
+      (pdzGlow.material.opacity = Math.min(1, r * 1.4)),
+      pdzGlow.scale.setScalar(0.5 + 1.6 * r),
+
+      e > 0 && (pdzFlashI *= Math.exp(-e * 14)),
+      pdzFlashI < 0.01 && (pdzFlashI = 0));
+  }
+  if (!Dz.pts) return;
+  let t = Dz.pts.geometry,
+    a = t.attributes.position.array,
+    n = t.attributes.aC.array,
+    o = t.attributes.aS.array,
+    s = Math.exp(-e * 1.8),
+    i = 0;
+  for (let r = 0; r < Dz.N; r++) {
+    if (Dz.life[r] <= 0) {
+      n[r * 4 + 3] !== 0 && (n[r * 4 + 3] = 0);
+      continue;
+    }
+    ((Dz.life[r] -= e), i++);
+    let l = r * 3;
+    ((Dz.v[l] *= s),
+      (Dz.v[l + 1] = Dz.v[l + 1] * s + 0.25 * e),
+      (Dz.v[l + 2] *= s),
+      (Dz.p[l] += Dz.v[l] * e),
+      (Dz.p[l + 1] = Math.max(0.05, Dz.p[l + 1] + Dz.v[l + 1] * e)),
+      (Dz.p[l + 2] += Dz.v[l + 2] * e));
+    let f = Math.min(1, Math.max(0, 1 - Dz.life[r] / Dz.max[r])),
+      c = 1 - f;
+    ((a[l] = Dz.p[l]),
+      (a[l + 1] = Dz.p[l + 1]),
+      (a[l + 2] = Dz.p[l + 2]),
+      (n[r * 4] = Dz.c[l]),
+      (n[r * 4 + 1] = Dz.c[l + 1]),
+      (n[r * 4 + 2] = Dz.c[l + 2]),
+      (n[r * 4 + 3] = Dz.life[r] > 0 ? Dz.a[r] * Math.min(1, f / 0.06) * c * Math.sqrt(c) : 0),
+      (o[r * 2] = Dz.s0[r] + (Dz.s1[r] - Dz.s0[r]) * (1 - c * c)));
+  }
+  ((i || Dz.live) &&
+    ((t.attributes.position.needsUpdate = t.attributes.aC.needsUpdate = t.attributes.aS.needsUpdate = !0)),
+    (Dz.live = i));
+}
+function pdzFxReset() {
+  Dz.life && (Dz.life.fill(0), pdzFxTick(0));
+  pdzFlashI = 0;
+}
+// soft contact shadow under each car, laid on whatever the body is standing on
+
+var pdzBlobT = null,
+  pdzBlobM = new mt(),
+  pdzBV = [new He(), new He(), new He()];
+function pdzBlobTick() {
+  let e = We;
+  if (!e.blob) {
+    pdzBlobT ||
+      ((pdzBlobT = St(128, 256, (s, i, l) => {
+        let f = s.createImageData(i, l);
+        for (let c = 0; c < l; c++)
+          for (let u = 0; u < i; u++) {
+            let d = Math.abs(((u + 0.5) / i) * 2 - 1),
+              h = Math.abs(((c + 0.5) / l) * 2 - 1),
+              p = (1 - f0(0.42, 1, d)) * (1 - f0(0.6, 1, h)),
+              m = (c * i + u) * 4;
+            ((f.data[m] = f.data[m + 1] = f.data[m + 2] = 0), (f.data[m + 3] = 255 * Math.pow(p, 1.3)));
+          }
+        s.putImageData(f, 0, 0);
+      })),
+      (pdzBlobT.wrapS = pdzBlobT.wrapT = ga.ClampToEdgeWrapping));
+    let t = 1e9,
+      a = -1e9,
+      n = 1e9,
+      o = -1e9;
+    for (let s = 0; s < J; s++)
+      (ve[s] < t && (t = ve[s]), ve[s] > a && (a = ve[s]), ye[s] < n && (n = ye[s]), ye[s] > o && (o = ye[s]));
+    ((e.blobW = (a - t) * 1.45),
+      (e.blobL = (o - n) * 1.22),
+      (e.blobX = (a + t) / 2 - fa),
+      (e.blobZ = (o + n) / 2 - j0));
+    let r = new ce(
+      new Nt(1, 1),
+      new Hr({
+        color: 0,
+        map: pdzBlobT,
+        transparent: !0,
+        depthWrite: !1,
+        opacity: 0.7,
+        polygonOffset: !0,
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4,
+      }),
+    );
+    ((r.renderOrder = 1), (r.matrixAutoUpdate = !1), ie.add(r), (e.blob = r));
+  }
+  let b = e.blob,
+    R = v.R;
+  if (M0 === 2) {
+    b.visible = !1;
+    return;
+  }
+  let x = v.cx + R[0] * e.blobX + R[2] * e.blobZ,
+    z = v.cz + R[6] * e.blobX + R[8] * e.blobZ,
+    h = Ou(x, v.cy + 0.3, z, 0, -1, 0, 6);
+  if (!h) {
+    b.visible = !1;
+    return;
+  }
+  let gy = v.cy + 0.3 - h.t,
+    up = v.cy - gy,
+    al = 1 - f0(0.85, 2.4, up);
+  if (((b.visible = al > 0.01), !b.visible)) return;
+  let N = pdzBV[2].set(h.nx, h.ny, h.nz),
+    F = pdzBV[1].set(R[2], R[5], R[8]);
+  (F.addScaledVector(N, -F.dot(N)).normalize(), pdzBV[0].crossVectors(F, N));
+  let s = 1 + 0.35 * Math.max(0, up - 0.75);
+  (pdzBlobM.makeBasis(pdzBV[0].multiplyScalar(e.blobW * s), F.multiplyScalar(e.blobL * s), N).setPosition(x, gy + 0.012, z),
+    b.matrix.copy(pdzBlobM),
+    (b.matrixWorldNeedsUpdate = !0),
+    (b.material.opacity = 0.72 * al));
+}
 function Eo(e) {
   pdzDt = Math.min(0.1, Math.max(1e-3, e));
   (v0(() => {
-    (Ii(), Di(), Ps(), Ds(), Pi(), Oi(), Bi(), Ei(), M0 > 0 && Pc());
+    (Ii(), Di(), Ps(), Ds(), Pi(), Oi(), Bi(), Ei(), pdzBlobTick(), M0 > 0 && Pc());
   }),
     Nc(e),
-    gt.render(ie, fe));
+    pdzShakeCam(),
+    pdzRender());
 }
+
 var To = performance.now();
 function Cn(e) {
   let t = Math.min(0.25, Math.max(1e-4, (e - To) / 1e3));
@@ -14530,6 +15085,8 @@ function Cn(e) {
   if (le.on) {
     (Xi(t),
       Vs(le.paused ? 0 : t * le.speed),
+      pdzFxTick(le.paused ? 0 : t * le.speed),
+
       Eo(t),
       v0(() => _l(t)),
       Gl(t),
@@ -14571,7 +15128,8 @@ async function Vc() {
   }
 }
 async function Kc() {
-  (Ta(),
+  (pdzGfxApply(pdzGfxDefault(), !0),
+    Ta(),
     Oo(
       C(
         "\u041A\u0443\u0437\u043E\u0432 \u2192 \u043F\u0430\u043D\u0435\u043B\u0438, \u0432\u0435\u0440\u0448\u0438\u043D\u044B \u2192 \u0443\u0437\u043B\u044B, \u0440\u0451\u0431\u0440\u0430 \u2192 \u0431\u0430\u043B\u043A\u0438\u2026",
@@ -14815,6 +15373,13 @@ function Yc() {
 }
 function Qc() {
   return {
+    Низкая: "Low",
+    Средняя: "Medium",
+    Высокая: "High",
+    Ультра: "Ultra",
+    "Низкая — для слабых телефонов. Высокая — мягкие тени, свечение, отражения неба. Ультра — тени 4K, больше осколков и обломков, суперсэмплинг.":
+      "Low suits weak phones. High adds soft shadows, bloom and sky reflections. Ultra adds 4K shadows, more shards and debris, and supersampling.",
+
     Каркас: "Frame",
     Капот: "Hood",
     "\u0411\u0430\u043C\u043F\u0435\u0440 \u043F\u0435\u0440\u0435\u0434\u043D\u0438\u0439":
