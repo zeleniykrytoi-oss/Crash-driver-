@@ -13647,39 +13647,8 @@ function W2() {
       pdzGround(new Se({ vertexColors: !0, map: b, roughness: 0.96, metalness: 0 }), 0.7),
     );
   ((M.receiveShadow = !0), (M.frustumCulled = !1), ie.add(M));
-  let x = y0(1234),
-    A = Oe ? 420 : 1100,
-    R = new ga.InstancedMesh(
-      new ga.ConeGeometry(2.1, 7, 7),
-      new Se({ color: 1915423, roughness: 0.9 }),
-      A,
-    ),
-    S = new ga.InstancedMesh(
-      new p0(0.22, 0.3, 1.8, 5),
-      new Se({ color: 4863270, roughness: 0.9 }),
-      A,
-    ),
-    E = new mt(),
-    D = 0;
-  for (let F = 0; D < A && F < A * 6; F++) {
-    let L = x() * Math.PI * 2,
-      z = Ze.R0 + 10 + x() ** 1.4 * 300,
-      G = Math.sin(L) * z,
-      j = Math.cos(L) * z,
-      U = dn(G, j, z);
-    if (U > 130 || ho(G, j)[1] < 0.8) continue;
-    let W = 0.7 + x() * 0.9;
-    (E.makeScale(W, W * (0.9 + x() * 0.4), W).setPosition(
-      G,
-      U + 3.2 * W + 1,
-      j,
-    ),
-      R.setMatrixAt(D, E),
-      E.makeScale(W, W, W).setPosition(G, U + 0.7 * W, j),
-      S.setMatrixAt(D, E),
-      D++);
-  }
-  ((R.count = S.count = D), ie.add(R, S));
+  let x = y0(1234);
+  pdzForestBuild();
   let B = $2("glass"),
     P = new Se({ color: 2830133, roughness: 0.9 });
   B.color = new xt(0.75, 0.8, 0.88);
@@ -19546,10 +19515,10 @@ function ql(e) {
 }
 // ---------- graphics quality: Low / Medium / High / Ultra ----------
 var pdzGfxPresets = {
-    low: { pr: [0.6, 1], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7 },
-    medium: { pr: [0.75, 1.5], shadow: 2048, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.85, clouds: 0.8, env: 0.75 },
-    high: { pr: [1, 2], shadow: 2048, pcss: !0, soft: 1, post: !0, bloom: 0.3, fx: 1, clouds: 1, env: 0.75 },
-    ultra: { pr: [1, 2.5], shadow: 4096, pcss: !0, soft: 1.15, post: !0, bloom: 0.36, fx: 1.6, clouds: 1, env: 0.8 },
+    low: { pr: [0.6, 1], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7, trees: 0.25 },
+    medium: { pr: [0.75, 1.5], shadow: 2048, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.85, clouds: 0.8, env: 0.75, trees: 0.4 },
+    high: { pr: [1, 2], shadow: 2048, pcss: !0, soft: 1, post: !0, bloom: 0.3, fx: 1, clouds: 1, env: 0.75, trees: 0.6 },
+    ultra: { pr: [1, 2.5], shadow: 4096, pcss: !0, soft: 1.15, post: !0, bloom: 0.36, fx: 1.6, clouds: 1, env: 0.8, trees: 1 },
   },
   Gx = { name: "", fx: 1, env: 0.75 },
   Px = { on: !1, composer: null, bloom: null, grade: null, hit: 0, shake: 0, t: 0 };
@@ -19580,6 +19549,7 @@ function pdzGfxApply(e, t) {
   }
   ((m0.shadow.radius = n.soft),
     (Sk.clouds.value = n.clouds),
+    pdzForestDensity(),
     I0 === "game" && (ie.environmentIntensity = n.env),
     (Px.on = n.post),
     n.post && pdzPostInit(),
@@ -19884,6 +19854,271 @@ function pdzFxTick(e) {
 function pdzFxReset() {
   Dz.life && (Dz.life.fill(0), pdzFxTick(0));
   pdzFlashI = 0;
+}
+// ---------- forest: spruce, fir, Scots pine and a few broadleaf trees on the valley slopes ----------
+var pdzForest = { meshes: [], max: [] };
+// one tree as a single vertex-coloured mesh; foliage normals point out from the trunk so crowns shade as volumes
+function pdzTreeGeo(e) {
+  let t = y0(e.seed),
+    a = [],
+    n = [],
+    o = [],
+    r = (b, M, x, A) => {
+      let R = b.index ? b.toNonIndexed() : b,
+        S = R.attributes.position,
+        E = R.attributes.normal;
+      for (let D = 0; D < S.count; D++) {
+        let B = S.getX(D),
+          P = S.getY(D),
+          F = S.getZ(D),
+          L = M(B, P, F, D);
+        (a.push(L[0], L[1], L[2]), o.push(...x(L[0], L[1], L[2])));
+        let z = A ? A(L[0], L[1], L[2]) : [E.getX(D), E.getY(D), E.getZ(D)];
+        n.push(...z);
+      }
+      (R !== b && R.dispose(), b.dispose());
+    },
+    s = (b, M, x) => b.map((A, R) => A + (M[R] - A) * x),
+    i = (b, M, x, A) => {
+      let R = Math.hypot(b, x) || 1,
+        S = [(b / R) * 0.85, A, (x / R) * 0.85],
+        E = Math.hypot(...S);
+      return S.map((D) => D / E);
+    };
+  // trunk, slightly tapered, bark darkening to the ground
+  let l = e.trunkH,
+    f = new p0(e.trunkR * 0.45, e.trunkR, l, 7, 1, !0);
+  (f.translate(0, l / 2, 0),
+    r(
+      f,
+      (b, M, x) => [b, M, x],
+      (b, M) => s(e.bark, e.bark2 || e.bark, M / l),
+    ));
+  if (e.kind === "cone") {
+    // stacked, overlapping skirts of branches; each rim is ragged and droops at random
+    let c = e.tiers,
+      u = e.crownBase;
+    for (let d = 0; d < c; d++) {
+      let h = d / c,
+        p = u + (e.H - u) * Math.pow(h, 0.92),
+        m = e.R * Math.pow(1 - h, 1.05) * (0.86 + 0.28 * t()) + 0.12,
+        y = d === c - 1 ? e.H - p : Math.min(e.H - p, ((e.H - u) / c) * 2.5),
+        w = e.seg,
+        k = new p0(0, m, y, w, 1, !0),
+        b = Array.from({ length: w }, () => [1 + e.jag * (t() - 0.5), e.droop * m * t()]),
+        M = t() * 6.3;
+      (k.rotateY(M),
+        k.translate(0, p + y / 2, 0),
+        r(
+          k,
+          (x, A, R, S) => {
+            if (A > p + y * 0.5) return [x * 0.3, A, R * 0.3];
+            let E = (Math.round(((Math.atan2(R, x) - M + 12.566) % 6.2832) / (6.2832 / w)) % w + w) % w,
+              D = b[E];
+            return [x * D[0], A - D[1], R * D[0]];
+          },
+          (x, A) => {
+            let R = A > p + y * 0.5 ? 1 : 0;
+            return s(s(e.dark, e.mid, 0.25 + 0.75 * h), e.tip, R);
+          },
+          (x, A, R) => i(x, A, R, 0.55),
+        ));
+    }
+  } else {
+    // clumps of foliage high on the trunk (pine) or a rounded crown (broadleaf)
+    let c = e.clumps;
+    for (let u = 0; u < c; u++) {
+      let d = u === 0 ? 0 : t() * 6.3,
+        h = u === 0 ? 0 : e.R * (0.45 + 0.35 * t()),
+        p = Math.cos(d) * h,
+        m = Math.sin(d) * h,
+        y = e.crownBase + (e.H - e.crownBase) * (u === 0 ? 0.55 : 0.2 + 0.6 * t()),
+        w = e.R * (u === 0 ? 0.85 : 0.5 + 0.3 * t()),
+        k = new ga.IcosahedronGeometry(1, u === 0 ? 1 : 0),
+        b = k.attributes.position,
+        M = [];
+      for (let x = 0; x < b.count; x++) {
+        let A = `${b.getX(x).toFixed(3)},${b.getY(x).toFixed(3)},${b.getZ(x).toFixed(3)}`;
+        M[x] = A;
+      }
+      let x = new Map();
+      (r(
+        k,
+        (A, R, S, E) => {
+          let D = x.get(M[E]);
+          D === void 0 && x.set(M[E], (D = 0.78 + 0.44 * t()));
+          return [p + A * w * D, y + R * w * e.flat * D, m + S * w * D];
+        },
+        (A, R) => s(e.dark, e.tip, Math.min(1, Math.max(0, (R - (y - w * e.flat)) / (2 * w * e.flat)))),
+        (A, R, S) => {
+          let E = [A - p, (R - y) / e.flat + w * 0.25, S - m],
+            D = Math.hypot(...E) || 1;
+          return E.map((B) => B / D);
+        },
+      ),
+        e.branches &&
+          ((b = new p0(0.03, 0.06, h + 0.2, 4, 1, !0)),
+          b.rotateZ(0.35 - Math.PI / 2),
+          b.rotateY(-d),
+          b.translate(p * 0.5, y - 0.25, m * 0.5),
+          r(
+            b,
+            (A, R, S) => [A, R, S],
+            () => e.bark2,
+          )));
+    }
+  }
+  let c = new Lt();
+  return (
+    c.setAttribute("position", new _e(a, 3)),
+    c.setAttribute("normal", new _e(n, 3)),
+    c.setAttribute("color", new _e(o, 3)),
+    c.computeBoundingSphere(),
+    c
+  );
+}
+function pdzTreeMat() {
+  let e = new Se({ vertexColors: !0, roughness: 0.88, metalness: 0, side: e0 });
+  return (
+    (e.onBeforeCompile = (t) => {
+      ((t.uniforms.uTime = Sk.time),
+        (t.vertexShader = t.vertexShader
+          .replace("#include <common>", "#include <common>\nuniform float uTime;")
+          .replace(
+            "#include <begin_vertex>",
+            `#include <begin_vertex>
+#ifdef USE_INSTANCING
+{ // crowns lean with the wind, more towards the top; each tree on its own phase
+  float h = max(transformed.y - 1.5, 0.0), ph = dot(instanceMatrix[3].xz, vec2(0.13, 0.17));
+  transformed.x += (sin(uTime * 1.2 + ph) + 0.4 * sin(uTime * 2.9 + ph * 1.7)) * 0.006 * h * h;
+  transformed.z += cos(uTime * 1.05 + ph * 1.3) * 0.004 * h * h;
+}
+#endif`,
+          )));
+    }),
+    (e.customProgramCacheKey = () => "pdz-tree"),
+    e
+  );
+}
+function pdzForestBuild() {
+  let e = ga,
+    t = (b) => new xt(b).toArray(),
+    a = [
+      {
+        kind: "cone",
+        seed: 11,
+        H: 10.5,
+        R: 1.85,
+        tiers: 10,
+        seg: 9,
+        crownBase: 0.8,
+        trunkH: 2,
+        trunkR: 0.22,
+        jag: 0.62,
+        droop: 0.4,
+        dark: t(462612),
+        mid: t(1259811),
+        tip: t(2312754),
+        bark: t(2235671),
+        bark2: t(3878443),
+      },
+      {
+        kind: "cone",
+        seed: 23,
+        H: 7.5,
+        R: 2.1,
+        tiers: 8,
+        seg: 9,
+        crownBase: 0.5,
+        trunkH: 1.3,
+        trunkR: 0.2,
+        jag: 0.55,
+        droop: 0.34,
+        dark: t(661780),
+        mid: t(1653540),
+        tip: t(3036986),
+        bark: t(2564892),
+        bark2: t(4206899),
+      },
+      {
+        kind: "clump",
+        seed: 37,
+        H: 13,
+        R: 1.7,
+        clumps: 6,
+        flat: 0.42,
+        crownBase: 8.4,
+        trunkH: 10.4,
+        trunkR: 0.2,
+        branches: !0,
+        dark: t(924938),
+        tip: t(2771765),
+        bark: t(3482141),
+        bark2: t(9065017),
+      },
+      {
+        kind: "clump",
+        seed: 53,
+        H: 9,
+        R: 2.3,
+        clumps: 8,
+        flat: 0.72,
+        crownBase: 3.4,
+        trunkH: 4.4,
+        trunkR: 0.17,
+        branches: !0,
+        dark: t(1452049),
+        tip: t(4417835),
+        bark: t(10724768),
+        bark2: t(12895422),
+      },
+    ],
+    n = Oe ? [900, 450, 200, 130] : [3000, 1500, 650, 420],
+    o = pdzTreeMat(),
+    r = a.map((b, M) => {
+      let x = new e.InstancedMesh(pdzTreeGeo(b), o, n[M]);
+      return ((x.count = 0), x);
+    }),
+    s = y0(2024),
+    i = new mt(),
+    l = new Za(),
+    f = new W1(),
+    c = new He(),
+    u = new He(),
+    d = new xt(),
+    h = [0, 0, 0, 0];
+  for (let b = 0; b < 12e4 && h.some((M, x) => M < n[x]); b++) {
+    let M = s() * Math.PI * 2,
+      x = Ze.R0 + 12 + s() ** 1.5 * 320,
+      A = Math.sin(M) * x,
+      R = Math.cos(M) * x,
+      S = dn(A, R, x);
+    if (S > 138 || ho(A, R)[1] < 0.78) continue;
+    // stands of forest with glades between them, thinning out towards the tree line
+    let E = f0(-0.05, 0.25, $a(A * 0.012 + 3.3, R * 0.012 - 1.7) + 0.35 * $a(A * 0.05, R * 0.05)) * (1 - f0(92, 138, S));
+    if (s() > E * 0.95 + 0.02) continue;
+    let D = s(),
+      B = S < 35 ? (D < 0.28 ? 3 : D < 0.5 ? 2 : D < 0.8 ? 0 : 1) : S < 85 ? (D < 0.15 ? 2 : D < 0.62 ? 0 : D < 0.95 ? 1 : 3) : D < 0.65 ? 0 : 1;
+    if (h[B] >= n[B]) continue;
+    let P = (0.6 + 0.55 * s() + 0.45 * s() * s()) * (1 - 0.35 * f0(80, 138, S)),
+      F = P * (0.88 + 0.3 * s());
+    (f.set((s() - 0.5) * 0.07, s() * 6.3, (s() - 0.5) * 0.07),
+      i.compose(c.set(A, S - 0.3, R), l.setFromEuler(f), u.set(P, F, P)),
+      r[B].setMatrixAt(h[B], i));
+    let L = 0.72 + 0.42 * s(),
+      z = (s() - 0.5) * 0.22;
+    (s() < 0.022 && B < 3 ? d.setRGB(5.5, 1.5, 1.8) : d.setRGB(L * (1 + z), L, L * (1 - z * 0.6)),
+      r[B].setColorAt(h[B], d),
+      h[B]++);
+  }
+  for (let b = 0; b < 4; b++)
+    ((pdzForest.max[b] = r[b].count = h[b]), (r[b].frustumCulled = !1), r[b].computeBoundingSphere(), ie.add(r[b]));
+  ((pdzForest.meshes = r), pdzForestDensity());
+}
+// the preset decides how many of the planted trees are drawn; they were planted in random order, so this thins evenly
+function pdzForestDensity() {
+  let e = Gx.trees ?? 1;
+  pdzForest.meshes.forEach((t, a) => (t.count = Math.round(pdzForest.max[a] * e)));
 }
 // ground: large soft stains and roughness patches in world space so tiled textures stop reading as tiles
 function pdzGround(e, t) {
