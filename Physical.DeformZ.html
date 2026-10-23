@@ -256,7 +256,7 @@ input[type="range"] {
   position: absolute;
   top: calc(var(--pad) + env(safe-area-inset-top, 0px));
   left: calc(var(--pad) + env(safe-area-inset-left, 0px));
-  width: 232px;
+  width: 240px;
   padding: 12px 14px 12px;
   display: flex;
   flex-direction: column;
@@ -282,7 +282,8 @@ input[type="range"] {
 .hud-card h1 {
   margin: 0;
   flex: 1;
-  font: 400 15px/1 var(--font-display);
+  min-width: 0;
+  font: 400 13.5px/1 var(--font-display);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1182,10 +1183,12 @@ body.no-ui #play-bar {
   border-color: rgba(255, 77, 77, 0.6);
 }
 .pedal.hb {
-  width: 76px;
+  width: 84px;
   height: 64px;
   border-radius: 32px;
-  font-size: 12px;
+  padding: 0 4px;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
 }
 .pedal.on {
   background: var(--hot);
@@ -1208,8 +1211,14 @@ body.touch #slomo {
     width: min(380px, calc(100vw - 2 * var(--pad)));
     bottom: calc(206px + env(safe-area-inset-bottom, 0px));
   }
+  /* portrait phone: the gauge sits under the status card, clear of the car */
   body.touch .gauge {
-    bottom: calc(258px + env(safe-area-inset-bottom, 0px));
+    left: calc(var(--pad) + env(safe-area-inset-left, 0px));
+    right: auto;
+    top: calc(188px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    transform: scale(0.62);
+    transform-origin: 0 0;
   }
 }
 
@@ -1891,8 +1900,45 @@ body.touch .menu-keys {
   body.in-menu #credit {
     max-width: 40vw;
   }
+  /* landscape phone: small gauge between the steering strip and the pedals */
   body.touch .gauge {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(2px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%) scale(0.6);
+    transform-origin: 50% 100%;
+  }
+  .menu-pane {
+    top: auto;
+    bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+    transform: none;
+    animation: none;
+  }
+  .gar-stats,
+  .gar-h,
+  .map-card.soon {
     display: none;
+  }
+  .gar-arrow {
+    height: 44px;
+  }
+  .gar-name {
+    padding: 5px 6px;
+  }
+  .gar-name b {
+    font-size: 16px;
+    margin-top: 3px;
+  }
+  .swatches {
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+  }
+  .menu-head h2 {
+    font-size: 24px;
+  }
+  .mbtn.back {
+    height: 34px;
   }
 }
 
@@ -3337,7 +3383,7 @@ var Au = St(
     1,
   ),
   jn = [],
-  Yt = new Se({ map: Ru, roughness: 0.92 }),
+  Yt = pdzGround(new Se({ map: Ru, roughness: 0.92 }), 0.6),
   va = new Se({ map: Cu, roughness: 0.85 }),
   Ho = new Se({ map: Su, roughness: 0.6 }),
   Xr = new Se({ map: jo, roughness: 0.7 });
@@ -7365,14 +7411,17 @@ function R2(e, t, a, n, o = {}) {
   return (
     (r.needsUpdate = !0),
     r.repeat.set(a / t, n / t),
-    new Se({
-      map: r,
-      roughness: 0.9,
-      polygonOffset: !0,
-      polygonOffsetFactor: -1 - (o.lift || 0),
-      polygonOffsetUnits: -2,
-      ...o.m,
-    })
+    pdzGround(
+      new Se({
+        map: r,
+        roughness: 0.9,
+        polygonOffset: !0,
+        polygonOffsetFactor: -1 - (o.lift || 0),
+        polygonOffsetUnits: -2,
+        ...o.m,
+      }),
+      1,
+    )
   );
 }
 var Xs = 0;
@@ -7489,7 +7538,7 @@ function il(e, t, a, n) {
 function C2() {
   (A2(), W2());
   let e = 2 * Ze.R0 + 8,
-    t = new ce(new Nt(e, e), new Se({ map: n0.asphalt, roughness: 0.93 }));
+    t = new ce(new Nt(e, e), pdzGround(new Se({ map: n0.asphalt, roughness: 0.93 }), 1));
   (n0.asphalt.repeat.set(e / 5, e / 5),
     (t.rotation.x = -Math.PI / 2),
     (t.receiveShadow = !0),
@@ -9594,7 +9643,7 @@ function W2() {
   let b = St(256, 256, (F, L, z) => g0(F, L, z, [235, 235, 235], 0.28, 31)),
     M = new ce(
       l,
-      new Se({ vertexColors: !0, map: b, roughness: 0.96, metalness: 0 }),
+      pdzGround(new Se({ vertexColors: !0, map: b, roughness: 0.96, metalness: 0 }), 0.7),
     );
   ((M.receiveShadow = !0), (M.frustumCulled = !1), ie.add(M));
   let x = y0(1234),
@@ -13218,7 +13267,7 @@ function kc() {
   let l = new mt().makeScale(0, 0, 0),
     f = new xt(1, 1, 1);
   for (let c = 0; c < X0; c++) (l0.setMatrixAt(c, l), l0.setColorAt(c, f));
-  ((l0.frustumCulled = !1), (l0.castShadow = !Oe), ie.add(l0), i2(), m2(), pdzFxInit());
+  ((l0.frustumCulled = !1), (l0.castShadow = !Oe), ie.add(l0), i2(), m2(), pdzFxInit(), pdzSkidInit());
 }
 function ki() {
   if (
@@ -15655,8 +15704,8 @@ void main() {
   float r = length(d) * 2.0;
   if (r > 1.0) discard;
   // a billowy puff: soft disc broken up by two octaves of noise, lit a little from above
-  float n = dzN(d * 4.5 + vSeed * 31.0) * 0.6 + dzN(d * 9.0 - vSeed * 17.0) * 0.4;
-  float a = smoothstep(1.0, 0.25, r) * smoothstep(0.18, 0.62, n + 0.42 * (1.0 - r));
+  float n = dzN(d * 3.5 + vSeed * 31.0) * 0.6 + dzN(d * 7.0 - vSeed * 17.0) * 0.4;
+  float a = exp(-r * r * 3.2) * (1.0 - r * r) * (0.55 + 0.45 * smoothstep(0.2, 0.75, n + 0.3 * (1.0 - r)));
   gl_FragColor = vec4(vC.rgb * (0.9 - 0.35 * d.y), vC.a * a);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -15753,14 +15802,26 @@ function pdzWheelFx(e) {
   if (!(e <= 0))
     for (let t of Je) {
       if (!t.contact) {
-        t.smk = 0;
+        ((t.smk = 0), (t.skid = null), (t.skidA = 0));
         continue;
       }
-      let a = Math.hypot(t.omega * t.r - (t.vLong || 0), t.vLat || 0);
+      let a = Math.hypot(t.omega * t.r - (t.vLong || 0), t.vLat || 0),
+        sm = pdzSkidOf(t.surf || mr.asphalt);
+      if (a >= 2.6 && sm) {
+        let o = v.R;
+        pdzSkid(
+          t,
+          t.tx - o[1] * (t.s + t.r),
+          t.ty - o[4] * (t.s + t.r) + 0.012,
+          t.tz - o[7] * (t.s + t.r),
+          sm[3] * Math.min(1, (a - 2.2) / 5),
+          sm,
+        );
+      } else ((t.skid = null), (t.skidA = 0));
       if (a < 3.2) continue;
       let n = pdzDustOf(t.surf || mr.asphalt);
       if (!n) continue;
-      t.smk = (t.smk || 0) + e * Math.min(28, (a - 3.2) * 3.2);
+      t.smk = (t.smk || 0) + e * Math.min(40, (a - 3.2) * 4.5);
       let o = v.R;
       for (; t.smk >= 1; t.smk--)
         pdzPuff(
@@ -15771,12 +15832,12 @@ function pdzWheelFx(e) {
           0.2,
           t.vz * 0.3,
           0.7,
-          1.1 + Math.min(1.4, a * 0.06),
+          1.4 + Math.min(1.6, a * 0.07),
           n[0],
           n[1],
           n[2],
-          n[3] * Math.min(1, (a - 2.5) / 5),
-          1.6 + Math.min(1.8, a * 0.08),
+          n[3] * 0.75 * Math.min(1, (a - 2.5) / 5),
+          1.8 + Math.min(2, a * 0.09),
         );
     }
 }
@@ -15829,6 +15890,101 @@ function pdzFxTick(e) {
 function pdzFxReset() {
   Dz.life && (Dz.life.fill(0), pdzFxTick(0));
   pdzFlashI = 0;
+}
+// ground: large soft stains and roughness patches in world space so tiled textures stop reading as tiles
+function pdzGround(e, t) {
+  return (
+    (e.onBeforeCompile = (a) => {
+      ((a.vertexShader = a.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vGW;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvGW = (modelMatrix * vec4(transformed, 1.0)).xyz;")),
+        (a.fragmentShader = a.fragmentShader
+          .replace(
+            "#include <common>",
+            `#include <common>
+varying vec3 vGW;
+float gwH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float gwN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(gwH(i), gwH(i + vec2(1.0, 0.0)), f.x), mix(gwH(i + vec2(0.0, 1.0)), gwH(i + vec2(1.0, 1.0)), f.x), f.y); }`,
+          )
+          .replace(
+            "#include <map_fragment>",
+            `#include <map_fragment>
+{ float m = gwN(vGW.xz * 0.045) * 0.6 + gwN(vGW.xz * 0.19 + 3.1) * 0.4;
+  diffuseColor.rgb *= mix(1.0, 0.84 + 0.3 * m, ${t.toFixed(2)}); }`,
+          )
+          .replace(
+            "#include <roughnessmap_fragment>",
+            `#include <roughnessmap_fragment>
+roughnessFactor = clamp(roughnessFactor + (gwN(vGW.xz * 0.11 + 7.0) - 0.5) * 0.14 * ${t.toFixed(2)}, 0.04, 1.0);`,
+          )));
+    }),
+    (e.customProgramCacheKey = () => "pdz-ground-" + t),
+    e
+  );
+}
+// tyre marks: a ring buffer of quads laid where a wheel slides
+var Tm = { N: Oe ? 1600 : 4800, head: 0, mesh: null };
+function pdzSkidInit() {
+  if (Tm.mesh) return;
+  let e = Tm.N,
+    t = new Lt(),
+    a = new Uint32Array(e * 6);
+  for (let n = 0; n < e; n++) a.set([n * 4, n * 4 + 1, n * 4 + 2, n * 4 + 2, n * 4 + 1, n * 4 + 3], n * 6);
+  (t.setAttribute("position", new Mt(new Float32Array(e * 12), 3).setUsage(Kt)),
+    t.setAttribute("color", new Mt(new Float32Array(e * 16), 4).setUsage(Kt)),
+    t.setIndex(new Mt(a, 1)),
+    (Tm.mesh = new ce(
+      t,
+      new Hr({
+        vertexColors: !0,
+        transparent: !0,
+        depthWrite: !1,
+        side: e0,
+        polygonOffset: !0,
+        polygonOffsetFactor: -3,
+        polygonOffsetUnits: -3,
+      }),
+    )),
+    (Tm.mesh.frustumCulled = !1),
+    (Tm.mesh.renderOrder = 1),
+    ie.add(Tm.mesh));
+}
+function pdzSkid(e, t, a, n, o, r) {
+  let s = e.skid;
+  if (((e.skid = [t, a, n]), !s || !Tm.mesh)) return;
+  let i = t - s[0],
+    l = n - s[2],
+    f = Math.hypot(i, l);
+  if (f < 0.05) {
+    e.skid = s;
+    return;
+  }
+  if (f > 1.6) return;
+  let c = ((e.width || 0.2) * 0.42) / f,
+    u = -l * c,
+    d = i * c,
+    h = Tm.head,
+    p = Tm.mesh.geometry.attributes.position,
+    m = Tm.mesh.geometry.attributes.color;
+  ((Tm.head = (h + 1) % Tm.N),
+    p.array.set([s[0] + u, s[1], s[2] + d, s[0] - u, s[1], s[2] - d, t + u, a, n + d, t - u, a, n - d], h * 12));
+  for (let y = 0; y < 4; y++) m.array.set([r[0], r[1], r[2], y < 2 ? (e.skidA ?? 0) : o], h * 16 + y * 4);
+  ((e.skidA = o),
+    p.addUpdateRange(h * 12, 12),
+    m.addUpdateRange(h * 16, 16),
+    (p.needsUpdate = m.needsUpdate = !0));
+}
+function pdzSkidOf(e) {
+  return e === mr.ice
+    ? null
+    : e === mr.snow
+      ? [0.32, 0.34, 0.38, 0.5]
+      : e === mr.sand || e === mr.dirt || e === mr.gravel || e === mr.grass
+        ? [0.1, 0.075, 0.05, 0.55]
+        : e === mr.wet
+          ? [0.02, 0.02, 0.02, 0.32]
+          : [0.018, 0.018, 0.02, 0.7];
 }
 // soft contact shadow under each car, laid on whatever the body is standing on
 
@@ -16109,7 +16265,7 @@ async function Kc() {
       setViewMode: wn,
       setHood: kl,
       impacts: () => Mi,
-      dbg: () => ({ fold: u0, dmg: d0, nq: Ct, qs: We.qShow, carQ: v.q, rest: Gt, L0: Ft, state: qe }),
+      dbg: () => ({ fold: u0, dmg: d0, nq: Ct, qs: We.qShow, rest: Gt, L0: Ft, state: qe, skid: Tm.head }),
       nodePart: () => Ye,
       nodes: () => ({ px: Z, py: Y, pz: X }),
       optimizeEngine: yi,
