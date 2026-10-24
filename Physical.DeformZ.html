@@ -301,6 +301,9 @@ input[type="range"] {
   color: var(--yellow);
 }
 #s-fps {
+  pointer-events: auto;
+  cursor: pointer;
+  background: none;
   font: 700 10.5px/1 var(--font-ui);
   color: var(--dim);
   font-variant-numeric: tabular-nums;
@@ -2442,16 +2445,43 @@ body.gar-edit .menu-shade {
     display: none;
   }
 }
+
+/* performance readout: what a frame costs on this device */
+#perf {
+  position: fixed;
+  top: calc(var(--pad) + 52px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  margin: 0;
+  padding: 8px 11px;
+  font: 500 11px/1.45 "JetBrains Mono", ui-monospace, monospace;
+  color: #e9f1ff;
+  background: rgba(7, 9, 12, 0.82);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  white-space: pre;
+  pointer-events: none;
+}
+#s-up .up-lab {
+  align-self: center;
+  margin-right: 4px;
+  font: 600 11px/1 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
 </style>
 </head>
 <body>
 
 <canvas id="view" tabindex="0" aria-label="3D-сцена симулятора"></canvas>
+<pre id="perf" hidden></pre>
 <div id="vig" aria-hidden="true"></div>
 
 <section id="hud" aria-label="Телеметрия">
   <div class="hud-card">
-    <header><span class="target" aria-hidden="true"></span><h1>Physical<i>.</i>DeformZ</h1><span id="s-fps" title="Кадров в секунду">—</span></header>
+    <header><span class="target" aria-hidden="true"></span><h1>Physical<i>.</i>DeformZ</h1><button id="s-fps" type="button" title="Кадров в секунду (нажмите — замеры производительности)">—</button></header>
     <div class="hud-int"><span class="hud-lab">Целостность</span><div class="integrity" role="img" aria-label="Доля целых, помятых и разорванных балок"><i id="bar-int"></i><i id="bar-def"></i><i id="bar-brk"></i></div></div>
     <dl>
       <dt>Покрытие</dt><dd id="s-surf">—</dd>
@@ -2512,6 +2542,8 @@ body.gar-edit .menu-shade {
     <div class="note">Низкая — для слабых телефонов. Высокая — мягкие тени, свечение, отражения неба. Ультра — тени 4K, больше осколков и обломков, суперсэмплинг.</div>
     <label class="btn res" for="q-res"
  title="Чёткость: выше — больше пикселей рендера, картинка резче">Чёткость <input id="q-res" type="range" min="0" max="8" step="1" value="0"><output id="q-out">авто</output></label></div>
+    <div class="row gfx-row" id="s-up" role="group" aria-label="Масштабирование"><span class="up-lab">Масштабирование</span><button class="btn" type="button" data-up="auto">Авто</button><button class="btn" type="button" data-up="off">Выкл</button><button class="btn" type="button" data-up="fast">Быстрое</button><button class="btn" type="button" data-up="quality">Качество</button></div>
+    <div class="note">Когда устройство не успевает, 3D рисуется в меньшем разрешении и растягивается на экран. Быстрое — лёгкая резкость (для телефонов), Качество — как FSR (для компьютеров), Выкл — без лишнего прохода: быстрее всего, но мягче. Нажмите на счётчик кадров, чтобы увидеть замеры.</div>
     <div class="set-tab" data-tab="phys" hidden><h3>Физика</h3><div class="col">
     <label class="btn res" for="p-glass">Прочность стёкол <input id="p-glass" type="range" min="0.4" max="2.5" step="0.05" value="1"><output id="p-glass-o">×1.00</output></label>
     <label class="btn res" for="p-body">Прочность кузова <input id="p-body" type="range" min="0.4" max="2.5" step="0.05" value="1"><output id="p-body-o">×1.00</output></label>
@@ -18646,18 +18678,23 @@ function pdzCalm(c, e) {
 // which put a 40 fps phone in permanent slow motion: floaty jumps, soft crashes)
 var pdzStepMax = 1 / 24,
   pdzSubCost = 0.1,
-  pdzFrameT = 1 / 60;
-// how much time this frame's physics may cover: the frame's own length, unless the solver would then take
-// more than about 60% of the frame (a phone whose CPU is the limit): there it slows down instead of stalling
+  pdzFrameT = 1 / 60,
+  pdzBusy0 = 4;
+// how much time this frame's physics covers: 1/60 s, as it always did; more (up to the frame's own length,
+// so the world keeps its real speed at 30-40 fps) only out of time the main thread would otherwise spend
+// waiting for the GPU, so it never costs frame rate. A phone whose CPU is the limit stays as it was.
 function pdzSimDt(t) {
   pdzFrameT += (Math.min(t, 0.1) - pdzFrameT) * 0.08;
   let want = Math.min(pdzStepMax, Math.max(H1, t)),
-    cap = Math.max(Uo, Math.floor((pdzFrameT * 1e3 * 0.6) / Math.max(0.004, pdzSubCost))) / (Uo * 60);
-  return Math.min(want, cap);
+    sc = Math.max(0.004, pdzSubCost),
+    idle = pdzFrameT * 1e3 - pdzBusy0 - Uo * sc,
+    extra = idle > 0 ? Math.floor((idle * 0.5) / sc) : 0;
+  return Math.min(want, (Uo + extra) / (Uo * 60));
 }
+var pdzLastN = 0;
 function yl(e) {
   e = Math.min(e, pdzStepMax);
-  let N = Math.max(1, Math.ceil(e * Uo * 60 - 1e-6)),
+  let N = (pdzLastN = Math.max(1, Math.ceil(e * Uo * 60 - 1e-6))),
     L = je.filter((c) => !pdzCalm(c, e)),
     w0 = (f) => {
       for (let c of L) (Zt(c), f(c), go(c));
@@ -21321,7 +21358,7 @@ function ql(e) {
 // pr: the screen resolution (device pixels per CSS pixel, at most), then the 3D view's lowest and starting
 // share of it; below the screen resolution the view is upscaled (see pdzUp), so a low share stays sharp
 var pdzGfxPresets = {
-    low: { pr: [1.25, 0.45, 0.7], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7, trees: 0.25 },
+    low: { pr: [1, 0.55, 0.8], shadow: 0, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7, trees: 0.25 },
     medium: { pr: [1.5, 0.5, 0.8], shadow: 2048, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.85, clouds: 0.8, env: 0.75, trees: 0.4 },
     high: { pr: [2, 0.55, 1], shadow: 2048, pcss: !0, soft: 1, post: !0, bloom: 0.3, fx: 1, clouds: 1, env: 0.75, trees: 0.6 },
     ultra: { pr: [2.5, 0.7, 1], shadow: 4096, pcss: !0, soft: 1.15, post: !0, bloom: 0.36, fx: 1.6, clouds: 1, env: 0.8, trees: 1 },
@@ -21369,10 +21406,13 @@ function pdzGfxApply(e, t, u) {
     (Wn = Math.min(Math.max(o, a === "ultra" ? 1.5 : 0), n.pr[0])),
     (ks = Wn * n.pr[1]),
     ji || (N0 = Wn * n.pr[2]));
-  let r = n.pcss ? _1 : g1;
-  if (gt.shadowMap.type !== r || m0.shadow.mapSize.x !== n.shadow) {
-    ((gt.shadowMap.type = r),
-      m0.shadow.mapSize.set(n.shadow, n.shadow),
+  let r = n.pcss ? _1 : g1,
+    // Low draws no sun shadow map at all: no second pass over the scene, no lookups on every lit pixel
+    // (the car keeps the soft contact shadow under it); a phone on Medium gets a 1024 map
+    sm = n.shadow && Oe && a === "medium" ? 1024 : n.shadow;
+  if (m0.castShadow !== sm > 0 || (sm && (gt.shadowMap.type !== r || m0.shadow.mapSize.x !== sm))) {
+    ((m0.castShadow = sm > 0),
+      sm && ((gt.shadowMap.type = r), m0.shadow.mapSize.set(sm, sm)),
       m0.shadow.map && (m0.shadow.map.dispose(), (m0.shadow.map = null)));
     t ||
       ie.traverse((s) => {
@@ -21437,12 +21477,57 @@ function pdzPostSize() {
 }
 function pdzRender() {
   ((Px.t += pdzDt), (Sk.time.value = Px.t), (Px.hit *= Math.exp(-pdzDt * 4.5)));
-  let up = pdzUpOn();
+  let gq = pdzPerf.on && pdzGpuBegin(),
+    up = pdzUpOn();
   Px.on && Px.composer
     ? ((Px.grade.uniforms.uHit.value = Px.hit), (Px.composer.renderToScreen = !up), Px.composer.render(pdzDt), up && pdzUpDraw(Px.composer.readBuffer.texture))
     : up
       ? (gt.setRenderTarget(pdzUp.rt), gt.render(ie, fe), gt.setRenderTarget(null), pdzUpDraw(pdzUp.rt.texture))
       : gt.render(ie, fe);
+  gq && pdzGpuEnd();
+}
+// ---------- performance readout (tap the FPS number) ----------
+// What a frame costs on this device: physics and drawing on the CPU, the GPU's own time where the browser
+// exposes a timer for it, the 3D resolution and the preset. Meant for finding what holds a phone back.
+var pdzPerf = { on: !1, acc: 0, n: 0, t: 0, ph: 0, dr: 0, bz: 0, sim: 0, gpu: -1, q: null, ext: void 0 };
+function pdzGpuBegin() {
+  let g = gt.getContext(),
+    P = pdzPerf;
+  P.ext === void 0 && (P.ext = g.getExtension("EXT_disjoint_timer_query_webgl2"));
+  if (!P.ext) return !1;
+  if (P.q) {
+    if (!g.getQueryParameter(P.q, g.QUERY_RESULT_AVAILABLE)) return !1;
+    let ns = g.getQueryParameter(P.q, g.QUERY_RESULT);
+    (g.getParameter(P.ext.GPU_DISJOINT_EXT) || (P.gpu = P.gpu < 0 ? ns / 1e6 : P.gpu + (ns / 1e6 - P.gpu) * 0.2), g.deleteQuery(P.q), (P.q = null));
+  }
+  return ((P.q = g.createQuery()), g.beginQuery(P.ext.TIME_ELAPSED_EXT, P.q), !0);
+}
+function pdzGpuEnd() {
+  let g = gt.getContext();
+  g.endQuery(pdzPerf.ext.TIME_ELAPSED_EXT);
+}
+function pdzPerfTick(t, sim, ph, dr, bz) {
+  let P = pdzPerf;
+  if (!P.on) return;
+  ((P.t += t), (P.ph += ph), (P.dr += dr), (P.bz += bz), (P.sim += sim), P.n++, (P.acc += t));
+  if (P.acc < 0.5) return;
+  let n = P.n,
+    f = (x) => x.toFixed(1),
+    v = pdzRSize(new Vr()),
+    o = gt.getDrawingBufferSize(new Vr()),
+    mode = pdzUpOn() ? pdzUpMode() : C("нет");
+  I("perf").textContent = [
+    `${Math.round(n / P.t)} FPS · ${C("кадр")} ${f((P.t / n) * 1e3)} ${C("мс")}`,
+    `${C("физика")} ${f(P.ph / n)} ${C("мс")} · ${pdzLastN} ${C("шагов")} · ${C("скорость")} ${Math.round((P.sim / P.t) * 100)}%`,
+    `${C("рисование")} (CPU) ${f(P.dr / n)} ${C("мс")} · ${C("главный поток")} ${f(P.bz / n)} ${C("мс")}`,
+    `GPU ${P.gpu < 0 ? C("нет таймера в браузере") : f(P.gpu) + " " + C("мс")}`,
+    `3D ${Math.round((N0 / Math.max(1e-3, Wn)) * 100)}% ${v.x}×${v.y} → ${o.x}×${o.y} · ${C("масштабирование")}: ${mode}`,
+    `${Gx.name} · ${C("тени")} ${m0.castShadow ? m0.shadow.mapSize.x : C("нет")} · DPR ${(devicePixelRatio || 1).toFixed(2)}`,
+  ].join("\n");
+  P.acc = P.n = P.t = P.ph = P.dr = P.bz = P.sim = 0;
+}
+function pdzPerfToggle() {
+  ((pdzPerf.on = !pdzPerf.on), (I("perf").hidden = !pdzPerf.on), pdzPerf.on || (I("perf").textContent = ""));
 }
 // ---------- render small, upscale sharp ----------
 // When the GPU cannot keep up, the 3D view is drawn at a lower resolution than the screen (the frame rate
@@ -21452,11 +21537,26 @@ function pdzRender() {
 // texels so it cannot ring; then a light sharpen against the plain bilinear value. Before, the browser
 // stretched a small canvas bilinearly, which is where the blur and the pixel mess came from. Buttons and text
 // are HTML and stay at the screen's full resolution either way.
-var pdzUp = { rt: null, mat: null, scene: null, cam: null, w: 0, h: 0, sharp: 0.3 },
+// Three ways, a setting: Off (the canvas itself at the lower resolution, stretched by the browser: costs
+// nothing, blurry), Fast (bilinear plus a contrast-adaptive sharpen after AMD CAS: five reads a pixel, for
+// phones) and Quality (the EASU pass below: fourteen reads, for computers). Auto picks by device and preset.
+var pdzUp = { rt: null, mat: null, cas: null, scene: null, cam: null, quad: null, w: 0, h: 0, sharp: 0.3 },
   pdzUpV = new Vr();
-// the canvas resolution: the preset's screen resolution, or more when the view is supersampled
+function pdzUpPref() {
+  try {
+    return localStorage.getItem("pdz-up") || "auto";
+  } catch {
+    return "auto";
+  }
+}
+function pdzUpMode() {
+  let p = pdzUpPref();
+  return p !== "auto" ? p : Oe ? (Gx.name === "low" ? "off" : Gx.name === "medium" ? "fast" : "quality") : Gx.name === "low" ? "fast" : "quality";
+}
+// the canvas resolution: the preset's screen resolution (or more when the view is supersampled); with the
+// upscaler off, the 3D view's own
 function pdzOutPR() {
-  return Math.max(Wn, N0);
+  return pdzUpMode() === "off" ? N0 : Math.max(Wn, N0);
 }
 function pdzUpOn() {
   return N0 < pdzOutPR() * 0.97 && !Kr;
@@ -21473,8 +21573,8 @@ function pdzUpSize() {
   if (!pdzUp.rt) {
     // drawn straight in display colours (tone-mapped, sRGB) into 8 bits: three applies both when the target
     // is flagged as an XR one; the upscaler wants perceptual values anyway
-    // multisampling in an offscreen target is resolved through memory, which a phone GPU pays for: 2x there
-    let t = new ga.WebGLRenderTarget(w, h, { samples: gt.getContext().getContextAttributes().antialias ? (Oe ? 2 : 4) : 0, minFilter: ga.LinearFilter, magFilter: ga.LinearFilter, generateMipmaps: !1, depthBuffer: !0 });
+    // multisampling in an offscreen target is resolved through memory, which a phone GPU pays for: none there
+    let t = new ga.WebGLRenderTarget(w, h, { samples: !Oe && gt.getContext().getContextAttributes().antialias ? 4 : 0, minFilter: ga.LinearFilter, magFilter: ga.LinearFilter, generateMipmaps: !1, depthBuffer: !0 });
     ((t.texture.colorSpace = ga.SRGBColorSpace), (t.texture.internalFormat = "RGBA8"), (t.isXRRenderTarget = !0), (pdzUp.rt = t));
     ((pdzUp.mat = new ga.ShaderMaterial({
       uniforms: { tSrc: { value: null }, uIn: { value: new ga.Vector4() }, uSharp: { value: pdzUp.sharp }, uAA: { value: 0 } },
@@ -21484,25 +21584,46 @@ function pdzUpSize() {
       depthWrite: !1,
       toneMapped: !1,
     })),
+      (pdzUp.cas = new ga.ShaderMaterial({
+        uniforms: { tSrc: { value: null }, uIn: { value: new ga.Vector4() }, uSharp: { value: pdzUp.sharp } },
+        vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+        fragmentShader: pdzCasFS,
+        depthTest: !1,
+        depthWrite: !1,
+        toneMapped: !1,
+      })),
       (pdzUp.scene = new ga.Scene()),
       (pdzUp.cam = new ga.OrthographicCamera(-1, 1, 1, -1, 0, 1)));
-    let q = new ga.Mesh(new ga.PlaneGeometry(2, 2), pdzUp.mat);
+    let q = (pdzUp.quad = new ga.Mesh(new ga.PlaneGeometry(2, 2), pdzUp.mat));
     ((q.frustumCulled = !1), pdzUp.scene.add(q));
   }
   (pdzUp.w !== w || pdzUp.h !== h) && (pdzUp.rt.setSize(w, h), (pdzUp.w = w), (pdzUp.h = h));
 }
 function pdzUpDraw(t) {
   pdzUpSize();
-  let m = pdzUp.mat,
+  let m = pdzUpMode() === "fast" ? pdzUp.cas : pdzUp.mat,
     w = t.image.width,
     h = t.image.height;
-  ((m.uniforms.tSrc.value = t),
+  ((pdzUp.quad.material = m),
+    (m.uniforms.tSrc.value = t),
     m.uniforms.uIn.value.set(w, h, 1 / w, 1 / h),
     (m.uniforms.uSharp.value = pdzUp.sharp),
-    (m.uniforms.uAA.value = Px.on && Px.composer ? 0 : pdzUp.rt.samples ? 0 : 1),
+    m.uniforms.uAA && (m.uniforms.uAA.value = Px.on && Px.composer ? 0 : pdzUp.rt.samples ? 0 : 1),
     gt.setRenderTarget(null),
     gt.render(pdzUp.scene, pdzUp.cam));
 }
+// Fast: one bilinear read at the pixel and four a source texel away; sharpened by how much headroom the
+// neighbourhood leaves (strong on soft detail, gentle on hard edges, so no halos)
+var pdzCasFS = `uniform sampler2D tSrc; uniform vec4 uIn; uniform float uSharp; varying vec2 vUv;
+void main() {
+  vec2 d = uIn.zw;
+  vec3 c = texture2D(tSrc, vUv).rgb,
+    n = texture2D(tSrc, vUv + vec2(0.0, d.y)).rgb, s = texture2D(tSrc, vUv - vec2(0.0, d.y)).rgb,
+    e = texture2D(tSrc, vUv + vec2(d.x, 0.0)).rgb, w = texture2D(tSrc, vUv - vec2(d.x, 0.0)).rgb;
+  vec3 mn = min(c, min(min(n, s), min(e, w))), mx = max(c, max(max(n, s), max(e, w)));
+  vec3 wt = -sqrt(clamp(min(mn, 1.0 - mx) / max(mx, vec3(1e-4)), 0.0, 1.0)) * mix(0.125, 0.2, uSharp);
+  gl_FragColor = vec4(clamp((c + (n + s + e + w) * wt) / (1.0 + 4.0 * wt), 0.0, 1.0), 1.0);
+}`;
 var pdzEasuFS = `uniform sampler2D tSrc; uniform vec4 uIn; uniform float uSharp, uAA; varying vec2 vUv;
 vec3 T(vec2 p) { return texture2D(tSrc, p * uIn.zw).rgb; }
 float L(vec3 c) { return c.g + 0.5 * (c.r + c.b); }
@@ -23304,17 +23425,19 @@ function Cn(e) {
       requestAnimationFrame(Cn));
     return;
   }
+  let c0 = performance.now();
   (jc(t), Gc(), Qs(t), ni(t));
-  let a = pdzSimDt(t) * ot.cur;
-  (a > 1e-6 && yl(a),
-    v0(() => a1(t)),
-    r1(),
-    Ce.on && Ji(t),
-    Eo(t),
-    v0(() => _l(t)),
-    Gl(t),
-    ql(t),
-    requestAnimationFrame(Cn));
+  let a = pdzSimDt(t) * ot.cur,
+    c1 = performance.now();
+  a > 1e-6 && yl(a);
+  let c2 = performance.now();
+  (v0(() => a1(t)), r1(), Ce.on && Ji(t), Eo(t));
+  let c3 = performance.now();
+  (v0(() => _l(t)), Gl(t), ql(t));
+  let c4 = performance.now();
+  // the main thread's work apart from the physics, for the physics budget and the readout
+  // (a frame that compiled shaders counts as at most 50 ms, so one hitch does not hold the budget down)
+  ((pdzBusy0 += (Math.min(50, c4 - c0 - (c2 - c1)) - pdzBusy0) * 0.1), pdzPerfTick(t, a, c2 - c1, c3 - c2, c4 - c0), requestAnimationFrame(Cn));
 }
 async function Hc() {
   let e = await tl(await el(I("car-glb").textContent)),
@@ -24227,6 +24350,24 @@ function Qc() {
     "{} узлов": "{} nodes",
     "держит до {} кН": "holds up to {} kN",
     "Нажмите «назад» ещё раз, чтобы выйти": "Press back again to exit",
+    "Кадров в секунду (нажмите — замеры производительности)": "Frames per second (tap for performance readout)",
+    Масштабирование: "Upscaling",
+    масштабирование: "upscaling",
+    Авто: "Auto",
+    Выкл: "Off",
+    Быстрое: "Fast",
+    Качество: "Quality",
+    "Когда устройство не успевает, 3D рисуется в меньшем разрешении и растягивается на экран. Быстрое — лёгкая резкость (для телефонов), Качество — как FSR (для компьютеров), Выкл — без лишнего прохода: быстрее всего, но мягче. Нажмите на счётчик кадров, чтобы увидеть замеры.":
+      "When the device can't keep up, the 3D view is drawn at a lower resolution and stretched to the screen. Fast adds a light sharpen (phones), Quality is FSR-like (computers), Off skips the extra pass: fastest, but softer. Tap the frame counter to see measurements.",
+    кадр: "frame",
+    мс: "ms",
+    физика: "physics",
+    шагов: "steps",
+    скорость: "speed",
+    рисование: "drawing",
+    "главный поток": "main thread",
+    "нет таймера в браузере": "no timer in this browser",
+    тени: "shadows",
   };
 }
 function Jc() {
@@ -24337,6 +24478,24 @@ function pdzWakeOn() {
       addEventListener("pointerdown", arm, !0));
   }
   (addEventListener("pointerdown", pdzWakeOn, !0), addEventListener("keydown", pdzWakeOn, !0), document.addEventListener("visibilitychange", pdzWakeOn));
+})();
+// the FPS number opens the performance readout; the upscaler choice in the graphics settings
+(() => {
+  I("s-fps").addEventListener("click", () => (pdzPerfToggle(), lt.focus()));
+  let e = I("s-up");
+  if (!e) return;
+  let ui = () => {
+    for (let b of e.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.up === pdzUpPref()));
+  };
+  (ui(),
+    e.addEventListener("click", (t) => {
+      let b = t.target.closest("button");
+      if (!b) return;
+      try {
+        localStorage.setItem("pdz-up", b.dataset.up);
+      } catch {}
+      (ui(), Ta());
+    }));
 })();
 </script>
 </body>
