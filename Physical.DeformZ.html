@@ -2390,12 +2390,32 @@ body.gar-edit .menu-shade {
     height: 60vh;
     gap: 7px;
   }
-  .gar-pane .menu-head,
+  .gar-pane .menu-head h2,
   .gar-pane #g-go small {
     display: none;
   }
+  /* the way back to the main menu stays, small, above the car picker */
+  .gar-pane .menu-head {
+    margin: 0;
+  }
+  .gar-pane #m-gback {
+    height: 34px;
+    padding: 0 14px;
+    font-size: 12px;
+  }
+  /* the credit line moves out of the play button's way while the editor is open */
+  body.gar-edit #credit {
+    left: auto;
+    right: calc(var(--pad) + env(safe-area-inset-right, 0px));
+    max-width: 44vw;
+    text-align: right;
+  }
   .gar-pane #g-go {
     height: 46px;
+  }
+  /* only the tab body gives way when the panel is short */
+  .gar-pane > :not(.gar-body) {
+    flex-shrink: 0;
   }
   .gar-pick .gar-arrow {
     height: 48px;
@@ -7466,6 +7486,11 @@ vec2 pdzVogel( int i, int n, float phi ) {
 	float r = sqrt( ( float( i ) + 0.5 ) / float( n ) ), th = float( i ) * 2.39996323 + phi;
 	return vec2( cos( th ), sin( th ) ) * r;
 }
+float pdzBil( sampler2D sm, vec2 size, vec3 p ) {
+	vec2 t = p.xy * size - 0.5, f = fract( t ), b = ( floor( t ) + 0.5 ) / size, d = 1.0 / size;
+	return mix( mix( step( p.z, unpackRGBAToDepth( texture2D( sm, b ) ) ), step( p.z, unpackRGBAToDepth( texture2D( sm, b + vec2( d.x, 0.0 ) ) ) ), f.x ),
+		mix( step( p.z, unpackRGBAToDepth( texture2D( sm, b + vec2( 0.0, d.y ) ) ) ), step( p.z, unpackRGBAToDepth( texture2D( sm, b + d ) ) ), f.x ), f.y );
+}
 float pdzDirShadow( sampler2D sm, vec2 size, float intensity, float bias, float radius, vec4 sc ) {
 #if defined( SHADOWMAP_TYPE_PCF )
 	vec3 p = sc.xyz / sc.w;
@@ -7491,6 +7516,14 @@ float pdzDirShadow( sampler2D sm, vec2 size, float intensity, float bias, float 
 		s += step( p.z + dot( g, o ) - 2e-4, unpackRGBAToDepth( texture2D( sm, p.xy + o ) ) );
 	}
 	return mix( 1.0, s / float( PDZ_FILTER ), intensity );
+#elif defined( SHADOWMAP_TYPE_PCF_SOFT )
+	// Low and Medium: a bilinear-weighted 2x2 compare (4 reads; 8 on a 2048 map, two of them half a texel
+	// apart for a wider edge) instead of three's 16, which on a phone ran on every lit pixel
+	vec3 p = sc.xyz / sc.w;
+	p.z += bias;
+	if ( p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || p.z > 1.0 ) return 1.0;
+	float s = size.x > 1500.0 ? 0.5 * ( pdzBil( sm, size, p + vec3( 0.5, 0.25, 0.0 ) / vec3( size, 1.0 ) ) + pdzBil( sm, size, p - vec3( 0.5, 0.25, 0.0 ) / vec3( size, 1.0 ) ) ) : pdzBil( sm, size, p );
+	return mix( 1.0, s, intensity );
 #else
 	return getShadow( sm, size, intensity, bias, radius, sc );
 #endif
@@ -7517,6 +7550,41 @@ ie.fog = new D1(Sk.horizon.clone(), 140, 520);
 var fe = new U1(58, 1, 0.1, 1500);
 fe.position.set(-6, 3, -8);
 var xu = new C1(gt);
+// tiling fbm for the clouds: 16 lattice cells across 256 texels, five octaves
+var pdzCloudT = null;
+function pdzCloudTex() {
+  if (pdzCloudT) return pdzCloudT;
+  let N = 256,
+    d = new Uint8Array(N * N),
+    h = (x, y, P) => {
+      x = ((x % P) + P) % P;
+      y = ((y % P) + P) % P;
+      let n = Math.sin(x * 127.1 + y * 311.7 + P * 17.3) * 43758.5453;
+      return n - Math.floor(n);
+    },
+    vn = (x, y, P) => {
+      let i = Math.floor(x),
+        j = Math.floor(y),
+        f = x - i,
+        g = y - j;
+      ((f = f * f * (3 - 2 * f)), (g = g * g * (3 - 2 * g)));
+      let a = h(i, j, P),
+        b = h(i + 1, j, P),
+        c = h(i, j + 1, P),
+        e = h(i + 1, j + 1, P);
+      return a + (b - a) * f + (c - a) * g + (a - b - c + e) * f * g;
+    };
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      let s = 0,
+        a = 0.5,
+        P = 16;
+      for (let o = 0; o < 5; o++, a *= 0.5, P *= 2) s += a * vn(((x + 0.5) / N) * P + o * 0.37 * P, ((y + 0.5) / N) * P + o * 0.61 * P, P);
+      d[y * N + x] = Math.round(Math.min(1, s) * 255);
+    }
+  let t = new ga.DataTexture(d, N, N, ga.RedFormat, ga.UnsignedByteType);
+  return ((t.wrapS = t.wrapT = ga.RepeatWrapping), (t.magFilter = t.minFilter = ga.LinearFilter), (t.needsUpdate = !0), (pdzCloudT = t));
+}
 function pdzSkyMat(e) {
   return new Dn({
     side: y1,
@@ -7531,15 +7599,15 @@ function pdzSkyMat(e) {
       uClouds: Sk.clouds,
       uTime: Sk.time,
       uDisk: { value: e ? 0 : 1 },
+      uNoise: { value: pdzCloudTex() },
     },
+    // at the far plane (depth just under 1), so drawn after everything opaque it only shades the sky that shows
     vertexShader:
-      "varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }",
-    fragmentShader: `uniform vec3 uSun, uSunCol, uZenith, uHorizon, uGround; uniform float uClouds, uTime, uDisk;
+      "varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; gl_Position.z = gl_Position.w * 0.999999; }",
+    fragmentShader: `uniform vec3 uSun, uSunCol, uZenith, uHorizon, uGround; uniform float uClouds, uTime, uDisk; uniform sampler2D uNoise;
 varying vec3 vW;
-float skH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float skN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(skH(i), skH(i + vec2(1.0, 0.0)), f.x), mix(skH(i + vec2(0.0, 1.0)), skH(i + vec2(1.0, 1.0)), f.x), f.y); }
-float skF(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * skN(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s; }
+// five octaves of value noise, baked once into a tiling texture (it used to be twenty hashes a pixel)
+float skF(vec2 p) { return texture2D(uNoise, p * (1.0 / 16.0)).r; }
 void main() {
   vec3 d = normalize(vW - cameraPosition);
   float h = d.y, mu = max(dot(d, uSun), 0.0);
@@ -7562,7 +7630,7 @@ void main() {
   });
 }
 var As = new ce(new Do(900, 48, 24), pdzSkyMat(0));
-((As.frustumCulled = !1), (As.renderOrder = -1), ie.add(As));
+((As.frustumCulled = !1), (As.renderOrder = 1e3), ie.add(As));
 // image-based light: the car paint reflects this sky and a dark ground, not a studio
 var pdzEnvStudio = xu.fromScene(new d1(), 0.04).texture,
   pdzEnvSky = (() => {
@@ -11192,9 +11260,9 @@ function g2() {
     a = e.attributes.aTail.array,
     n = e.attributes.aCol.array,
     o = 0;
-  (gt.getDrawingBufferSize(ol),
+  (pdzRSize(ol),
     Y0.material.uniforms.uRes.value.set(ol.x / 2, ol.y / 2),
-    (Y0.material.uniforms.uW.value = 1.3 * gt.getPixelRatio()));
+    (Y0.material.uniforms.uW.value = 1.3 * N0));
   for (let r = 0; r < o0; r++) {
     let s = r * 16;
     if (ee.life[r] <= 0 || ee.kind[r] !== 0) {
@@ -18263,7 +18331,9 @@ function vc(e) {
 var pdzRigAcc = null,
   pdzRigF = new Float64Array(6),
   pdzRigM3 = new Float64Array(9),
-  pdzRigOn = !0;
+  // off: a car cruising as one rigid block lost the give of its body and handled differently from the soft
+  // one, so the soft body runs all the time (the stand-in is kept for tests)
+  pdzRigOn = !1;
 function pdzRigQuat(q, w, dt) {
   let [x, y, z, s] = q,
     hx = 0.5 * dt * w[0],
@@ -18571,17 +18641,34 @@ function pdzCalm(c, e) {
     }
   return ((c.wake = 0), (c.calm = busy ? 0 : (c.calm || 0) + e), c.calm > 1.5);
 }
+// physics follows the clock: a frame advances the world by its own length, in substeps no longer than
+// 1/480 s, so the beams are as stiff and as stable at 30 fps as at 60 (it used to stop at 1/60 s a frame,
+// which put a 40 fps phone in permanent slow motion: floaty jumps, soft crashes)
+var pdzStepMax = 1 / 24,
+  pdzSubCost = 0.1,
+  pdzFrameT = 1 / 60;
+// how much time this frame's physics may cover: the frame's own length, unless the solver would then take
+// more than about 60% of the frame (a phone whose CPU is the limit): there it slows down instead of stalling
+function pdzSimDt(t) {
+  pdzFrameT += (Math.min(t, 0.1) - pdzFrameT) * 0.08;
+  let want = Math.min(pdzStepMax, Math.max(H1, t)),
+    cap = Math.max(Uo, Math.floor((pdzFrameT * 1e3 * 0.6) / Math.max(0.004, pdzSubCost))) / (Uo * 60);
+  return Math.min(want, cap);
+}
 function yl(e) {
-  e = Math.min(e, No);
-  let L = je.filter((c) => !pdzCalm(c, e)),
+  e = Math.min(e, pdzStepMax);
+  let N = Math.max(1, Math.ceil(e * Uo * 60 - 1e-6)),
+    L = je.filter((c) => !pdzCalm(c, e)),
     w0 = (f) => {
       for (let c of L) (Zt(c), f(c), go(c));
       ut && Zt(ut);
     };
   w0(() => wc(e));
-  let t = e / Uo;
+  let t = e / N,
+    c0 = performance.now();
   (pdzProf.on && pdzProf.n++, w0(pdzWbPrep));
-  for (let a = 0; a < Uo; a++) (w0(() => (We.rig && We.rig.on ? pdzRigStep(t) : hc(t))), pdzTic(), L.length > 1 && Mc(), pdzToc("carcar"));
+  for (let a = 0; a < N; a++) (w0(() => (We.rig && We.rig.on ? pdzRigStep(t) : hc(t))), pdzTic(), L.length > 1 && Mc(), pdzToc("carcar"));
+  L.length && (pdzSubCost += ((performance.now() - c0) / N - pdzSubCost) * 0.1);
   (pdzTic(), (pdzDtF = e), w0(pdzWbFrame), w0(() => vc(e)), w0(() => pdzRigFrame(e)), pdzToc("vc"), Fi(e), pdzToc("Fi"), g2(), pdzToc("g2"), Vs(e), pdzToc("Vs"), Pu(e), v0(() => pdzWheelFx(e)), pdzFxTick(e), pdzToc("fx"));
 }
 var bc = 0.2,
@@ -21197,16 +21284,19 @@ function Rn() {
 function Ta() {
   let e = innerWidth,
     t = innerHeight;
-  (gt.setPixelRatio(N0),
-    gt.setSize(e, t, !1),
-    (fe.aspect = e / t),
+  let pr = pdzOutPR();
+  // a resolution step below the screen's only resizes the 3D view: the canvas is left alone (resizing it
+  // clears it, a visible hitch)
+  (gt.getPixelRatio() === pr && gt.domElement.width === Math.floor(e * pr) && gt.domElement.height === Math.floor(t * pr)) || (gt.setPixelRatio(pr), gt.setSize(e, t, !1));
+  ((fe.aspect = e / t),
     (fe.fov =
       ((e < t ? 72 : 58) + ($.mode === 2 ? 12 : 0)) *
       ($.mode >= 2 ? Be.fovK : 1)),
     (fe.near = $.mode === 2 ? 0.03 : 0.1),
     fe.updateProjectionMatrix(),
     (xi.value = (t * N0 * 0.5) / Math.tan((fe.fov * Math.PI) / 360)),
-    pdzPostSize());
+    pdzPostSize(),
+    pdzUpSize());
 }
 addEventListener("resize", Ta);
 var $l = 0,
@@ -21228,11 +21318,13 @@ function ql(e) {
           : (Sn = 0)));
 }
 // ---------- graphics quality: Low / Medium / High / Ultra ----------
+// pr: the screen resolution (device pixels per CSS pixel, at most), then the 3D view's lowest and starting
+// share of it; below the screen resolution the view is upscaled (see pdzUp), so a low share stays sharp
 var pdzGfxPresets = {
-    low: { pr: [0.55, 1], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7, trees: 0.25 },
-    medium: { pr: [0.75, 1.5], shadow: 2048, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.85, clouds: 0.8, env: 0.75, trees: 0.4 },
-    high: { pr: [1, 2], shadow: 2048, pcss: !0, soft: 1, post: !0, bloom: 0.3, fx: 1, clouds: 1, env: 0.75, trees: 0.6 },
-    ultra: { pr: [1, 2.5], shadow: 4096, pcss: !0, soft: 1.15, post: !0, bloom: 0.36, fx: 1.6, clouds: 1, env: 0.8, trees: 1 },
+    low: { pr: [1.25, 0.45, 0.7], shadow: 1024, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.6, clouds: 0, env: 0.7, trees: 0.25 },
+    medium: { pr: [1.5, 0.5, 0.8], shadow: 2048, pcss: !1, soft: 1, post: !1, bloom: 0, fx: 0.85, clouds: 0.8, env: 0.75, trees: 0.4 },
+    high: { pr: [2, 0.55, 1], shadow: 2048, pcss: !0, soft: 1, post: !0, bloom: 0.3, fx: 1, clouds: 1, env: 0.75, trees: 0.6 },
+    ultra: { pr: [2.5, 0.7, 1], shadow: 4096, pcss: !0, soft: 1.15, post: !0, bloom: 0.36, fx: 1.6, clouds: 1, env: 0.8, trees: 1 },
   },
   Gx = { name: "", fx: 1, env: 0.75 },
   Px = { on: !1, composer: null, bloom: null, grade: null, hit: 0, shake: 0, t: 0 };
@@ -21274,9 +21366,9 @@ function pdzGfxApply(e, t, u) {
     n = pdzGfxPresets[a],
     o = devicePixelRatio || 1;
   ((Gx = Object.assign({ name: a }, n)),
-    (Wn = Math.min(Math.max(o, a === "ultra" ? 1.5 : 0), n.pr[1])),
-    (ks = Math.min(Wn, n.pr[0])),
-    ji || (N0 = Wn));
+    (Wn = Math.min(Math.max(o, a === "ultra" ? 1.5 : 0), n.pr[0])),
+    (ks = Wn * n.pr[1]),
+    ji || (N0 = Wn * n.pr[2]));
   let r = n.pcss ? _1 : g1;
   if (gt.shadowMap.type !== r || m0.shadow.mapSize.x !== n.shadow) {
     ((gt.shadowMap.type = r),
@@ -21345,10 +21437,141 @@ function pdzPostSize() {
 }
 function pdzRender() {
   ((Px.t += pdzDt), (Sk.time.value = Px.t), (Px.hit *= Math.exp(-pdzDt * 4.5)));
+  let up = pdzUpOn();
   Px.on && Px.composer
-    ? ((Px.grade.uniforms.uHit.value = Px.hit), Px.composer.render(pdzDt))
-    : gt.render(ie, fe);
+    ? ((Px.grade.uniforms.uHit.value = Px.hit), (Px.composer.renderToScreen = !up), Px.composer.render(pdzDt), up && pdzUpDraw(Px.composer.readBuffer.texture))
+    : up
+      ? (gt.setRenderTarget(pdzUp.rt), gt.render(ie, fe), gt.setRenderTarget(null), pdzUpDraw(pdzUp.rt.texture))
+      : gt.render(ie, fe);
 }
+// ---------- render small, upscale sharp ----------
+// When the GPU cannot keep up, the 3D view is drawn at a lower resolution than the screen (the frame rate
+// sets how much lower) and enlarged in one pass by an edge-adaptive upscaler after AMD FidelityFX Super
+// Resolution 1 (EASU): twelve texels around the pixel, a Lanczos-like kernel stretched along the local edge
+// direction so edges stay straight instead of turning into steps, the result clamped to the nearest four
+// texels so it cannot ring; then a light sharpen against the plain bilinear value. Before, the browser
+// stretched a small canvas bilinearly, which is where the blur and the pixel mess came from. Buttons and text
+// are HTML and stay at the screen's full resolution either way.
+var pdzUp = { rt: null, mat: null, scene: null, cam: null, w: 0, h: 0, sharp: 0.3 },
+  pdzUpV = new Vr();
+// the canvas resolution: the preset's screen resolution, or more when the view is supersampled
+function pdzOutPR() {
+  return Math.max(Wn, N0);
+}
+function pdzUpOn() {
+  return N0 < pdzOutPR() * 0.97 && !Kr;
+}
+// the size of the 3D view in pixels
+function pdzRSize(e) {
+  return pdzUpOn() ? e.set(Math.max(2, Math.round(innerWidth * N0)), Math.max(2, Math.round(innerHeight * N0))) : gt.getDrawingBufferSize(e);
+}
+function pdzUpSize() {
+  if (!pdzUpOn()) return;
+  pdzRSize(pdzUpV);
+  let w = pdzUpV.x,
+    h = pdzUpV.y;
+  if (!pdzUp.rt) {
+    // drawn straight in display colours (tone-mapped, sRGB) into 8 bits: three applies both when the target
+    // is flagged as an XR one; the upscaler wants perceptual values anyway
+    // multisampling in an offscreen target is resolved through memory, which a phone GPU pays for: 2x there
+    let t = new ga.WebGLRenderTarget(w, h, { samples: gt.getContext().getContextAttributes().antialias ? (Oe ? 2 : 4) : 0, minFilter: ga.LinearFilter, magFilter: ga.LinearFilter, generateMipmaps: !1, depthBuffer: !0 });
+    ((t.texture.colorSpace = ga.SRGBColorSpace), (t.texture.internalFormat = "RGBA8"), (t.isXRRenderTarget = !0), (pdzUp.rt = t));
+    ((pdzUp.mat = new ga.ShaderMaterial({
+      uniforms: { tSrc: { value: null }, uIn: { value: new ga.Vector4() }, uSharp: { value: pdzUp.sharp }, uAA: { value: 0 } },
+      vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+      fragmentShader: pdzEasuFS,
+      depthTest: !1,
+      depthWrite: !1,
+      toneMapped: !1,
+    })),
+      (pdzUp.scene = new ga.Scene()),
+      (pdzUp.cam = new ga.OrthographicCamera(-1, 1, 1, -1, 0, 1)));
+    let q = new ga.Mesh(new ga.PlaneGeometry(2, 2), pdzUp.mat);
+    ((q.frustumCulled = !1), pdzUp.scene.add(q));
+  }
+  (pdzUp.w !== w || pdzUp.h !== h) && (pdzUp.rt.setSize(w, h), (pdzUp.w = w), (pdzUp.h = h));
+}
+function pdzUpDraw(t) {
+  pdzUpSize();
+  let m = pdzUp.mat,
+    w = t.image.width,
+    h = t.image.height;
+  ((m.uniforms.tSrc.value = t),
+    m.uniforms.uIn.value.set(w, h, 1 / w, 1 / h),
+    (m.uniforms.uSharp.value = pdzUp.sharp),
+    (m.uniforms.uAA.value = Px.on && Px.composer ? 0 : pdzUp.rt.samples ? 0 : 1),
+    gt.setRenderTarget(null),
+    gt.render(pdzUp.scene, pdzUp.cam));
+}
+var pdzEasuFS = `uniform sampler2D tSrc; uniform vec4 uIn; uniform float uSharp, uAA; varying vec2 vUv;
+vec3 T(vec2 p) { return texture2D(tSrc, p * uIn.zw).rgb; }
+float L(vec3 c) { return c.g + 0.5 * (c.r + c.b); }
+// edge direction and length from one texel's cross of neighbours, weighted by its bilinear share
+void E(inout vec2 dir, inout float len, float w, float a, float b, float c, float d, float e) {
+  float lx = max(abs(d - c), abs(c - b)), dx = d - b;
+  lx = clamp(abs(dx) / max(lx, 1e-5), 0.0, 1.0);
+  float ly = max(abs(e - c), abs(c - a)), dy = e - a;
+  ly = clamp(abs(dy) / max(ly, 1e-5), 0.0, 1.0);
+  dir += vec2(dx, dy) * w;
+  len += (lx * lx + ly * ly) * w;
+}
+void K(inout vec3 ac, inout float aw, vec2 o, vec2 dir, vec2 len, float lob, float clp, vec3 c) {
+  vec2 v = vec2(dot(o, dir), dot(o, vec2(-dir.y, dir.x))) * len;
+  float d2 = min(dot(v, v), clp);
+  float wb = 0.4 * d2 - 1.0, wa = lob * d2 - 1.0;
+  wb *= wb; wa *= wa;
+  float w = (1.5625 * wb - 0.5625) * wa;
+  ac += c * w; aw += w;
+}
+void main() {
+  vec2 pp = vUv * uIn.xy - 0.5, fp = floor(pp);
+  pp -= fp;
+  vec2 c0 = fp + 0.5;
+  vec3 b = T(c0 + vec2(0.0, -1.0)), c = T(c0 + vec2(1.0, -1.0)),
+    e = T(c0 + vec2(-1.0, 0.0)), f = T(c0), g = T(c0 + vec2(1.0, 0.0)), h = T(c0 + vec2(2.0, 0.0)),
+    i = T(c0 + vec2(-1.0, 1.0)), j = T(c0 + vec2(0.0, 1.0)), k = T(c0 + vec2(1.0, 1.0)), l = T(c0 + vec2(2.0, 1.0)),
+    n = T(c0 + vec2(0.0, 2.0)), o = T(c0 + vec2(1.0, 2.0));
+  float bL = L(b), cL = L(c), eL = L(e), fL = L(f), gL = L(g), hL = L(h), iL = L(i), jL = L(j), kL = L(k), lL = L(l), nL = L(n), oL = L(o);
+  vec2 dir = vec2(0.0);
+  float len = 0.0;
+  E(dir, len, (1.0 - pp.x) * (1.0 - pp.y), bL, eL, fL, gL, jL);
+  E(dir, len, pp.x * (1.0 - pp.y), cL, fL, gL, hL, kL);
+  E(dir, len, (1.0 - pp.x) * pp.y, fL, iL, jL, kL, nL);
+  E(dir, len, pp.x * pp.y, gL, jL, kL, lL, oL);
+  float r2 = dot(dir, dir);
+  dir = r2 < 1.0 / 32768.0 ? vec2(1.0, 0.0) : dir * inversesqrt(r2);
+  len *= 0.5;
+  len *= len;
+  float st = dot(dir, dir) / max(abs(dir.x), abs(dir.y));
+  vec2 len2 = vec2(1.0 + (st - 1.0) * len, 1.0 - 0.5 * len);
+  float lob = 0.5 - 0.29 * len, clp = 1.0 / lob;
+  vec3 ac = vec3(0.0);
+  float aw = 0.0;
+  K(ac, aw, vec2(0.0, -1.0) - pp, dir, len2, lob, clp, b);
+  K(ac, aw, vec2(1.0, -1.0) - pp, dir, len2, lob, clp, c);
+  K(ac, aw, vec2(-1.0, 1.0) - pp, dir, len2, lob, clp, i);
+  K(ac, aw, vec2(0.0, 1.0) - pp, dir, len2, lob, clp, j);
+  K(ac, aw, vec2(0.0, 0.0) - pp, dir, len2, lob, clp, f);
+  K(ac, aw, vec2(-1.0, 0.0) - pp, dir, len2, lob, clp, e);
+  K(ac, aw, vec2(1.0, 1.0) - pp, dir, len2, lob, clp, k);
+  K(ac, aw, vec2(2.0, 1.0) - pp, dir, len2, lob, clp, l);
+  K(ac, aw, vec2(2.0, 0.0) - pp, dir, len2, lob, clp, h);
+  K(ac, aw, vec2(1.0, 0.0) - pp, dir, len2, lob, clp, g);
+  K(ac, aw, vec2(1.0, 2.0) - pp, dir, len2, lob, clp, o);
+  K(ac, aw, vec2(0.0, 2.0) - pp, dir, len2, lob, clp, n);
+  vec3 mn = min(min(f, g), min(j, k)), mx = max(max(f, g), max(j, k));
+  vec3 col = clamp(ac / aw, mn, mx);
+  vec3 bl = mix(mix(f, g, pp.x), mix(j, k, pp.x), pp.y);
+  col = clamp(col + uSharp * (col - bl), mn, mx);
+  // no multisampling behind this image (weak phones): smooth the stair-steps by blending in two reads along
+  // the edge EASU found, as much as the edge is clear (FXAA-like, so an enlarged edge does not look blocky)
+  if (uAA > 0.0) {
+    vec2 P = vUv * uIn.xy, tg = vec2(-dir.y, dir.x);
+    vec3 av = 0.5 * (texture2D(tSrc, (P + tg) * uIn.zw).rgb + texture2D(tSrc, (P - tg) * uIn.zw).rgb);
+    col = mix(col, av, uAA * smoothstep(0.08, 0.6, len) * 0.6);
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
 // a hard hit: short camera shake and a lens pulse, scaled by impact speed in m/s
 function pdzImpactFx(e) {
   let t = Math.min(1, Math.max(0, (e - 4) / 12));
@@ -23082,7 +23305,7 @@ function Cn(e) {
     return;
   }
   (jc(t), Gc(), Qs(t), ni(t));
-  let a = Math.min(No, Math.max(H1, t)) * ot.cur;
+  let a = pdzSimDt(t) * ot.cur;
   (a > 1e-6 && yl(a),
     v0(() => a1(t)),
     r1(),
@@ -23156,6 +23379,14 @@ async function Kc() {
     Kr && (I("loading").hidden = !0),
     lt.focus(),
     (window.__crashlab = {
+      stepDt(dt, n = 1) {
+        for (let i = 0; i < n; i++) yl(dt);
+      },
+      physDump: () => {
+        let a = (t) => Array.from(t);
+        return { J, ke, Z: a(Z), Y: a(Y), X: a(X), Ve: a(Ve), tt: a(tt), Ke: a(Ke), st: a(st), it: a(it), Ia: a(Ia), Ft: a(Ft), bt: a($t), Gt: a(Gt), qe: a(qe), Da: a(Da), nr: a(nr), Tr: a(Tr), zr: a(zr), Ma: a(Ma), a0: a(a0), dt: v.dtPrev };
+      },
+      gfx: () => ({ gt, ie, fe, m0, Px, Gx, ka, sky: As, forest: pdzForest, three: ga, apply: pdzGfxApply, render: pdzRender, lockRes: Vi, setPR: (x) => ((N0 = x), Ta()), get N0() { return N0; } }),
       get car() {
         return i0;
       },
@@ -23995,6 +24226,7 @@ function Qc() {
     "{} креплений": "{} mounts",
     "{} узлов": "{} nodes",
     "держит до {} кН": "holds up to {} kN",
+    "Нажмите «назад» ещё раз, чтобы выйти": "Press back again to exit",
   };
 }
 function Jc() {
@@ -24061,6 +24293,51 @@ function Zc() {
   }
 }
 Zc();
+// ---------- as an Android app ----------
+// The page runs unchanged inside an app wrapper (Capacitor, Cordova or any WebView). There the Android back
+// button does what Esc does (closes what is open, pauses the drive) and leaves the app only from the main
+// menu, on a second press; and the screen stays on while driving, as touch input does not keep it awake.
+var pdzExitT = 0,
+  pdzWake = null;
+function pdzAtMain() {
+  return I0 === "menu" && !I("menu-main").hidden && I("settings").hidden && !Re.open;
+}
+function pdzBack() {
+  let main = pdzAtMain();
+  if (main) {
+    let t = performance.now();
+    if (t - pdzExitT < 2500) return !0;
+    return ((pdzExitT = t), k0(C("Нажмите «назад» ещё раз, чтобы выйти"), 2500), !1);
+  }
+  return (document.body.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape", key: "Escape", bubbles: !0 })), !1);
+}
+function pdzWakeOn() {
+  try {
+    I0 !== "game" || pdzWake || document.hidden || !navigator.wakeLock || navigator.wakeLock.request("screen").then((w) => ((pdzWake = w), w.addEventListener("release", () => (pdzWake = null)))).catch(() => {});
+  } catch {}
+}
+(() => {
+  let A = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (A && A.addListener) A.addListener("backButton", () => pdzBack() && A.exitApp());
+  else if (window.cordova)
+    document.addEventListener("backbutton", (e) => (e.preventDefault(), pdzBack() && navigator.app && navigator.app.exitApp()), !1);
+  else if (/; wv\)/.test(navigator.userAgent) || matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches) {
+    // a plain WebView steps back through the page's history: keep one entry in hand to catch the button
+    let arm = () => {
+      try {
+        (history.state && history.state.pdz) || history.pushState({ pdz: 1 }, "");
+      } catch {}
+    };
+    (arm(),
+      addEventListener("popstate", () => {
+        // from the main menu the entry is not put back, so the next press leaves the app
+        let main = pdzAtMain();
+        (pdzBack(), main || arm());
+      }),
+      addEventListener("pointerdown", arm, !0));
+  }
+  (addEventListener("pointerdown", pdzWakeOn, !0), addEventListener("keydown", pdzWakeOn, !0), document.addEventListener("visibilitychange", pdzWakeOn));
+})();
 </script>
 </body>
 </html>

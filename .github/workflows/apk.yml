@@ -1,0 +1,39 @@
+# Builds an Android APK of the game (debug-signed, installable for testing) whenever the game or the
+# wrapper changes, or by hand from the Actions tab. The APK is attached to the run as an artifact.
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - Physical.DeformZ.html
+      - apk/**
+      - .github/workflows/apk.yml
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Install the wrapper
+        run: npm ci --no-audit --no-fund
+      - name: Create the Android project
+        run: npm run android:add
+      - name: Build the APK
+        run: npm run apk:debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Physical.DeformZ-apk
+          path: apk/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
