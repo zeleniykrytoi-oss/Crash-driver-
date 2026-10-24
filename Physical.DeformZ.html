@@ -188,7 +188,8 @@ input[type="range"] {
   accent-color: var(--yellow);
 }
 #settings input[type="range"],
-#play-bar input[type="range"] {
+#play-bar input[type="range"],
+.gar-pane input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   height: 24px;
@@ -196,13 +197,15 @@ input[type="range"] {
   cursor: pointer;
 }
 #settings input[type="range"]::-webkit-slider-runnable-track,
-#play-bar input[type="range"]::-webkit-slider-runnable-track {
+#play-bar input[type="range"]::-webkit-slider-runnable-track,
+.gar-pane input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   background: linear-gradient(90deg, rgba(255, 205, 28, 0.55), rgba(255, 255, 255, 0.14));
   transform: skewX(-20deg);
 }
 #settings input[type="range"]::-webkit-slider-thumb,
-#play-bar input[type="range"]::-webkit-slider-thumb {
+#play-bar input[type="range"]::-webkit-slider-thumb,
+.gar-pane input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 12px;
   height: 20px;
@@ -212,17 +215,20 @@ input[type="range"] {
   box-shadow: 0 0 10px rgba(255, 205, 28, 0.6);
 }
 #settings input[type="range"]::-moz-range-track,
-#play-bar input[type="range"]::-moz-range-track {
+#play-bar input[type="range"]::-moz-range-track,
+.gar-pane input[type="range"]::-moz-range-track {
   height: 4px;
   background: rgba(255, 255, 255, 0.16);
 }
 #settings input[type="range"]::-moz-range-progress,
-#play-bar input[type="range"]::-moz-range-progress {
+#play-bar input[type="range"]::-moz-range-progress,
+.gar-pane input[type="range"]::-moz-range-progress {
   height: 4px;
   background: var(--yellow);
 }
 #settings input[type="range"]::-moz-range-thumb,
-#play-bar input[type="range"]::-moz-range-thumb {
+#play-bar input[type="range"]::-moz-range-thumb,
+.gar-pane input[type="range"]::-moz-range-thumb {
   width: 10px;
   height: 18px;
   border: 0;
@@ -2072,6 +2078,350 @@ body.touch .rs .kb {
   color: var(--dim);
   max-width: 100%;
 }
+
+/* garage editor */
+.gar-pane {
+  top: calc(max(118px, 15vh) + env(safe-area-inset-top, 0px));
+  bottom: calc(max(20px, 4vh) + env(safe-area-inset-bottom, 0px));
+  transform: none;
+  gap: 10px;
+  animation: none;
+}
+.gar-name em {
+  display: block;
+  margin-top: 5px;
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.04em;
+  font-style: normal;
+  color: var(--dim);
+}
+.gar-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.gar-tabs button {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 2px 7px;
+  font: 700 10px/1 var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: rgba(10, 13, 18, 0.6);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.gar-tabs svg {
+  width: 20px;
+  height: 20px;
+}
+.gar-tabs span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gar-tabs button:hover,
+.gar-tabs button:focus-visible {
+  color: var(--fg);
+  border-color: var(--line-2);
+  outline: none;
+}
+.gar-tabs button[aria-selected="true"] {
+  color: #120d02;
+  background: var(--hot);
+  border-color: transparent;
+}
+.gar-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 12px 14px;
+  background: rgba(10, 13, 18, 0.62);
+  border: 1px solid var(--line);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 205, 28, 0.5) transparent;
+}
+.gar-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gar-tab .gar-h {
+  margin: 4px 0 -2px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chips button,
+.gbtn {
+  padding: 7px 11px 6px;
+  font: 700 11.5px/1.1 var(--font-ui);
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-2);
+  cursor: pointer;
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  transition: background 0.12s, color 0.12s;
+}
+.chips button:hover,
+.gbtn:hover,
+.chips button:focus-visible,
+.gbtn:focus-visible {
+  background: rgba(255, 205, 28, 0.16);
+  outline: none;
+}
+.chips button[aria-pressed="true"],
+.gbtn[aria-pressed="true"] {
+  color: #120d02;
+  background: var(--yellow);
+  border-color: transparent;
+}
+.chips button i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  background: var(--c, transparent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.gbtn.danger {
+  border-color: rgba(255, 77, 77, 0.5);
+}
+.gbtn.danger:hover {
+  background: rgba(255, 77, 77, 0.25);
+}
+.gar-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gar-row {
+  display: grid;
+  grid-template-columns: 112px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font: 700 11px/1.2 var(--font-ui);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.gar-row output {
+  min-width: 46px;
+  font: 600 12px/1 var(--font-data);
+  color: var(--fg);
+  text-align: right;
+}
+.gar-row input[type="color"] {
+  width: 46px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  background: none;
+  cursor: pointer;
+}
+.gar-row input[type="number"] {
+  width: 80px;
+  padding: 5px 8px;
+  font: 600 13px/1 var(--font-data);
+  color: var(--fg);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line-2);
+}
+.gar-hint {
+  margin: 0;
+  font: 500 12px/1.45 var(--font-ui);
+  color: var(--dim);
+}
+.swatches.small {
+  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  gap: 6px;
+}
+.stk-lib {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.stk-lib button {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 4px;
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0 25%, rgba(255, 255, 255, 0.02) 0 50%) 0 0 / 14px 14px, rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line-2);
+  cursor: pointer;
+}
+.stk-lib canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.stk-lib button[aria-pressed="true"] {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 2px rgba(255, 205, 28, 0.4);
+}
+.stk-lib button span {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  font: 700 8.5px/1.1 var(--font-ui);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #000;
+}
+.stk-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 205, 28, 0.35);
+  background: rgba(255, 205, 28, 0.05);
+}
+.stk-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.stk-list button {
+  width: 44px;
+  height: 44px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line-2);
+  cursor: pointer;
+}
+.stk-list button[aria-pressed="true"] {
+  border-color: var(--yellow);
+}
+.stk-list canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.tune {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.legend-j {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font: 600 11px/1.3 var(--font-ui);
+  color: var(--dim);
+}
+.legend-j span::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  background: var(--c);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+.parts-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.parts-list button {
+  display: grid;
+  gap: 3px;
+  padding: 7px 9px 6px;
+  text-align: left;
+  font: 700 12px/1.1 var(--font-ui);
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.parts-list button small {
+  font: 500 10.5px/1.2 var(--font-ui);
+  color: var(--dim);
+}
+.parts-list button[aria-pressed="true"] {
+  border-color: var(--yellow);
+  background: rgba(255, 205, 28, 0.12);
+}
+#gar-tip {
+  position: fixed;
+  z-index: 30;
+  max-width: 260px;
+  padding: 7px 10px 6px;
+  font: 600 12px/1.35 var(--font-ui);
+  color: var(--fg);
+  background: rgba(8, 10, 14, 0.92);
+  border: 1px solid rgba(255, 205, 28, 0.5);
+  pointer-events: none;
+  transform: translate(14px, -50%);
+}
+#gar-tip b {
+  color: var(--yellow);
+}
+body.gar-edit .car-card,
+body.gar-edit .menu-keys {
+  display: none;
+}
+body.gar-edit .menu-shade {
+  background:
+    linear-gradient(90deg, rgba(5, 7, 10, 0.88), rgba(5, 7, 10, 0.4) 34%, rgba(5, 7, 10, 0) 52%),
+    linear-gradient(180deg, rgba(5, 7, 10, 0.55), rgba(5, 7, 10, 0) 20%);
+}
+@media (max-width: 760px), (pointer: coarse) and (max-height: 520px) {
+  .gar-pane {
+    top: auto;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    max-height: 60vh;
+    height: 60vh;
+    gap: 7px;
+  }
+  .gar-pane .menu-head,
+  .gar-pane #g-go small {
+    display: none;
+  }
+  .gar-pane #g-go {
+    height: 46px;
+  }
+  .gar-pick .gar-arrow {
+    height: 48px;
+    width: 40px;
+  }
+  .gar-name {
+    padding: 6px;
+  }
+  .gar-name b {
+    font-size: 16px;
+    margin-top: 3px;
+  }
+  .gar-name em {
+    display: none;
+  }
+  .gar-tabs button {
+    padding: 6px 1px 5px;
+    font-size: 8.5px;
+  }
+  .gar-row {
+    grid-template-columns: 92px 1fr auto;
+  }
+  body.gar-edit .brand {
+    display: none;
+  }
+}
 </style>
 </head>
 <body>
@@ -2214,26 +2564,82 @@ body.touch .rs .kb {
   <section class="menu-pane" id="menu-main" aria-label="Главное меню">
     <nav class="mnav">
       <button class="mbtn primary" id="m-play" type="button"><span class="mi">01</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg><span class="mt">PLAY</span><small>выбор карты</small></button>
-      <button class="mbtn" id="m-garage" type="button"><span class="mi">02</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 15.5v-2.6l2.2-4.6c.4-.8 1.1-1.3 2-1.3h8.6c.9 0 1.6.5 2 1.3l2.2 4.6v2.6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="7.5" cy="16.5" r="2" fill="currentColor"/><circle cx="16.5" cy="16.5" r="2" fill="currentColor"/></svg><span class="mt">GARAGE</span><small>машина и цвет</small></button>
+      <button class="mbtn" id="m-garage" type="button"><span class="mi">02</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 15.5v-2.6l2.2-4.6c.4-.8 1.1-1.3 2-1.3h8.6c.9 0 1.6.5 2 1.3l2.2 4.6v2.6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="7.5" cy="16.5" r="2" fill="currentColor"/><circle cx="16.5" cy="16.5" r="2" fill="currentColor"/></svg><span class="mt">GARAGE</span><small>покраска, наклейки, тюнинг</small></button>
       <button class="mbtn" id="m-set" type="button"><span class="mi">03</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="mt">SETTINGS</span><small>графика, физика, управление</small></button>
     </nav>
   </section>
-  <section class="menu-pane" id="menu-garage" aria-label="Гараж" hidden>
+  <section class="menu-pane gar-pane" id="menu-garage" aria-label="Гараж" hidden>
     <div class="menu-head"><button class="mbtn back" id="m-gback" type="button">← Назад</button><h2>Гараж</h2></div>
     <div class="gar-pick">
       <button class="gar-arrow" id="g-prev" type="button" aria-label="Предыдущая машина"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div class="gar-name"><small id="g-idx">1 / 3</small><b id="g-name">—</b></div>
+      <div class="gar-name"><small id="g-idx">1 / 3</small><b id="g-name">—</b><em id="g-spec">—</em></div>
       <button class="gar-arrow" id="g-next" type="button" aria-label="Следующая машина"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
-    <div class="gar-stats">
-      <div><span>Узлы</span><i><b id="g-st-n"></b></i><em id="g-st-nv">—</em></div>
-      <div><span>Балки</span><i><b id="g-st-b"></b></i><em id="g-st-bv">—</em></div>
-      <div><span>Стёкла</span><i><b id="g-st-g"></b></i><em id="g-st-gv">—</em></div>
+    <div class="gar-tabs" role="tablist" id="g-tabs">
+      <button type="button" role="tab" data-gt="paint" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15c3-1 4 3 7 1l7-9a2 2 0 0 0-3-3l-9 7c-2 3 2 4 1 7-1 2-4 2-5 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Покраска</span></button>
+      <button type="button" role="tab" data-gt="stk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z M15 4v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 14l2 2 4-5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>Наклейки</span></button>
+      <button type="button" role="tab" data-gt="whl"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 4v5M12 15v5M4 12h5M15 12h5" stroke="currentColor" stroke-width="2"/></svg><span>Диски</span></button>
+      <button type="button" role="tab" data-gt="tune"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v16M12 4v16M19 4v16" stroke="currentColor" stroke-width="2"/><rect x="3" y="13" width="4" height="3" fill="currentColor"/><rect x="10" y="7" width="4" height="3" fill="currentColor"/><rect x="17" y="15" width="4" height="3" fill="currentColor"/></svg><span>Тюнинг</span></button>
+      <button type="button" role="tab" data-gt="ext"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Опции</span></button>
+      <button type="button" role="tab" data-gt="insp"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg><span>Осмотр</span></button>
     </div>
-    <h3 class="gar-h">Цвет кузова</h3>
-    <div class="swatches" id="g-paint" role="group" aria-label="Цвет кузова"></div>
+    <div class="gar-body">
+      <div class="gar-tab" data-gt="paint">
+        <h3 class="gar-h">Что красим</h3>
+        <div class="chips" id="g-ptarget" role="group" aria-label="Что красим"></div>
+        <h3 class="gar-h">Цвет</h3>
+        <div class="swatches" id="g-paint" role="group" aria-label="Цвет"></div>
+        <label class="gar-row">Свой цвет <input type="color" id="g-pick" value="#16357a"></label>
+        <h3 class="gar-h">Отделка краски</h3>
+        <div class="chips" id="g-fin" role="group" aria-label="Отделка краски"></div>
+        <button class="gbtn" id="g-preset" type="button">Сбросить покраску</button>
+      </div>
+      <div class="gar-tab" data-gt="stk" hidden>
+        <div class="stk-lib" id="g-stk-lib" role="group" aria-label="Наклейки"></div>
+        <p class="gar-hint" id="g-stk-hint">Выберите наклейку и нажмите на кузов, чтобы приклеить. Наклейка мнётся вместе с панелью.</p>
+        <div class="stk-edit" id="g-stk-edit" hidden>
+          <label class="gar-row">Размер <input type="range" id="g-stk-s" min="0.12" max="1.4" step="0.01"></label>
+          <label class="gar-row">Поворот <input type="range" id="g-stk-r" min="-3.1416" max="3.1416" step="0.01"></label>
+          <label class="gar-row" id="g-stk-numrow">Номер <input type="number" id="g-stk-num" min="0" max="999" value="7"></label>
+          <div class="swatches small" id="g-stk-c" role="group" aria-label="Цвет наклейки"></div>
+          <div class="gar-btns"><button class="gbtn" id="g-stk-m" type="button" aria-pressed="false">Зеркально на другой бок</button><button class="gbtn" id="g-stk-mv" type="button" aria-pressed="false">Переклеить</button><button class="gbtn danger" id="g-stk-del" type="button">Удалить</button></div>
+        </div>
+        <div class="stk-list" id="g-stk-list"></div>
+        <button class="gbtn" id="g-stk-clear" type="button">Снять все наклейки</button>
+      </div>
+      <div class="gar-tab" data-gt="whl" hidden>
+        <h3 class="gar-h">Дизайн</h3>
+        <div class="chips" id="g-rim" role="group" aria-label="Дизайн дисков"></div>
+        <h3 class="gar-h">Цвет дисков</h3>
+        <div class="swatches" id="g-rimc" role="group" aria-label="Цвет дисков"></div>
+        <h3 class="gar-h">Суппорты</h3>
+        <div class="swatches" id="g-cal" role="group" aria-label="Цвет суппортов"></div>
+      </div>
+      <div class="gar-tab" data-gt="tune" hidden>
+        <div class="tune" id="g-tune"></div>
+        <p class="gar-hint">Настройки сохраняются для этой машины и действуют в заезде.</p>
+        <button class="gbtn" id="g-tune-reset" type="button">Заводские настройки</button>
+      </div>
+      <div class="gar-tab" data-gt="ext" hidden>
+        <h3 class="gar-h">Тонировка стёкол</h3>
+        <div class="chips" id="g-tint" role="group" aria-label="Тонировка"></div>
+        <h3 class="gar-h">Фары</h3>
+        <div class="chips" id="g-light" role="group" aria-label="Цвет фар"></div>
+        <h3 class="gar-h">Подсветка днища</h3>
+        <div class="swatches" id="g-glow" role="group" aria-label="Подсветка днища"></div>
+      </div>
+      <div class="gar-tab" data-gt="insp" hidden>
+        <label class="gar-row">Разнести детали <input type="range" id="g-ex" min="0" max="1" step="0.01" value="0"></label>
+        <div class="gar-btns"><button class="gbtn" id="g-bolts" type="button" aria-pressed="false">Крепёж</button><button class="gbtn" id="g-xray" type="button" aria-pressed="false">Каркас из балок</button></div>
+        <div class="legend-j" id="g-jleg"></div>
+        <h3 class="gar-h">Детали</h3>
+        <div class="parts-list" id="g-parts"></div>
+        <p class="gar-hint">Наведите на болт или петлю, чтобы увидеть, что она держит и при какой силе сорвётся. Нажмите на деталь, чтобы осмотреть её отдельно.</p>
+      </div>
+    </div>
     <button class="mbtn primary" id="g-go" type="button"><span class="mi">▶</span><span class="mt">PLAY</span><small>выбор карты</small></button>
   </section>
+  <div id="gar-tip" hidden></div>
   <section class="menu-pane" id="menu-maps" aria-label="Выбор карты" hidden>
     <div class="menu-head"><button class="mbtn back" id="m-back" type="button">← Назад</button><h2>Карта</h2></div>
     <div class="maps">
@@ -7673,7 +8079,9 @@ var ia = (e, t, a = 8) => {
   }
   return o;
 };
+var pdzLabels = [];
 function tn(e, t, a, n = 0) {
+  if (pdzLabels) return void pdzLabels.push([e, t, a, n]);
   let o = St(512, 128, (s, i, l) => {
       (s.clearRect(0, 0, i, l),
         (s.fillStyle = "#f2f0e6"),
@@ -10999,8 +11407,10 @@ function cn(e) {
   );
 }
 var Nr = new mt().makeRotationZ(-Math.PI / 2);
-function M2(e, t) {
-  let a = ga,
+function M2(e, t, sty = 0) {
+  // rim designs: twin five-spoke, sport five, mesh, pressed steel, turbine
+  let SW = [1, 2.3, 0.55, 1, 0.75][sty] || 1,
+    a = ga,
     n = t / 2,
     o = e * 0.64,
     r = (x, A) => new Vr(x, A),
@@ -11029,10 +11439,10 @@ function M2(e, t) {
   let c = [],
     u = n * 0.55,
     d = new ls([
-      r(e * 0.2, -e * 0.05),
-      r(o * 0.97, -e * 0.034),
-      r(o * 0.97, e * 0.034),
-      r(e * 0.2, e * 0.05),
+      r(e * 0.2, -e * 0.05 * SW),
+      r(o * 0.97, -e * 0.034 * SW),
+      r(o * 0.97, e * 0.034 * SW),
+      r(e * 0.2, e * 0.05 * SW),
     ]),
     h = new ns(d, {
       depth: e * 0.05,
@@ -11042,12 +11452,18 @@ function M2(e, t) {
       bevelSegments: 2,
       curveSegments: 1,
     });
-  for (let x = 0; x < 10; x++) {
-    let A = ((x >> 1) / 5) * Math.PI * 2 + (x & 1 ? 0.13 : -0.13),
+  let NS = [10, 5, 16, 0, 14][sty] ?? 10,
+    tw = sty === 4 ? 0.55 : 0;
+  for (let x = 0; x < NS; x++) {
+    let A = sty === 0 ? ((x >> 1) / 5) * Math.PI * 2 + (x & 1 ? 0.13 : -0.13) : (x / NS) * Math.PI * 2,
       R = new He(0, Math.cos(A), Math.sin(A)),
-      S = new He(0, -Math.sin(A), Math.cos(A));
-    c.push([h.clone(), s(u, new mt().makeBasis(R, S, new He(1, 0, 0)))]);
+      S0 = new He(0, -Math.sin(A), Math.cos(A)),
+      S = S0.clone().multiplyScalar(Math.cos(tw)).add(new He(Math.sin(tw), 0, 0)),
+      Zx = new He(Math.cos(tw), 0, 0).add(S0.clone().multiplyScalar(-Math.sin(tw)));
+    c.push([h.clone(), s(u, new mt().makeBasis(R, S, Zx))]);
   }
+  // pressed steel: a dished disc and a raised ring
+  sty === 3 && c.push([new a.CylinderGeometry(o * 0.95, o * 0.95, e * 0.035, 48), s(u + e * 0.02, Nr)], [new a.TorusGeometry(o * 0.62, e * 0.03, 8, 48), s(u + e * 0.04, new mt().makeRotationY(Math.PI / 2))]);
   h.dispose();
   let p = cn([
       ...c,
@@ -11961,263 +12377,373 @@ var pe = {
     ctr: { value: new He() },
   },
   I0 = "game";
+// ---------- the garage: a working workshop round the car ----------
+// Concrete floor with a painted bay and old oil stains, block walls with a dark skirting, a roll-up door,
+// a two-post lift, a workbench under a pegboard of tools, a tool chest, a tyre rack, shelving, drums, jacks,
+// an engine on a stand and fluorescent tubes overhead. Everything static is merged per material at the end.
+function pdzGarageTex() {
+  let r = y0(77),
+    T = {};
+  T.floor = St(1024, 1024, (c, w, h) => {
+    g0(c, w, h, [118, 118, 114], 0.16, 5);
+    for (let i = 0; i < 70; i++) {
+      let x = r() * w,
+        y = r() * h,
+        s = 40 + r() * 160,
+        g = c.createRadialGradient(x, y, 0, x, y, s),
+        d = r() < 0.5;
+      (g.addColorStop(0, d ? "rgba(40,38,34,0.16)" : "rgba(255,255,250,0.07)"), g.addColorStop(1, "rgba(0,0,0,0)"), (c.fillStyle = g), c.fillRect(x - s, y - s, s * 2, s * 2));
+    }
+    // old oil stains: a few overlapping soft blots each
+    for (let i = 0; i < 8; i++) {
+      let x = r() * w,
+        y = r() * h;
+      for (let j = 0; j < 4; j++) {
+        let q = 14 + r() * 34,
+          px = x + (r() - 0.5) * 50,
+          py = y + (r() - 0.5) * 30,
+          g = c.createRadialGradient(px, py, 0, px, py, q);
+        (g.addColorStop(0, `rgba(14,12,10,${0.2 + r() * 0.15})`), g.addColorStop(0.7, "rgba(14,12,10,0.08)"), g.addColorStop(1, "rgba(14,12,10,0)"), (c.fillStyle = g));
+        (c.save(), c.translate(px, py), c.scale(1, 0.65), c.translate(-px, -py), c.fillRect(px - q, py - q, q * 2, q * 2), c.restore());
+      }
+    }
+    ((c.strokeStyle = "rgba(20,20,20,0.08)"), (c.lineWidth = 14));
+    for (let i = 0; i < 4; i++) (c.beginPath(), c.moveTo(0, r() * h), c.bezierCurveTo(w * 0.3, r() * h, w * 0.6, r() * h, w, r() * h), c.stroke());
+    // saw-cut joints between slabs
+    ((c.fillStyle = "rgba(30,30,28,0.55)"), c.fillRect(0, 0, w, 3), c.fillRect(0, 0, 3, h), (c.fillStyle = "rgba(255,255,255,0.08)"), c.fillRect(0, 3, w, 2), c.fillRect(3, 0, 2, h));
+  });
+  T.floor.repeat.set(4, 4);
+  T.wall = St(512, 1024, (c, w, h) => {
+    g0(c, w, h, [196, 198, 196], 0.06, 9);
+    // block courses above a dark painted skirting with a yellow-and-black band
+    let k = h * 0.76;
+    ((c.fillStyle = "rgba(60,60,60,0.35)"));
+    for (let y = 0; y < k; y += 32) {
+      c.fillRect(0, y, w, 3);
+      for (let x = (y / 32) % 2 ? 0 : 64; x < w; x += 128) c.fillRect(x, y, 3, 32);
+    }
+    ((c.fillStyle = "#2e3236"), c.fillRect(0, k, w, h - k));
+    let b = k - 22;
+    ((c.fillStyle = "#151515"), c.fillRect(0, b, w, 22), (c.fillStyle = "#e3a50c"));
+    for (let x = -40; x < w + 40; x += 44) (c.beginPath(), c.moveTo(x, b + 22), c.lineTo(x + 22, b + 22), c.lineTo(x + 44, b), c.lineTo(x + 22, b), c.closePath(), c.fill());
+    ((c.fillStyle = "rgba(0,0,0,0.25)"), c.fillRect(0, h - 10, w, 10));
+  });
+  T.door = St(512, 512, (c, w, h) => {
+    g0(c, w, h, [168, 172, 176], 0.08, 3);
+    for (let y = 0; y < h; y += 32) {
+      let g = c.createLinearGradient(0, y, 0, y + 32);
+      (g.addColorStop(0, "rgba(255,255,255,0.18)"), g.addColorStop(0.5, "rgba(0,0,0,0)"), g.addColorStop(0.92, "rgba(0,0,0,0.35)"), g.addColorStop(1, "rgba(0,0,0,0.6)"), (c.fillStyle = g), c.fillRect(0, y, w, 32));
+    }
+  });
+  T.peg = St(1024, 512, (c, w, h) => {
+    ((c.fillStyle = "#8a7258"), c.fillRect(0, 0, w, h), (c.fillStyle = "rgba(30,20,10,0.75)"));
+    for (let y = 12; y < h; y += 24) for (let x = 12; x < w; x += 24) (c.beginPath(), c.arc(x, y, 3, 0, 6.3), c.fill());
+    // tools hanging on the board, each with its painted outline
+    let tool = (x, y, s, f) => {
+      (c.save(), c.translate(x, y), c.scale(s, s), (c.fillStyle = "rgba(255,255,255,0.18)"), c.translate(4, 4), f(!0), c.restore());
+      (c.save(), c.translate(x, y), c.scale(s, s), f(!1), c.restore());
+    };
+    let wrench = (sh) => {
+      ((c.fillStyle = sh ? c.fillStyle : "#b8bec6"), c.fillRect(-6, 0, 12, 150), c.beginPath(), c.arc(0, -8, 20, 0, 6.3), c.fill(), c.beginPath(), c.arc(0, 160, 14, 0, 6.3), c.fill());
+      sh || ((c.fillStyle = "#8a7258"), c.fillRect(-7, -32, 14, 22));
+    };
+    for (let i = 0; i < 7; i++) tool(60 + i * 46, 70, 0.55 + i * 0.07, wrench);
+    let hammer = (sh) => {
+      ((c.fillStyle = sh ? c.fillStyle : "#6b4a2e"), c.fillRect(-7, 0, 14, 180), (c.fillStyle = sh ? "rgba(255,255,255,0.18)" : "#3d4248"), c.fillRect(-40, -18, 80, 30));
+    };
+    (tool(470, 90, 1, hammer), tool(560, 90, 0.85, hammer));
+    let driver = (col) => (sh) => {
+      ((c.fillStyle = sh ? c.fillStyle : col), c.fillRect(-10, 0, 20, 70), (c.fillStyle = sh ? "rgba(255,255,255,0.18)" : "#c9ccd0"), c.fillRect(-3, 70, 6, 90));
+    };
+    ["#d22", "#e8b10c", "#1b6fd1", "#2a2", "#d22", "#e8b10c"].forEach((k, i) => tool(650 + i * 34, 60, 0.9, driver(k)));
+    let pliers = (sh) => {
+      ((c.fillStyle = sh ? c.fillStyle : "#c42a20"), c.fillRect(-14, 50, 9, 110), c.fillRect(5, 50, 9, 110), (c.fillStyle = sh ? "rgba(255,255,255,0.18)" : "#9aa0a8"), c.beginPath(), c.moveTo(-14, 52), c.lineTo(0, -10), c.lineTo(14, 52), c.fill());
+    };
+    (tool(880, 70, 0.9, pliers), tool(940, 70, 0.9, pliers));
+    let saw = (sh) => {
+      ((c.fillStyle = sh ? c.fillStyle : "#c9ccd0"), c.beginPath(), c.moveTo(0, 0), c.lineTo(260, 20), c.lineTo(260, 70), c.lineTo(0, 60), c.fill(), (c.fillStyle = sh ? "rgba(255,255,255,0.18)" : "#e05a14"), c.fillRect(-60, 0, 70, 60));
+    };
+    tool(120, 330, 0.9, saw);
+    let coil = (sh) => ((c.strokeStyle = sh ? "rgba(255,255,255,0.18)" : "#e8b10c"), (c.lineWidth = 14), c.beginPath(), c.arc(0, 0, 60, 0, 6.3), c.stroke(), c.beginPath(), c.arc(0, 0, 40, 0, 6.3), c.stroke());
+    (tool(520, 360, 1, coil), tool(700, 360, 0.8, coil));
+    let tape = (sh) => ((c.fillStyle = sh ? c.fillStyle : "#f2c200"), c.fillRect(-40, -40, 80, 80), (c.fillStyle = sh ? "rgba(255,255,255,0.18)" : "#222"), c.fillRect(-14, -14, 28, 28));
+    (tool(880, 360, 0.8, tape), tool(970, 360, 0.6, tape));
+  });
+  T.drawers = St(256, 256, (c, w, h) => {
+    ((c.fillStyle = "#a8121b"), c.fillRect(0, 0, w, h));
+    for (let k = 0; k < 5; k++) ((c.fillStyle = "rgba(0,0,0,0.45)"), c.fillRect(0, 18 + k * 46, w, 4), (c.fillStyle = "#c9ccd1"), c.fillRect(w / 2 - 50, 36 + k * 46, 100, 7));
+  });
+  T.wood = St(256, 256, (c, w, h) => {
+    g0(c, w, h, [150, 108, 66], 0.12, 4);
+    c.strokeStyle = "rgba(70,40,15,0.25)";
+    for (let y = 0; y < h; y += 6) ((c.lineWidth = 1 + r() * 2), c.beginPath(), c.moveTo(0, y + r() * 4), c.bezierCurveTo(w * 0.3, y + r() * 8, w * 0.7, y - r() * 8, w, y + r() * 4), c.stroke());
+  });
+  let poster = (title, sub, a, b, art) =>
+    St(256, 384, (c, w, h) => {
+      let g = c.createLinearGradient(0, 0, 0, h);
+      (g.addColorStop(0, a), g.addColorStop(1, b), (c.fillStyle = g), c.fillRect(0, 0, w, h), art(c, w, h));
+      ((c.fillStyle = "#fff"), (c.textAlign = "center"), (c.font = 'italic 900 40px "Russo One", "Arial Black", sans-serif'), c.fillText(title, w / 2, h - 70, w - 20));
+      ((c.font = '700 18px "Exo 2", Arial, sans-serif'), (c.fillStyle = "rgba(255,255,255,0.8)"), c.fillText(sub, w / 2, h - 38, w - 20));
+      ((c.strokeStyle = "rgba(255,255,255,0.6)"), (c.lineWidth = 4), c.strokeRect(8, 8, w - 16, h - 16));
+    });
+  T.posters = [
+    poster("SOFT BODY", "RACING SERIES", "#c8102e", "#3a050c", (c, w) => {
+      ((c.fillStyle = "rgba(0,0,0,0.5)"), c.beginPath(), c.moveTo(30, 200), c.lineTo(70, 150), c.lineTo(170, 140), c.lineTo(226, 190), c.lineTo(226, 220), c.lineTo(30, 220), c.fill());
+      ((c.fillStyle = "#111"), c.beginPath(), c.arc(75, 222, 22, 0, 6.3), c.arc(185, 222, 22, 0, 6.3), c.fill());
+      ((c.fillStyle = "#ffcd1c"), (c.font = 'italic 900 90px "Russo One", "Arial Black", sans-serif'), (c.textAlign = "center"), c.fillText("07", w / 2, 110));
+    }),
+    poster("NODE & BEAM", "CRASH LAB", "#16357a", "#050b1c", (c) => {
+      ((c.strokeStyle = "rgba(140,200,255,0.8)"), (c.lineWidth = 2));
+      let p = [];
+      for (let i = 0; i < 14; i++) p.push([30 + (i % 5) * 50, 40 + Math.floor(i / 5) * 60 + (i % 2) * 18]);
+      for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) Math.hypot(p[i][0] - p[j][0], p[i][1] - p[j][1]) < 80 && (c.beginPath(), c.moveTo(...p[i]), c.lineTo(...p[j]), c.stroke());
+      c.fillStyle = "#ffcd1c";
+      for (let q of p) (c.beginPath(), c.arc(q[0], q[1], 5, 0, 6.3), c.fill());
+    }),
+    poster("SAFETY", "WEAR EYE PROTECTION", "#e3a50c", "#6b4a06", (c, w) => {
+      ((c.fillStyle = "#111"), c.beginPath(), c.moveTo(w / 2, 40), c.lineTo(w - 40, 220), c.lineTo(40, 220), c.closePath(), c.fill(), (c.fillStyle = "#e3a50c"), (c.font = '900 120px "Arial Black", sans-serif'), (c.textAlign = "center"), c.fillText("!", w / 2, 205));
+    }),
+  ];
+  T.sign = St(1024, 160, (c, w, h) => {
+    (c.clearRect(0, 0, w, h), (c.font = 'italic 400 96px "Russo One", "Arial Black", sans-serif'), (c.textBaseline = "middle"), (c.textAlign = "center"));
+    ((c.shadowColor = "rgba(255,205,28,0.9)"), (c.shadowBlur = 24), (c.fillStyle = "#fff6d8"), c.fillText("DEFORMZ GARAGE", w / 2, h / 2 + 4));
+  });
+  T.clock = St(128, 128, (c, w) => {
+    ((c.fillStyle = "#f4f4f0"), c.beginPath(), c.arc(64, 64, 62, 0, 6.3), c.fill(), (c.strokeStyle = "#222"), (c.lineWidth = 6), c.stroke());
+    for (let i = 0; i < 12; i++) {
+      let a = (i / 12) * 6.28;
+      ((c.lineWidth = i % 3 ? 2 : 5), c.beginPath(), c.moveTo(64 + Math.sin(a) * 48, 64 - Math.cos(a) * 48), c.lineTo(64 + Math.sin(a) * 56, 64 - Math.cos(a) * 56), c.stroke());
+    }
+    ((c.lineWidth = 5), c.beginPath(), c.moveTo(64, 64), c.lineTo(64 + 26, 64 - 18), c.stroke(), (c.lineWidth = 3), c.beginPath(), c.moveTo(64, 64), c.lineTo(64 - 10, 64 - 44), c.stroke());
+  });
+  T.drum = St(256, 128, (c, w, h) => {
+    g0(c, w, h, [255, 255, 255], 0.05, 2);
+    ((c.fillStyle = "rgba(255,255,255,0.85)"), c.fillRect(0, h * 0.38, w, h * 0.24), (c.fillStyle = "#222"), (c.font = '900 22px "Arial Black", sans-serif'), (c.textAlign = "center"), (c.textBaseline = "middle"), c.fillText("MOTOR OIL  ·  10W-40", w / 2, h / 2));
+  });
+  T.box = St(128, 128, (c, w, h) => {
+    (g0(c, w, h, [176, 136, 92], 0.1, 6), (c.fillStyle = "rgba(90,60,30,0.6)"), c.fillRect(0, h / 2 - 6, w, 12), (c.strokeStyle = "rgba(60,40,20,0.5)"), (c.lineWidth = 3), c.strokeRect(20, 30, 50, 30));
+  });
+  return T;
+}
+function pdzGarageBuild(t) {
+  let G = ga,
+    T = pdzGarageTex(),
+    W = 7.5,
+    D = 8,
+    H = 4.6,
+    M = (o) => new Se(o),
+    add = (geo, mat, x, y, z, ry = 0, rx = 0, rz = 0, sh = !0) => {
+      let m = new ce(geo, mat);
+      return (m.position.set(x, y, z), m.rotation.set(rx, ry, rz), (m.castShadow = sh), (m.receiveShadow = !0), t.add(m), m);
+    },
+    box = (w, h, d, mat, x, y, z, ry = 0, sh = !0) => add(new Dt(w, h, d), mat, x, y, z, ry, 0, 0, sh),
+    cyl = (r0, r1, h, mat, x, y, z, seg = 16, rx = 0, rz = 0) => add(new p0(r0, r1, h, seg), mat, x, y, z, 0, rx, rz);
+  // materials
+  let steel = M({ color: 0x9aa0a6, metalness: 0.8, roughness: 0.38 }),
+    dark = M({ color: 0x2b2f35, metalness: 0.4, roughness: 0.6 }),
+    red = M({ color: 0xb3161e, metalness: 0.3, roughness: 0.42 }),
+    blue = M({ color: 0x1d4f9e, metalness: 0.35, roughness: 0.45 }),
+    yellow = M({ color: 0xe3a50c, metalness: 0.2, roughness: 0.5 }),
+    rubber = M({ color: 0x171717, roughness: 0.92 }),
+    wood = M({ map: T.wood, roughness: 0.75 }),
+    card = M({ map: T.box, roughness: 0.9 });
+  // floor and painted bay
+  let fl = new ce(new Nt(W * 2, D * 2), M({ map: T.floor, roughness: 0.62, metalness: 0, envMapIntensity: 0.8 }));
+  ((fl.rotation.x = -Math.PI / 2), (fl.receiveShadow = !0), t.add(fl), (pe.floor = fl));
+  let paint = M({ color: 0xe8b513, roughness: 0.55 });
+  for (let [w, d, x, z] of [
+    [0.09, 6.6, -2.05, 0],
+    [0.09, 6.6, 2.05, 0],
+    [4.19, 0.09, 0, -3.3],
+    [4.19, 0.09, 0, 3.3],
+  ])
+    box(w, 0.004, d, paint, x, 0.002, z, 0, !1);
+  // walls (the door wall gets its opening) and ceiling
+  let wt = (len) => {
+      let q = T.wall.clone();
+      return ((q.needsUpdate = !0), q.repeat.set(len / 4, 1), M({ map: q, roughness: 0.85 }));
+    },
+    wall = (len, x, z, ry) => add(new Nt(len, H), wt(len), x, H / 2, z, ry, 0, 0, !1);
+  (wall(W * 2, 0, -D, 0), wall(W * 2, 0, D, Math.PI), wall(D * 2, -W, 0, Math.PI / 2));
+  // the door wall: a roll-up door between two block piers
+  let dw = 4.2,
+    dh = 3.4;
+  for (let s of [-1, 1]) {
+    let len = (D * 2 - dw) / 2;
+    add(new Nt(len, H), wt(len), W, H / 2, s * (dw / 2 + len / 2), -Math.PI / 2, 0, 0, !1);
+  }
+  add(new Nt(dw, H - dh), wt(dw), W, dh + (H - dh) / 2, 0, -Math.PI / 2, 0, 0, !1);
+  let dtx = T.door;
+  dtx.repeat.set(2, 3);
+  add(new Nt(dw, dh), M({ map: dtx, metalness: 0.55, roughness: 0.42 }), W - 0.05, dh / 2, 0, -Math.PI / 2, 0, 0, !1);
+  // daylight under the door
+  add(new Nt(dw - 0.1, 0.05), new Hr({ color: new xt(2.6, 2.7, 3) }), W - 0.06, 0.025, 0, -Math.PI / 2, 0, 0, !1);
+  box(0.12, dh + 0.1, 0.18, dark, W - 0.06, dh / 2, -dw / 2 - 0.09, 0, !1);
+  box(0.12, dh + 0.1, 0.18, dark, W - 0.06, dh / 2, dw / 2 + 0.09, 0, !1);
+  box(0.4, 0.4, dw + 0.4, dark, W - 0.22, dh + 0.25, 0, 0, !1);
+  let ceil = new ce(new Nt(W * 2, D * 2), M({ color: 0x3a3d42, roughness: 0.9 }));
+  ((ceil.rotation.x = Math.PI / 2), (ceil.position.y = H), t.add(ceil));
+  // roof trusses and fluorescent tubes
+  for (let z of [-5, 0, 5]) (box(W * 2, 0.24, 0.12, dark, 0, H - 0.12, z, 0, !1), box(W * 2, 0.06, 0.04, dark, 0, H - 0.5, z, 0, !1));
+  for (let x = -W + 1; x < W; x += 1.5) for (let z of [-5, 0, 5]) box(0.03, 0.38, 0.03, dark, x, H - 0.31, z, 0, !1);
+  let tube = new Hr({ color: new xt(3.2, 3.15, 3) }),
+    hous = M({ color: 0xd8dadc, roughness: 0.5, metalness: 0.3 });
+  for (let x of [-3.2, 0, 3.2])
+    for (let z of [-2.5, 2.5]) (box(0.32, 0.08, 1.6, hous, x, H - 0.62, z, 0, !1), box(0.06, 0.04, 1.5, tube, x - 0.07, H - 0.68, z, 0, !1), box(0.06, 0.04, 1.5, tube, x + 0.07, H - 0.68, z, 0, !1));
+  // a two-post lift in the next bay
+  let lx = 4.8,
+    lz = 5.1;
+  for (let s of [-1, 1]) {
+    (box(0.34, 3.4, 0.4, blue, lx + s * 1.8, 1.7, lz), box(0.6, 0.02, 0.7, steel, lx + s * 1.8, 0.01, lz, 0, !1));
+    for (let a of [-1, 1]) (box(1.1, 0.08, 0.13, yellow, lx + s * 1.45, 0.16, lz + a * 0.5, s * a * 0.55), box(0.18, 0.06, 0.18, rubber, lx + s * 1.0, 0.22, lz + a * 0.95, 0));
+  }
+  (box(3.95, 0.16, 0.2, blue, lx, 3.32, lz), box(0.12, 3.25, 0.06, steel, lx - 1.62, 1.66, lz + 0.22, 0, !1), box(0.12, 3.25, 0.06, steel, lx + 1.62, 1.66, lz + 0.22, 0, !1));
+  for (let [w, d, x, z] of [
+    [0.09, 4.6, lx - 2.3, lz - 0.2],
+    [4.6, 0.09, lx, lz - 2.5],
+  ])
+    box(w, 0.004, d, paint, x, 0.002, z, 0, !1);
+  // back wall: workbench under a pegboard, shelving, the name sign
+  (box(2.8, 0.06, 0.78, wood, -2.6, 0.93, -D + 0.45), box(2.8, 0.03, 0.7, dark, -2.6, 0.24, -D + 0.45));
+  for (let x of [-1.35, 1.35]) for (let z of [-0.33, 0.33]) box(0.05, 0.92, 0.05, dark, -2.6 + x, 0.46, -D + 0.45 + z);
+  (box(0.24, 0.16, 0.18, dark, -1.6, 1.04, -D + 0.62), cyl(0.04, 0.04, 0.3, steel, -1.6, 1.05, -D + 0.82, 8, Math.PI / 2));
+  (box(0.5, 0.22, 0.32, red, -3.3, 1.07, -D + 0.42), box(0.3, 0.08, 0.2, steel, -2.5, 1.0, -D + 0.5), cyl(0.06, 0.06, 0.12, yellow, -2.1, 1.02, -D + 0.32));
+  add(new Nt(3.2, 1.6), M({ map: T.peg, roughness: 0.8 }), -2.6, 1.95, -D + 0.02, 0, 0, 0, !1);
+  // a work lamp on the bench
+  (cyl(0.015, 0.015, 0.5, dark, -1.2, 1.2, -D + 0.3), add(new G.ConeGeometry(0.1, 0.14, 12, 1, !0), M({ color: 0x1d4f9e, side: e0, roughness: 0.5 }), -1.2, 1.46, -D + 0.38, 0, 0.7));
+  // steel shelving with boxes and cans
+  for (let x of [1.3, 3.3]) for (let z of [0, 0.5]) box(0.04, 2.3, 0.04, steel, x, 1.15, -D + 0.25 + z);
+  let cans = [red, blue, yellow, M({ color: 0x2a8a3a, roughness: 0.4, metalness: 0.4 })],
+    rr = y0(5);
+  for (let y of [0.15, 0.75, 1.35, 1.95]) {
+    box(2.04, 0.03, 0.54, steel, 2.3, y, -D + 0.5);
+    for (let x = 1.45; x < 3.2; ) {
+      let k = rr();
+      if (k < 0.45) {
+        let w = 0.3 + rr() * 0.25,
+          h = 0.2 + rr() * 0.3;
+        (box(w, h, 0.4, card, x + w / 2, y + h / 2 + 0.015, -D + 0.5, (rr() - 0.5) * 0.2), (x += w + 0.04));
+      } else (cyl(0.07, 0.07, 0.2, cans[Math.floor(rr() * 4)], x + 0.08, y + 0.115, -D + 0.38 + rr() * 0.25), (x += 0.19));
+    }
+  }
+  add(new Nt(5.2, 0.8), new Hr({ map: T.sign, transparent: !0, color: new xt(1.8, 1.7, 1.5), depthWrite: !1 }), 0, 3.35, -D + 0.03, 0, 0, 0, !1);
+  // left wall: tool chest, compressor, tyre rack
+  (box(1.5, 1.0, 0.62, M({ map: T.drawers, roughness: 0.38, metalness: 0.55 }), -W + 0.4, 0.58, -2.6, Math.PI / 2), box(1.5, 0.45, 0.5, M({ map: T.drawers, roughness: 0.38, metalness: 0.55 }), -W + 0.36, 1.32, -2.6, Math.PI / 2));
+  box(1.52, 0.04, 0.64, M({ color: 0x1b1b1b, roughness: 0.7 }), -W + 0.4, 1.1, -2.6, Math.PI / 2);
+  for (let z of [-3.25, -1.95]) for (let x of [-0.2, 0.2]) cyl(0.05, 0.05, 0.05, rubber, -W + 0.4 + x, 0.04, z, 10, 0, Math.PI / 2);
+  (cyl(0.28, 0.28, 1.1, red, -W + 0.5, 0.42, -6.3, 18, 0, Math.PI / 2), box(0.36, 0.28, 0.3, dark, -W + 0.5, 0.82, -6.1), cyl(0.14, 0.14, 0.08, dark, -W + 0.5, 0.82, -6.45, 14, Math.PI / 2));
+  for (let y of [0.55, 1.35]) box(0.06, 0.06, 3.0, steel, -W + 0.55, y, 2.4);
+  for (let z of [0.9, 3.9]) box(0.06, 1.7, 0.06, steel, -W + 0.55, 0.85, z);
+  let tg = new G.TorusGeometry(0.31, 0.12, 10, 28),
+    tm = M({ color: 0x151515, roughness: 0.95 }),
+    tyres = [];
+  for (let i = 0; i < 8; i++) tyres.push([-W + 0.45, i < 4 ? 0.46 : 1.26, 1.25 + (i % 4) * 0.72, Math.PI / 2, 0]);
+  for (let i = 0; i < 4; i++) tyres.push([-6.6, 0.13 + i * 0.25, 6.9, 0, Math.PI / 2]);
+  for (let i = 0; i < 3; i++) tyres.push([5.6, 0.13 + i * 0.25, -3.4, 0, Math.PI / 2]);
+  let ti_ = new G.InstancedMesh(tg, tm, tyres.length),
+    m4 = new mt(),
+    e3 = new W1();
+  tyres.forEach(([x, y, z, ry, rx], i) => (e3.set(rx, ry, 0), m4.makeRotationFromEuler(e3).setPosition(x, y, z), ti_.setMatrixAt(i, m4)));
+  ((ti_.castShadow = ti_.receiveShadow = !0), t.add(ti_));
+  // right side: drums, an engine on its stand, cones
+  let drum = (col, x, z) => {
+    let q = T.drum.clone();
+    ((q.needsUpdate = !0), cyl(0.29, 0.29, 0.88, M({ map: q, color: col, metalness: 0.45, roughness: 0.45 }), x, 0.44, z, 22));
+    for (let y of [0.3, 0.6]) add(new G.TorusGeometry(0.292, 0.012, 6, 28), dark, x, y, z, 0, Math.PI / 2);
+  };
+  (drum(0x1d4f9e, 5.9, -6.9), drum(0xb3161e, 6.6, -6.4), drum(0x6b7076, 6.7, -7.2));
+  let ex = -4.4,
+    ez = 5.4;
+  (box(0.62, 0.48, 0.5, M({ color: 0x5a6069, metalness: 0.6, roughness: 0.45 }), ex, 0.92, ez), box(0.66, 0.1, 0.18, red, ex, 1.22, ez - 0.15), box(0.66, 0.1, 0.18, red, ex, 1.22, ez + 0.15));
+  (cyl(0.13, 0.13, 0.08, dark, ex + 0.35, 0.92, ez, 16, 0, Math.PI / 2), box(0.08, 0.7, 0.08, red, ex, 0.35, ez), box(0.9, 0.06, 0.08, red, ex, 0.03, ez), box(0.08, 0.06, 0.8, red, ex, 0.03, ez));
+  let cone = M({ color: 0xff5a14, roughness: 0.55 }),
+    white = M({ color: 0xf2f2ee, roughness: 0.5 });
+  for (let [x, z] of [
+    [1.6, 7.0],
+    [1.0, 7.4],
+  ])
+    (add(new G.ConeGeometry(0.16, 0.56, 16), cone, x, 0.32, z), cyl(0.1, 0.12, 0.07, white, x, 0.36, z), box(0.4, 0.04, 0.4, rubber, x, 0.02, z));
+  // round the car: a floor jack, stands, a creeper, a toolbox
+  (box(0.9, 0.12, 0.3, red, -2.7, 0.1, 2.6, 0.3), cyl(0.02, 0.02, 1.0, dark, -3.2, 0.42, 2.9, 8, 0, 1.0), box(0.16, 0.08, 0.2, steel, -2.3, 0.18, 2.47, 0.3));
+  for (let [x, z] of [
+    [2.7, -2.4],
+    [2.8, -1.4],
+  ])
+    (add(new G.ConeGeometry(0.16, 0.4, 4), red, x, 0.2, z), cyl(0.03, 0.03, 0.18, steel, x, 0.47, z, 8));
+  (box(0.45, 0.04, 1.0, M({ color: 0x2a2a2a, roughness: 0.6 }), 2.7, 0.08, 0.9, 0.15), box(0.55, 0.25, 0.25, red, -2.4, 0.13, -2.9, -0.2), box(0.56, 0.03, 0.26, dark, -2.4, 0.26, -2.9, -0.2));
+  // front wall: posters, a clock, an extinguisher, a door to the office
+  T.posters.forEach((q, i) => add(new Nt(0.9, 1.35), M({ map: q, roughness: 0.7 }), -3 + i * 1.3, 2.1, D - 0.02, Math.PI, 0, 0, !1));
+  (add(new G.CircleGeometry(0.28, 32), M({ map: T.clock, roughness: 0.5 }), 1.8, 3.0, D - 0.03, Math.PI, 0, 0, !1), cyl(0.09, 0.09, 0.5, red, 3.4, 1.15, D - 0.15, 14), cyl(0.03, 0.03, 0.1, dark, 3.4, 1.45, D - 0.15));
+  (box(1.0, 2.15, 0.06, M({ color: 0x55606c, metalness: 0.3, roughness: 0.6 }), -5.4, 1.075, D - 0.03, 0, !1), box(0.3, 0.12, 0.04, new Hr({ color: new xt(0.3, 2.2, 0.6) }), -5.4, 2.35, D - 0.05, 0, !1));
+  // a pipe run along the walls
+  (cyl(0.04, 0.04, D * 2, steel, -W + 0.1, 3.9, 0, 10, Math.PI / 2), cyl(0.04, 0.04, W * 2, steel, 0, 3.9, -D + 0.1, 10, 0, Math.PI / 2));
+  pdzMergeLocal(t);
+  // light: cool tubes overhead, daylight from the door, a key light on the car that casts the shadow
+  t.add(new G.HemisphereLight(0xb8c4d6, 0x3a3026, 0.7));
+  for (let x of [-3.2, 3.2]) {
+    let p = new G.PointLight(0xfff1de, 7, 0, 2);
+    (p.position.set(x, H - 0.8, 0), t.add(p));
+  }
+  let day = new G.DirectionalLight(0xcfe0ff, 0.9);
+  (day.position.set(9, 1.5, 0), t.add(day, day.target));
+  return T;
+}
+// static meshes of a group merged per material (in the group's own frame)
+function pdzMergeLocal(t) {
+  let bk = new Map(),
+    v3 = new He(),
+    nm = new rs();
+  for (let o of t.children) {
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || o.material.transparent) continue;
+    let g = o.geometry,
+      k = [o.material.uuid, o.castShadow, g.attributes.uv ? 1 : 0].join("|");
+    (bk.has(k) || bk.set(k, []), bk.get(k).push(o));
+  }
+  for (let list of bk.values()) {
+    if (list.length < 2) continue;
+    let P = [],
+      N = [],
+      U = [],
+      I = [],
+      b = 0;
+    for (let o of list) {
+      o.updateMatrix();
+      let g = o.geometry,
+        p = g.attributes.position,
+        n = g.attributes.normal,
+        u = g.attributes.uv;
+      nm.getNormalMatrix(o.matrix);
+      for (let k = 0; k < p.count; k++) {
+        (v3.fromBufferAttribute(p, k).applyMatrix4(o.matrix), P.push(v3.x, v3.y, v3.z), v3.fromBufferAttribute(n, k).applyMatrix3(nm).normalize(), N.push(v3.x, v3.y, v3.z));
+        u && U.push(u.getX(k), u.getY(k));
+      }
+      if (g.index) for (let k = 0; k < g.index.count; k++) I.push(g.index.getX(k) + b);
+      else for (let k = 0; k < p.count; k++) I.push(k + b);
+      ((b += p.count), t.remove(o), g.dispose());
+    }
+    let g = new Lt();
+    (g.setAttribute("position", new _e(P, 3)), g.setAttribute("normal", new _e(N, 3)), U.length && g.setAttribute("uv", new _e(U, 2)), g.setIndex(I), g.computeBoundingSphere());
+    let m = new ce(g, list[0].material);
+    ((m.castShadow = list[0].castShadow), (m.receiveShadow = !0), t.add(m));
+  }
+}
 function F2() {
   if (pe.built) return;
   pe.built = !0;
   let e = ga,
     t = new e.Group();
-  ((t.visible = !1),
-    ie.add(t),
-    (pe.group = t),
-    (pe.rt = new e.WebGLRenderTarget(16, 16)),
-    (pe.cam = new e.PerspectiveCamera()));
-  // floor: dark polished epoxy reflecting the stand; a brushed-steel turntable with an LED rim and a hazard ring
-  let a = new e.MeshStandardMaterial({
-    color: 592396,
-    roughness: 0.34,
-    metalness: 0,
-  });
-  ((a.onBeforeCompile = (m) => {
-    ((m.uniforms.tRefl = { value: pe.rt.texture }),
-      (m.uniforms.uTexM = pe.texM),
-      (m.uniforms.uCtr = pe.ctr),
-      (m.uniforms.uTime = pe.time),
-      (m.vertexShader = m.vertexShader
-        .replace(
-          "#include <common>",
-          `#include <common>
-uniform mat4 uTexM;
-varying vec4 vRefl;
-varying vec3 vFloorW;`,
-        )
-        .replace(
-          "#include <begin_vertex>",
-          `#include <begin_vertex>
-{ vec4 fw = modelMatrix * vec4(transformed, 1.0); vRefl = uTexM * fw; vFloorW = fw.xyz; }`,
-        )),
-      (m.fragmentShader = m.fragmentShader
-        .replace(
-          "#include <common>",
-          `#include <common>
-uniform sampler2D tRefl;
-uniform vec3 uCtr;
-uniform float uTime;
-varying vec4 vRefl;
-varying vec3 vFloorW;
-float gDisc = 0.0, gR = 0.0, gA = 0.0;`,
-        )
-        .replace(
-          "#include <color_fragment>",
-          `#include <color_fragment>
-{
-  vec2 q = vFloorW.xz - uCtr.xz;
-  gR = length(q); gA = atan(q.y, q.x);
-  gDisc = 1.0 - smoothstep(3.15, 3.18, gR);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.21, 0.23) * (0.86 + 0.14 * sin(gR * 260.0)), gDisc);
-  float band = smoothstep(3.46, 3.48, gR) * (1.0 - smoothstep(3.7, 3.72, gR));
-  float st = step(0.5, fract(gA / 6.2831853 * 72.0 + gR * 1.4));
-  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.012), vec3(0.62, 0.42, 0.03), st), band * 0.92);
-}`,
-        )
-        .replace(
-          "#include <roughnessmap_fragment>",
-          `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.42, gDisc);`,
-        )
-        .replace(
-          "#include <metalnessmap_fragment>",
-          `#include <metalnessmap_fragment>
-metalnessFactor = mix(metalnessFactor, 0.55, gDisc);`,
-        )
-        .replace(
-          "#include <emissivemap_fragment>",
-          `#include <emissivemap_fragment>
-{
-  float ring = 1.0 - smoothstep(0.0, 0.022, abs(gR - 3.22));
-  float chase = 0.55 + 0.45 * sin(gA * 5.0 - uTime * 1.6);
-  totalEmissiveRadiance += vec3(1.0, 0.58, 0.1) * ring * (2.2 + 2.2 * chase);
-  totalEmissiveRadiance += vec3(0.5, 0.75, 1.0) * (1.0 - smoothstep(0.0, 0.008, abs(gR - 3.92))) * 0.9;
-}`,
-        )
-        .replace(
-          "#include <opaque_fragment>",
-          `{
-  vec2 ruv = vRefl.xy / vRefl.w;
-  float r = gR, bl = 0.002 + 0.006 * smoothstep(0.5, 7.0, r);   // blurrier away from the car
-  vec3 rc = texture2D(tRefl, ruv).rgb * 0.36 + (texture2D(tRefl, ruv + vec2(bl, 0.0)).rgb + texture2D(tRefl, ruv - vec2(bl, 0.0)).rgb
-          + texture2D(tRefl, ruv + vec2(0.0, bl)).rgb + texture2D(tRefl, ruv - vec2(0.0, bl)).rgb) * 0.16;
-  float nv = clamp(dot(normal, normalize(-vViewPosition)), 0.0, 1.0), fres = mix(0.22, 0.9, pow(1.0 - nv, 3.0));
-  float fade = 1.0 - smoothstep(6.0, 15.0, r);
-  outgoingLight += rc * fres * fade * mix(1.0, 0.75, gDisc);
-  vec2 tg = abs(fract(vFloorW.xz / 2.4 + 0.5) - 0.5);
-  outgoingLight *= 1.0 - (1.0 - smoothstep(0.0, 0.005, min(tg.x, tg.y))) * step(4.0, r) * 0.6 * fade;   // seams between floor slabs
-}
-#include <opaque_fragment>`,
-        )));
-  }),
-    (a.customProgramCacheKey = () => "pdz-floor2"));
-  let n = new e.Mesh(new e.CircleGeometry(16, 96), a);
-  ((n.rotation.x = -Math.PI / 2),
-    (n.position.y = 0.001),
-    (n.receiveShadow = !0),
-    t.add(n),
-    (pe.floor = n));
-  // hangar wall: riveted steel panels over a hazard-striped skirting, lit by vertical LED strips
-  let o = St(256, 512, (m, y, w) => {
-    (g0(m, y, w, [24, 27, 33], 0.18, 41),
-      (m.fillStyle = "rgba(0,0,0,0.55)"),
-      m.fillRect(0, 0, 3, w),
-      (m.fillStyle = "rgba(255,255,255,0.07)"),
-      m.fillRect(3, 0, 2, w));
-    for (let k of [0.34, 0.62])
-      ((m.fillStyle = "rgba(0,0,0,0.5)"),
-        m.fillRect(0, w * k, y, 3),
-        (m.fillStyle = "rgba(255,255,255,0.06)"),
-        m.fillRect(0, w * k + 3, y, 2));
-    m.fillStyle = "rgba(160,170,180,0.35)";
-    for (let k of [0.34, 0.62])
-      for (let b = 14; b < y; b += 30) (m.beginPath(), m.arc(b, w * k - 7, 2.2, 0, 6.3), m.fill());
-    let k = w * 0.88;
-    ((m.fillStyle = "#121212"), m.fillRect(0, k, y, w - k), (m.fillStyle = "#e6a90e"));
-    for (let b = -w; b < y + w; b += 40)
-      (m.beginPath(), m.moveTo(b, w), m.lineTo(b + 20, w), m.lineTo(b + 20 + (w - k), k), m.lineTo(b + (w - k), k), m.closePath(), m.fill());
-    ((m.fillStyle = "rgba(255,255,255,0.12)"), m.fillRect(0, k - 3, y, 3));
-  });
-  o.repeat.set(18, 1);
-  let r = new e.Mesh(
-    new e.CylinderGeometry(15, 15, 9, 96, 1, !0),
-    new e.MeshStandardMaterial({ map: o, roughness: 0.72, metalness: 0.3, side: e.BackSide }),
-  );
-  ((r.position.y = 4.5), t.add(r));
-  let s0 = new e.InstancedMesh(
-      new e.BoxGeometry(0.07, 6.4, 0.07),
-      new e.MeshBasicMaterial({ color: new xt(2.6, 2.45, 2.2) }),
-      18,
-    ),
-    s1 = new mt();
-  for (let m = 0; m < 18; m++) {
-    let y = (m / 18) * Math.PI * 2 + Math.PI / 18;
-    (s1.makeRotationY(-y).setPosition(Math.cos(y) * 14.86, 4.1, Math.sin(y) * 14.86), s0.setMatrixAt(m, s1));
-  }
-  t.add(s0);
-  for (let [m, y, w] of [
-    [0.93, 0.03, 2.8],
-    [7.3, 0.03, 1.4],
-  ]) {
-    let k = new e.Mesh(
-      new e.TorusGeometry(14.88, y, 6, 160),
-      new e.MeshBasicMaterial({ color: new xt(w * 1.05, w * 0.7, w * 0.18) }),
-    );
-    ((k.rotation.x = Math.PI / 2), (k.position.y = m), t.add(k));
-  }
-  // lighting truss over the stand
-  let i0_ = new e.MeshStandardMaterial({ color: 1974568, roughness: 0.5, metalness: 0.8 }),
-    tr = new e.Mesh(new e.TorusGeometry(4.6, 0.09, 8, 96), i0_);
-  ((tr.rotation.x = Math.PI / 2), (tr.position.y = 6.1), t.add(tr));
-  let r1 = new e.Mesh(
-    new e.TorusGeometry(4.2, 0.035, 8, 96),
-    new e.MeshBasicMaterial({ color: new xt(2.4, 2.25, 2.05) }),
-  );
-  ((r1.rotation.x = Math.PI / 2), (r1.position.y = 5.9), t.add(r1));
-  let lh = new e.InstancedMesh(new e.CylinderGeometry(0.16, 0.2, 0.32, 16), i0_, 8),
-    lg = new e.InstancedMesh(new e.CircleGeometry(0.15, 16), new e.MeshBasicMaterial({ color: new xt(3, 2.8, 2.4) }), 8);
-  for (let m = 0; m < 8; m++) {
-    let y = (m / 8) * Math.PI * 2,
-      w = Math.cos(y) * 4.6,
-      k = Math.sin(y) * 4.6;
-    (s1.makeTranslation(w, 5.86, k), lh.setMatrixAt(m, s1));
-    (s1.makeRotationX(Math.PI / 2).setPosition(w, 5.695, k), lg.setMatrixAt(m, s1));
-  }
-  t.add(lh, lg);
-  // glowing name board on the wall
-  let sg = St(1024, 256, (m, y, w) => {
-    m.clearRect(0, 0, y, w);
-    let k = (b) => {
-      m.clearRect(0, 0, y, w);
-      let M = 150;
-      do m.font = `italic 400 ${(M -= 6)}px ${b}`;
-      while (M > 40 && m.measureText("PHYSICAL.DEFORMZ").width > y - 60);
-      let x = m.measureText("PHYSICAL").width,
-        A = m.measureText(".").width,
-        R = (y - m.measureText("PHYSICAL.DEFORMZ").width) / 2;
-      ((m.textAlign = "left"),
-        (m.textBaseline = "middle"),
-        (m.fillStyle = "#ffffff"),
-        m.fillText("PHYSICAL", R, w * 0.52),
-        (m.fillStyle = "#ffcd1c"),
-        m.fillText(".", R + x, w * 0.52),
-        (m.fillStyle = "#ffffff"),
-        m.fillText("DEFORMZ", R + x + A, w * 0.52));
-    };
-    (k('"Arial Black", Impact, sans-serif'),
-      document.fonts &&
-        document.fonts.load('128px "Russo One"').then(() => {
-          (k('"Russo One", "Arial Black", sans-serif'), sg && (sg.needsUpdate = !0));
-        }));
-  });
-  sg.repeat.set(1, 1);
-  let sb = new e.Mesh(
-    new e.PlaneGeometry(9, 2.25),
-    new e.MeshBasicMaterial({ map: sg, transparent: !0, color: new xt(1.6, 1.5, 1.35), depthWrite: !1 }),
-  );
-  (sb.position.set(0, 5.1, -14.6), t.add(sb));
-  // props round the walls: tyre stacks, cones, a tool chest, a crash barrier
-  let ty = new e.InstancedMesh(
-      new e.TorusGeometry(0.34, 0.15, 10, 28),
-      new e.MeshStandardMaterial({ color: 1315860, roughness: 0.92 }),
-      20,
-    ),
-    tq = 0;
-  for (let [m, y] of [
-    [2.2, 11.2],
-    [2.32, 11.5],
-    [4.1, 10.8],
-    [5.6, 11.4],
-    [5.72, 11.3],
-  ])
-    for (let w = 0; w < 4; w++)
-      (s1.makeRotationX(Math.PI / 2).setPosition(Math.cos(m) * y, 0.15 + w * 0.3, Math.sin(m) * y), ty.setMatrixAt(tq++, s1));
-  ((ty.count = tq), t.add(ty));
-  let cn = new e.MeshStandardMaterial({ color: 16733716, roughness: 0.55 }),
-    cw = new e.MeshStandardMaterial({ color: 15658734, roughness: 0.5 });
-  for (let m = 0; m < 5; m++) {
-    let y = 0.75 + m * 0.11,
-      w = 8.6,
-      k = new e.Group(),
-      b = new e.Mesh(new e.ConeGeometry(0.17, 0.56, 20), cn),
-      M = new e.Mesh(new e.CylinderGeometry(0.105, 0.125, 0.08, 20), cw),
-      x = new e.Mesh(new e.BoxGeometry(0.42, 0.04, 0.42), new e.MeshStandardMaterial({ color: 1315860, roughness: 0.8 }));
-    ((b.position.y = 0.32), (M.position.y = 0.33), (x.position.y = 0.02), k.add(b, M, x), k.position.set(Math.cos(y) * w, 0, Math.sin(y) * w), t.add(k));
-  }
-  let tc = St(256, 256, (m, y, w) => {
-      ((m.fillStyle = "#a8121b"), m.fillRect(0, 0, y, w));
-      for (let k = 0; k < 5; k++)
-        ((m.fillStyle = "rgba(0,0,0,0.45)"),
-          m.fillRect(0, 18 + k * 46, y, 4),
-          (m.fillStyle = "#c9ccd1"),
-          m.fillRect(y / 2 - 34, 36 + k * 46, 68, 7));
-    }),
-    ch = new e.Mesh(new e.BoxGeometry(1.5, 1.1, 0.62), new e.MeshStandardMaterial({ map: tc, roughness: 0.38, metalness: 0.55 }));
-  (ch.position.set(Math.cos(3.3) * 13.6, 0.55, Math.sin(3.3) * 13.6), ch.lookAt(0, 0.55, 0), t.add(ch));
-  let br = new e.Mesh(new e.BoxGeometry(3.4, 1.05, 0.8), [Yt, Yt, Yt, Yt, Xr, Yt]);
-  (br.position.set(Math.cos(4.9) * 12.9, 0.525, Math.sin(4.9) * 12.9), br.lookAt(0, 0.525, 0), t.add(br));
-  // a narrow key light from the truss, a cool rim from behind and a warm kicker
-  let s = new e.SpotLight(16773596, 260, 0, 0.44, 0.6, 2);
-  (s.position.set(0.5, 7.4, 1.1),
+  ((t.visible = !1), ie.add(t), (pe.group = t), pdzGarageBuild(t));
+  // a key light from the roof over the car: it casts the car's shadow
+  let s = new e.SpotLight(16773596, 120, 0, 0.62, 0.75, 2);
+  (s.position.set(0.5, 4.3, 1.1),
     (s.castShadow = !0),
     s.shadow.mapSize.set(Oe ? 512 : 1024, Oe ? 512 : 1024),
     (s.shadow.bias = -3e-4),
     (s.shadow.normalBias = 0.02),
-    (s.shadow.camera.near = 2),
-    (s.shadow.camera.far = 14),
+    (s.shadow.camera.near = 1),
+    (s.shadow.camera.far = 8),
     t.add(s, s.target),
     (pe.spot = s));
-  let i = new e.DirectionalLight(8368383, 1.05);
-  (i.position.set(-6, 3.5, -7), t.add(i, i.target));
-  let l = new e.DirectionalLight(16754784, 0.75);
-  (l.position.set(6, 2.5, 5),
-    t.add(l, l.target),
-    t.add(new e.HemisphereLight(2764342, 328966, 0.55)));
   let f = new e.ShaderMaterial({
       transparent: !0,
       depthWrite: !1,
@@ -12231,14 +12757,14 @@ metalnessFactor = mix(metalnessFactor, 0.55, gDisc);`,
 
     }),
     c = new e.Mesh(new e.ConeGeometry(2.8, 7, 48, 1, !0), f);
-  (c.position.set(0.5, 3.9, 1.1), (c.renderOrder = 6), t.add(c), (pe.beam = c));
+  (c.position.set(0.5, 2.6, 1.1), c.scale.set(0.8, 0.62, 0.8), (c.renderOrder = 6), (f.uniforms.uI.value = 0.035), t.add(c), (pe.beam = c));
   let u = Oe ? 90 : 180,
     d = new Float32Array(u * 3);
   for (let m = 0; m < u; m++) {
     let y = Math.random() * 6.28,
       w = Math.sqrt(Math.random()) * 2.6;
     ((d[m * 3] = Math.sin(y) * w),
-      (d[m * 3 + 1] = 0.3 + Math.random() * 5.2),
+      (d[m * 3 + 1] = 0.3 + Math.random() * 3.6),
       (d[m * 3 + 2] = Math.cos(y) * w));
   }
   let h = new Lt();
@@ -12263,8 +12789,8 @@ metalnessFactor = mix(metalnessFactor, 0.55, gDisc);`,
     }),
   )),
     t.add(pe.dust),
-    (pe.fog = new e.Fog(461068, 12, 40)),
-    (pe.bg = new xt(461068)));
+    (pe.fog = new e.Fog(1316634, 16, 40)),
+    (pe.bg = new xt(1316634)));
 }
 function ei(e) {
   F2();
@@ -12273,7 +12799,7 @@ function ei(e) {
     (ie.fog = e ? pe.fog : pe.worldFog),
     (ie.background = e ? pe.bg : null),
     (ie.environment = e ? pdzEnvStudio : pdzEnvSky),
-    (ie.environmentIntensity = e ? 0.32 : Gx.env || 0.75),
+    (ie.environmentIntensity = e ? 0.5 : Gx.env || 0.75),
     e || fe.clearViewOffset(),
     Ta());
 }
@@ -12287,15 +12813,15 @@ function ti(e) {
       Object.assign(Te, { throttle: 0, brake: 0, steer: 0, handbrake: !0 }),
       yl(1 / 60)),
     v0(() => {
-      (Ii(), Di(), Ps(), Ds(), Pi(), Oi(), Bi(), Ei(), pdzBlobTick());
+      (Ii(), Di(), Ps(), Ds(), Pi(), Oi(), Bi(), Ei(), pdzBlobTick(), pdzBoltsTick(), M0 > 0 && Pc());
     }));
   let t = innerWidth,
     a = innerHeight,
     n = a > t * 1.05;
-  ((pe.ang += e * 0.1), ($.pitch = Math.min(0.5, Math.max(-0.14, $.pitch))));
+  ((pe.ang += I0 === "garage" ? 0 : e * 0.1), ($.pitch = Math.min(0.45, Math.max(-0.1, $.pitch))), (pdzIns.ex += (pdzIns.exT - pdzIns.ex) * Math.min(1, e * 6)));
   let o = pe.ang + $.yaw,
     r = 0.2 + $.pitch,
-    s = (n ? 8.6 : 6.4) * Be.gar,
+    s = Math.min(7, (n ? 7 : 6.2) * Be.gar),
     i = v.cx,
     l = v.cz,
     f = 0.72;
@@ -12320,30 +12846,7 @@ function ti(e) {
       (c[m] += Math.sin(pe.time.value * 0.3 + m) * e * 0.03),
       c[m + 1] > 5.6 && (c[m + 1] = 0.2));
   pe.dust.geometry.attributes.position.needsUpdate = !0;
-  let u = pe.cam,
-    d = gt.getPixelRatio() * (Oe ? 0.33 : 0.5),
-    h = Math.max(2, Math.round(t * d)),
-    p = Math.max(2, Math.round(a * d));
-  ((pe.rt.width !== h || pe.rt.height !== p) && pe.rt.setSize(h, p),
-    u.copy(fe),
-    u.position.set(fe.position.x, -fe.position.y, fe.position.z),
-    u.up.set(0, -1, 0),
-    u.lookAt(i, -f, l),
-    u.updateMatrixWorld(),
-    u.updateProjectionMatrix(),
-    pe.texM.value
-      .set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
-      .multiply(u.projectionMatrix)
-      .multiply(u.matrixWorldInverse),
-    (pe.floor.visible = pe.dust.visible = pe.beam.visible = !1),
-    (gt.shadowMap.autoUpdate = !1),
-    gt.setRenderTarget(pe.rt),
-    gt.clear(),
-    gt.render(ie, u),
-    gt.setRenderTarget(null),
-    (gt.shadowMap.autoUpdate = !0),
-    (pe.floor.visible = pe.dust.visible = pe.beam.visible = !0),
-    pdzRender());
+  pdzRender();
 }
 function ai() {
   I0 === "garage" && pdzGarageUI();
@@ -12353,6 +12856,7 @@ function ai() {
       It`${Ka.format(J)} узлов · ${Ka.format(ke)} балок · ${e ? e.total : 0} стёкол`));
 }
 function ro(e) {
+  (e === "garage" ? (pdzGarWire(), We.cfg || pdzCfgApply()) : I0 === "garage" && pdzGarLeave(), document.body.classList.toggle("gar-edit", e === "garage"));
   ((I("menu-main").hidden = e !== "main"),
     (I("menu-maps").hidden = e !== "maps"),
     (I("menu-garage").hidden = e !== "garage"),
@@ -12361,68 +12865,699 @@ function ro(e) {
   let t = I(e === "maps" ? "map-grid" : e === "garage" ? "g-go" : "m-play");
   t && t.focus({ preventScroll: !0 });
 }
-// ---------- garage: pick the car and its paint ----------
-var pdzPaints = [
-  "",
-  "#16357a",
-  "#c8102e",
-  "#ff6a13",
-  "#ffcd1c",
-  "#76b82a",
-  "#00838f",
-  "#e9edf0",
-  "#a7adb3",
-  "#3a3f45",
-  "#101215",
-  "#6a2c9e",
-];
-function pdzPaintOf(e) {
+// ---------- garage: the car's look and set-up, saved per car ----------
+// paint per panel and finish, stickers (projected in the body's rest space, so they crumple with it),
+// rims, tuning, glass tint, lamp colour, underglow; and the inspection tools (exploded view, every joint
+// with its strength, the beam structure, one panel on its own)
+var pdzPaints = ["", "#16357a", "#2d6fd8", "#c8102e", "#7a0f1c", "#ff6a13", "#ffcd1c", "#76b82a", "#0d5c3a", "#00838f", "#e9edf0", "#a7adb3", "#3a3f45", "#101215", "#6a2c9e", "#e05ab5", "#8a6a3e", "#c9a14a"],
+  pdzFinish = {
+    factory: [0.55, 0.32, 1, 0.06],
+    gloss: [0.12, 0.28, 1, 0.04],
+    metal: [0.78, 0.26, 1, 0.05],
+    pearl: [0.5, 0.18, 1, 0.03],
+    satin: [0.3, 0.5, 0.35, 0.3],
+    matte: [0.04, 0.8, 0, 0.5],
+    chrome: [1, 0.06, 0.7, 0.02],
+  },
+  pdzFinNames = {
+    factory: C("Заводское"),
+    gloss: C("Глянец"),
+    metal: C("Металлик"),
+    pearl: C("Перламутр"),
+    satin: C("Сатин"),
+    matte: C("Мат"),
+    chrome: C("Хром"),
+  },
+  pdzRimNames = [C("Двойные лучи"), C("Спорт 5"), C("Сетка"), C("Штамповка"), C("Турбина")],
+  pdzTints = [
+    [C("Нет"), "#ffffff"],
+    [C("Лёгкая"), "#a4acb4"],
+    [C("Тёмная"), "#596068"],
+    [C("Лимузин"), "#22262b"],
+  ],
+  pdzLights = [
+    [C("Тёплые"), "#fff3dc"],
+    [C("Белые"), "#eef4ff"],
+    [C("Синие"), "#a9c8ff"],
+    [C("Жёлтые"), "#ffd84a"],
+  ],
+  pdzGlows = ["", "#00e5ff", "#ff2bd6", "#39ff14", "#ff3b1f", "#ffd21f", "#7c4dff"],
+  // panels the paint can be split over (the frame carries roof, sills and pillars)
+  pdzPaintParts = [0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14];
+function pdzCfgDefault() {
+  return {
+    paint: { c: "", fin: "factory" },
+    parts: {},
+    stk: [],
+    num: 7,
+    wheel: { style: 0, c: "", cal: "" },
+    tune: { ride: 0, spring: 1, damp: 1, grip: 1, power: 1, brake: 1 },
+    extra: { tint: 0, light: 0, glow: "" },
+  };
+}
+function pdzCfgOf(e) {
+  let t = pdzCfgDefault();
   try {
-    return localStorage.getItem("pdz-paint-" + e) || "";
-  } catch {
-    return "";
-  }
+    let a = JSON.parse(localStorage.getItem("pdz-cfg-" + e) || "null");
+    if (a) for (let n of Object.keys(t)) a[n] !== void 0 && (t[n] = typeof t[n] == "object" && !Array.isArray(t[n]) ? Object.assign(t[n], a[n]) : a[n]);
+    else {
+      let n = localStorage.getItem("pdz-paint-" + e);
+      n && (t.paint.c = n);
+    }
+  } catch {}
+  return t;
+}
+function pdzCfgSave() {
+  try {
+    localStorage.setItem("pdz-cfg-" + i0, JSON.stringify(We.cfg));
+  } catch {}
+}
+function pdzPaintOf(e) {
+  return pdzCfgOf(e).paint.c;
 }
 function pdzPaintFactory(e = i0) {
   return U0[e].paint || [0.035, 0.09, 0.26];
 }
-function pdzPaintSet(e) {
-  try {
-    e ? localStorage.setItem("pdz-paint-" + i0, e) : localStorage.removeItem("pdz-paint-" + i0);
-  } catch {}
-  let t = ka.find((a) => a.material.name === "paint");
-  (t && (e ? t.material.color.set(e) : t.material.color.setRGB(...pdzPaintFactory())),
-    (We.paintC = null),
-    pdzGarageUI());
+var pdzPM_ = (n) => (ka.find((t) => t.material.name === n) || {}).material;
+// sticker sheet: 4 x 4 cells of 256 px, drawn once (the number roundel redrawn when its number changes)
+var pdzStk = [
+    { n: C("Номер"), text: 1 },
+    { n: C("Пламя") },
+    { n: C("Полосы"), tint: 1 },
+    { n: C("Флаг") },
+    { n: C("Молния"), tint: 1 },
+    { n: C("Звезда"), tint: 1 },
+    { n: "TURBO", tint: 1, text: 1 },
+    { n: "DEFORMZ", text: 1 },
+    { n: C("Зубы") },
+    { n: C("Волна"), tint: 1 },
+    { n: "CRASH LAB", text: 1 },
+    { n: C("Глаза") },
+    { n: C("Опасность") },
+    { n: "NODE & BEAM", text: 1 },
+    { n: C("Шевроны"), tint: 1 },
+    { n: C("Сердце"), tint: 1 },
+  ],
+  pdzStkTex = null,
+  pdzStkNum = -1;
+function pdzStkDraw(c, k, num) {
+  let S = 256,
+    x0 = (k % 4) * S,
+    y0_ = Math.floor(k / 4) * S;
+  (c.save(), c.clearRect(x0, y0_, S, S), c.beginPath(), c.rect(x0 + 6, y0_ + 6, S - 12, S - 12), c.clip(), c.translate(x0 + S / 2, y0_ + S / 2));
+  let F = (s, w = 900) => `italic ${w} ${s}px "Russo One", "Arial Black", sans-serif`,
+    txt = (t, s, col, st) => ((c.font = F(s)), (c.textAlign = "center"), (c.textBaseline = "middle"), st && ((c.lineWidth = st[1]), (c.strokeStyle = st[0]), c.strokeText(t, 0, 4, 236)), (c.fillStyle = col), c.fillText(t, 0, 4, 236));
+  switch (k) {
+    case 0:
+      ((c.fillStyle = "#fff"), c.beginPath(), c.arc(0, 0, 112, 0, 6.3), c.fill(), (c.lineWidth = 10), (c.strokeStyle = "#111"), c.stroke(), txt(String(num), 132, "#111"));
+      break;
+    case 1: {
+      let g = c.createLinearGradient(-120, 0, 120, 0);
+      (g.addColorStop(0, "#fff3a0"), g.addColorStop(0.35, "#ffb21a"), g.addColorStop(0.75, "#ff3b0f"), g.addColorStop(1, "rgba(200,20,0,0)"), (c.fillStyle = g));
+      for (let i = 0; i < 5; i++) {
+        let y = -70 + i * 35,
+          L = 120 - Math.abs(i - 2) * 28;
+        (c.beginPath(), c.moveTo(-122, y + 6), c.bezierCurveTo(-60, y - 30, 10, y + 30, L, y - 4), c.bezierCurveTo(L - 40, y + 18, -40, y + 30, -122, y + 26), c.fill());
+      }
+      break;
+    }
+    case 2:
+      ((c.fillStyle = "#fff"), c.fillRect(-128, -70, 256, 46), c.fillRect(-128, 24, 256, 46));
+      break;
+    case 3:
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 6; j++) ((c.fillStyle = (i + j) % 2 ? "#111" : "#fff"), c.fillRect(-120 + i * 30, -90 + j * 30, 30, 30));
+      break;
+    case 4:
+      ((c.fillStyle = "#fff"), c.beginPath(), c.moveTo(30, -120), c.lineTo(-60, 10), c.lineTo(-5, 10), c.lineTo(-40, 120), c.lineTo(70, -20), c.lineTo(12, -20), c.closePath(), c.fill());
+      break;
+    case 5:
+      c.fillStyle = "#fff";
+      c.beginPath();
+      for (let i = 0; i < 10; i++) {
+        let a = (i / 10) * Math.PI * 2 - Math.PI / 2,
+          r = i % 2 ? 48 : 116;
+        c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      c.fill();
+      break;
+    case 6:
+      txt("TURBO", 78, "#fff");
+      break;
+    case 7:
+      (txt("DEFORMZ", 54, "#ffcd1c", ["#111", 10]), (c.fillStyle = "#ffcd1c"), c.fillRect(-110, 40, 220, 8));
+      break;
+    case 8:
+      ((c.fillStyle = "#8c0a12"), c.beginPath(), c.moveTo(-124, -30), c.quadraticCurveTo(0, 60, 124, -30), c.quadraticCurveTo(0, 110, -124, -30), c.fill(), (c.fillStyle = "#fff"));
+      for (let i = 0; i < 9; i++) {
+        let x = -110 + i * 27,
+          y = -28 + 30 * Math.sin((i / 8) * Math.PI);
+        (c.beginPath(), c.moveTo(x - 13, y), c.lineTo(x + 13, y), c.lineTo(x, y + 34), c.fill());
+      }
+      break;
+    case 9:
+      ((c.fillStyle = "#fff"), c.beginPath(), c.moveTo(-124, 60), c.bezierCurveTo(-40, -90, 40, 90, 124, -60), c.lineTo(124, -20), c.bezierCurveTo(40, 120, -40, -50, -124, 100), c.fill());
+      break;
+    case 10:
+      ((c.fillStyle = "#111"), c.fillRect(-124, -46, 248, 92), (c.strokeStyle = "#e21d2a"), (c.lineWidth = 8), c.strokeRect(-118, -40, 236, 80), txt("CRASH LAB", 46, "#fff"));
+      break;
+    case 11:
+      for (let s of [-1, 1]) ((c.fillStyle = "#fff"), c.beginPath(), c.ellipse(s * 58, 0, 52, 70, 0, 0, 6.3), c.fill(), (c.lineWidth = 6), (c.strokeStyle = "#111"), c.stroke(), (c.fillStyle = "#111"), c.beginPath(), c.arc(s * 58 + 14, 12, 22, 0, 6.3), c.fill());
+      break;
+    case 12:
+      ((c.fillStyle = "#111"), c.fillRect(-128, -60, 256, 120), (c.fillStyle = "#ffcd1c"));
+      for (let i = -6; i < 7; i++) (c.beginPath(), c.moveTo(i * 40, -60), c.lineTo(i * 40 + 20, -60), c.lineTo(i * 40 - 40, 60), c.lineTo(i * 40 - 60, 60), c.fill());
+      break;
+    case 13:
+      ((c.fillStyle = "#16357a"), c.fillRect(-124, -40, 248, 80), txt("NODE&BEAM", 40, "#fff"));
+      break;
+    case 14:
+      ((c.strokeStyle = "#fff"), (c.lineWidth = 26), (c.lineJoin = "miter"));
+      for (let i = 0; i < 3; i++) (c.beginPath(), c.moveTo(-100 + i * 70, -80), c.lineTo(-40 + i * 70, 0), c.lineTo(-100 + i * 70, 80), c.stroke());
+      break;
+    case 15:
+      ((c.fillStyle = "#fff"), c.beginPath(), c.moveTo(0, 100), c.bezierCurveTo(-150, 0, -90, -120, 0, -50), c.bezierCurveTo(90, -120, 150, 0, 0, 100), c.fill());
+      break;
+  }
+  c.restore();
+}
+function pdzStkAtlas(num) {
+  if (!pdzStkTex) {
+    let c = document.createElement("canvas");
+    ((c.width = c.height = 1024), (pdzStkTex = new b1(c)), (pdzStkTex.colorSpace = as), (pdzStkTex.anisotropy = ku));
+    for (let k = 1; k < 16; k++) pdzStkDraw(c.getContext("2d"), k, 0);
+    document.fonts &&
+      document.fonts.load('900 64px "Russo One"').then(() => {
+        let g = c.getContext("2d");
+        for (let k = 0; k < 16; k++) pdzStkDraw(g, k, pdzStkNum < 0 ? 7 : pdzStkNum);
+        pdzStkTex.needsUpdate = !0;
+      });
+  }
+  return (num !== void 0 && num !== pdzStkNum && ((pdzStkNum = num), pdzStkDraw(pdzStkTex.image.getContext("2d"), 0, num), (pdzStkTex.needsUpdate = !0)), pdzStkTex);
+}
+// the paint shader's extra uniforms (one set per car)
+function pdzPaintU(m) {
+  return (
+    m.userData.pdz ||
+    (m.userData.pdz = {
+      pc: Array.from({ length: 16 }, () => new M1(0, 0, 0, 0)),
+      pf: Array.from({ length: 16 }, () => new M1(0, 0, 0, 0)),
+      dn: { value: 0 },
+      dp: Array.from({ length: 12 }, () => new M1()),
+      dq: Array.from({ length: 12 }, () => new M1()),
+      dt: Array.from({ length: 12 }, () => new M1()),
+      tex: { value: pdzStkAtlas() },
+    })
+  );
+}
+var pdzPaintGLSLv = `varying vec3 vRestN;
+`,
+  pdzPaintGLSLf = `varying vec3 vRestN;
+uniform vec4 uPC[16];
+uniform vec4 uPF[16];
+uniform int uDecN;
+uniform vec4 uDP[12];
+uniform vec4 uDQ[12];
+uniform vec4 uDT[12];
+uniform sampler2D uDecTex;
+`,
+  pdzPaintColor = `int pdzPi = int(vPart + 0.5);
+float pdzVinyl = 0.0;
+if (uPC[pdzPi].w > 0.5) diffuseColor.rgb = uPC[pdzPi].rgb;
+for (int k = 0; k < 12; k++) {
+  if (k >= uDecN) break;
+  vec4 P = uDP[k], Q = uDQ[k], T = uDT[k];
+  vec3 d = vRest - P.xyz;
+  float s = P.w;
+  if (dot(d, d) > s * s * 0.55) continue;
+  vec3 n = Q.xyz;
+  if (abs(dot(d, n)) > s * 0.45 + 0.03 || dot(normalize(vRestN), n) < 0.2) continue;
+  vec3 up0 = abs(n.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0);
+  vec3 t1 = normalize(cross(up0, n)), t2 = cross(n, t1);
+  float ca = cos(Q.w), sa = sin(Q.w);
+  vec2 uv = vec2(dot(d, ca * t1 + sa * t2), dot(d, -sa * t1 + ca * t2)) / s + 0.5;
+  if (T.w < 0.0) uv.x = 1.0 - uv.x;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
+  float id = abs(T.w) - 0.5;
+  vec4 tx = texture2D(uDecTex, (vec2(mod(id, 4.0), 3.0 - floor(id / 4.0)) + uv) * 0.25);
+  diffuseColor.rgb = mix(diffuseColor.rgb, tx.rgb * T.rgb, tx.a);
+  pdzVinyl = max(pdzVinyl, tx.a);
+}
+`;
+// apply the whole set-up of the current car
+function pdzCfgApply() {
+  let c = (We.cfg = pdzCfgOf(i0));
+  // a new car: its panels are numbered alike, but a panel shown on its own belongs to the old one
+  pdzIns.solo >= 0 && pdzSolo(-1);
+  (pdzApplyPaint(), pdzApplyStk(), pdzApplyWheels(), pdzApplyTune(), pdzApplyExtra());
+  return c;
+}
+function pdzApplyPaint() {
+  let m = pdzPM_("paint");
+  if (!m) return;
+  let c = We.cfg,
+    U = pdzPaintU(m),
+    f = pdzFinish[c.paint.fin] || pdzFinish.factory;
+  (c.paint.c ? m.color.set(c.paint.c) : m.color.setRGB(...pdzPaintFactory()), (m.metalness = f[0]), (m.roughness = f[1]), (m.clearcoat = f[2]), (m.clearcoatRoughness = f[3]));
+  for (let k = 0; k < 16; k++) {
+    let p = c.parts[k];
+    if (p && p.c) {
+      let q = new xt(p.c);
+      U.pc[k].set(q.r, q.g, q.b, 1);
+    } else U.pc[k].set(0, 0, 0, 0);
+    let g = p && p.fin && pdzFinish[p.fin];
+    g ? U.pf[k].set(g[0], g[1], g[2], 1) : U.pf[k].set(0, 0, 0, 0);
+  }
+  We.paintC = null;
+}
+// stickers as uniforms: rest-space centre and size, normal and turn, tint and sheet cell (negative: mirrored)
+function pdzApplyStk() {
+  let m = pdzPM_("paint");
+  if (!m) return;
+  let U = pdzPaintU(m),
+    n = 0,
+    mid = We.midX ?? (We.midX = (Math.min(...ve) + Math.max(...ve)) / 2);
+  pdzStkAtlas(We.cfg.num);
+  let put = (s, mir) => {
+    if (n >= 12) return;
+    let q = new xt(s.c || "#ffffff"),
+      d = pdzStk[s.id] || {},
+      px = mir ? 2 * mid - s.p[0] : s.p[0],
+      nx = mir ? -s.n[0] : s.n[0],
+      flip = mir && !d.text;
+    (U.dp[n].set(px, s.p[1], s.p[2], s.s), U.dq[n].set(nx, s.n[1], s.n[2], mir ? -s.r : s.r), U.dt[n].set(q.r, q.g, q.b, (s.id + 0.5) * (flip ? -1 : 1)), n++);
+  };
+  for (let s of We.cfg.stk) (put(s, !1), s.m && put(s, !0));
+  U.dn.value = n;
+}
+function pdzApplyWheels() {
+  let w = We.cfg.wheel,
+    st = w.style | 0;
+  if (Je.length && Je[0].spinner && We.rimStyle !== st) {
+    let g = M2(Je[0].r, Je[0].width, st),
+      old = Je[0].spinner.children.map((m) => m.geometry);
+    for (let t of Je) ["tire", "rim", "polish", "disc"].forEach((k, i) => t.spinner.children[i] && (t.spinner.children[i].geometry = g[k]));
+    (old.forEach((q) => q.dispose()), g.cal.dispose(), (We.rimStyle = st));
+  }
+  for (let t of Je) {
+    let r = t.spinner && t.spinner.children[1];
+    r && (w.c ? r.material.color.set(w.c) : r.material.color.setHex(5922921));
+  }
+  let cal = b2().caliper;
+  w.cal ? cal.color.set(w.cal) : cal.color.setHex(16761370);
+}
+function pdzApplyTune() {
+  let t = We.cfg.tune;
+  We.tn = { d: t.damp, g: t.grip, p: t.power, b: t.brake };
+  for (let c of Je) ((c.kS0 ??= c.kSpring), (c.kSpring = c.kS0 * t.spring), (c.oy0 ??= c.oy), (c.oy = c.oy0 - t.ride));
+}
+function pdzApplyExtra() {
+  let e = We.cfg.extra,
+    g = pdzPM_("glass");
+  g && g.color.set((pdzTints[e.tint] || pdzTints[0])[1]);
+  let l = (pdzLights[e.light] || pdzLights[0])[1];
+  for (let n of ["lensL", "lensR"]) {
+    let m = pdzPM_(n);
+    m && m.emissive.set(l);
+  }
+  for (let o of E0) o.intact && o.intact.emissive && o.intact.emissive.set(l);
+  We.glowC = e.glow;
+}
+// sticker placement: the click as a ray in the body's rest frame, against the painted panels
+var pdzRayc = new ga.Raycaster(),
+  pdzRayM = null,
+  pdzRayG = null;
+function pdzRestHit(cx, cy) {
+  let m = ka.find((t) => t.material.name === "paint");
+  if (!m) return null;
+  let r = lt.getBoundingClientRect();
+  pdzRayc.setFromCamera(new Vr(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), fe);
+  let R = v.R,
+    o = pdzRayc.ray.origin,
+    d = pdzRayc.ray.direction,
+    ox = o.x - v.cx,
+    oy = o.y - v.cy,
+    oz = o.z - v.cz;
+  (o.set(fa + R[0] * ox + R[3] * oy + R[6] * oz, Pr + R[1] * ox + R[4] * oy + R[7] * oz, j0 + R[2] * ox + R[5] * oy + R[8] * oz),
+    d.set(R[0] * d.x + R[3] * d.y + R[6] * d.z, R[1] * d.x + R[4] * d.y + R[7] * d.z, R[2] * d.x + R[5] * d.y + R[8] * d.z));
+  (!pdzRayM || pdzRayM.geometry !== m.geometry) && (pdzRayM = new ce(m.geometry, new Hr({ side: e0 })));
+  let g = ka.find((t) => t.material.name === "glass");
+  g && (!pdzRayG || pdzRayG.geometry !== g.geometry) && (pdzRayG = new ce(g.geometry, new Hr({ side: e0 })));
+  // the nearest surface: a window in front means the click went through the glass, an inner face that it went through a gap
+  let h = pdzRayc.intersectObjects(g ? [pdzRayM, pdzRayG] : [pdzRayM], !1)[0];
+  if (!h || h.object !== pdzRayM) return null;
+  let N = m.geometry.attributes.normal,
+    f = h.face,
+    n = new He();
+  for (let i of [f.a, f.b, f.c]) n.x += N.getX(i), n.y += N.getY(i), n.z += N.getZ(i);
+  return n.dot(d) > 0 ? null : (n.normalize(), { p: [h.point.x, h.point.y, h.point.z], n: [n.x, n.y, n.z] });
+}
+// inspection: panels pulled apart, joints marked, one panel on its own
+var pdzIns = { ex: 0, exT: 0, bolts: !1, xray: !1, solo: -1 },
+  pdzExO = new Float64Array(16 * 3);
+function pdzExplodeOffsets() {
+  let a = pdzIns.ex;
+  if (a <= 0.001) return null;
+  let R = v.R;
+  for (let p = 0; p < oe; p++) {
+    if (p === _.FRAME || Ba[p] <= 0) {
+      pdzExO[p * 3] = pdzExO[p * 3 + 1] = pdzExO[p * 3 + 2] = 0;
+      continue;
+    }
+    let x = Pt[p * 3] / Ba[p] - fa,
+      y = Pt[p * 3 + 1] / Ba[p] - Pr,
+      z = Pt[p * 3 + 2] / Ba[p] - j0,
+      l = Math.hypot(x, y, z) || 1,
+      k = a * (0.42 + 0.2 * l);
+    ((x = (x / l) * k * 1.2), (y = (y / l) * k * 0.6 + a * (p === _.HOOD || p === _.TAILGATE ? 0.5 : 0.12)), (z = (z / l) * k));
+    ((pdzExO[p * 3] = R[0] * x + R[1] * y + R[2] * z), (pdzExO[p * 3 + 1] = R[3] * x + R[4] * y + R[5] * z), (pdzExO[p * 3 + 2] = R[6] * x + R[7] * y + R[8] * z));
+  }
+  return pdzExO;
+}
+var pdzJointCol = { hinge: 0x3d8bff, latch: 0xffcd1c, hoodlatch: 0xffcd1c, bolt: 0xc9ccd0, clip: 0x39d353, wing: 0xb36bff, weld: 0xff7a1a },
+  pdzJointName = {
+    hinge: C("Петля"),
+    latch: C("Замок"),
+    hoodlatch: C("Замок капота"),
+    bolt: C("Болт"),
+    clip: C("Клипса"),
+    wing: C("Крепление крыла"),
+    weld: C("Сварка"),
+  };
+// a little hex bolt, hinge pin or latch on every joint, in its panel's colour code
+function pdzBoltsTick() {
+  let show = I0 === "garage" && pdzIns.bolts;
+  if (!We.bolts) {
+    if (!show) return;
+    let L = [];
+    for (let g of ft.panels || []) for (let [t, x, y, z] of g.joints) L.push({ t, p: g.part, r: [x, y, z] });
+    let m = new ts(new p0(0.028, 0.028, 0.03, 6), new Hr({ toneMapped: !1 }), Math.max(1, L.length));
+    L.forEach((j, i) => m.setColorAt(i, new xt(pdzJointCol[j.t] || 0xffffff).multiplyScalar(1.6)));
+    ((m.count = L.length), (m.frustumCulled = !1), (m.renderOrder = 8), (m.material.depthTest = !1), (m.material.transparent = !0), (m.material.opacity = 0.95), ie.add(m), (We.bolts = { m, L }));
+  }
+  let B = We.bolts;
+  if (((B.m.visible = show), !show)) return;
+  let R = v.R,
+    E = pdzExplodeOffsets(),
+    M = new mt(),
+    q = new Za().setFromRotationMatrix(new mt().set(R[0], R[1], R[2], 0, R[3], R[4], R[5], 0, R[6], R[7], R[8], 0, 0, 0, 0, 1)).multiply(new Za().setFromAxisAngle(new He(1, 0, 0), Math.PI / 2));
+  let so = pdzIns.solo,
+    S1 = new He(1, 1, 1),
+    S0 = new He(0, 0, 0);
+  // in solo view only the shown panel's fasteners
+  B.L.forEach((j, i) => {
+    let x = j.r[0] - fa,
+      y = j.r[1] - Pr,
+      z = j.r[2] - j0,
+      w = j.w || (j.w = new He()),
+      on = so < 0 || j.p === so;
+    (w.set(v.cx + R[0] * x + R[1] * y + R[2] * z, v.cy + R[3] * x + R[4] * y + R[5] * z, v.cz + R[6] * x + R[7] * y + R[8] * z),
+      E && w.set(w.x + E[j.p * 3], w.y + E[j.p * 3 + 1], w.z + E[j.p * 3 + 2]),
+      (j.off = !on),
+      M.compose(w, q, on ? S1 : S0),
+      B.m.setMatrixAt(i, M));
+  });
+  B.m.instanceMatrix.needsUpdate = !0;
+}
+// the joint under the pointer, as "Hinge · Door FL · holds 7.6 kN"
+function pdzBoltAt(cx, cy) {
+  let B = We.bolts;
+  if (!B || !B.m.visible) return null;
+  let r = lt.getBoundingClientRect(),
+    best = null,
+    bd = 16 * 16,
+    v3 = new He();
+  for (let j of B.L) {
+    if (!j.w || j.off) continue;
+    v3.copy(j.w).project(fe);
+    if (v3.z > 1) continue;
+    let x = (v3.x * 0.5 + 0.5) * r.width + r.left - cx,
+      y = (-v3.y * 0.5 + 0.5) * r.height + r.top - cy,
+      d = x * x + y * y;
+    d < bd && ((bd = d), (best = j));
+  }
+  return best;
+}
+// one panel on its own (the others hidden), or all
+function pdzSolo(p) {
+  ((pdzIns.solo = p), (Oa.value = p < 0 ? 0 : 32767 & ~(1 << p)));
+}
+// ---------- garage editor: tabs, swatches, stickers on the body, tuning, inspection ----------
+var pdzGar = { tab: "paint", target: -1, stk: -1, pick: -1, move: !1, built: !1 },
+  pdzTuneDefs = [
+    ["ride", C("Клиренс"), -0.06, 0.08, 0.005, (v) => (v >= 0 ? "+" : "") + Math.round(v * 100) + " " + C("см")],
+    ["spring", C("Пружины"), 0.6, 1.6, 0.05],
+    ["damp", C("Амортизаторы"), 0.6, 1.6, 0.05],
+    ["grip", C("Сцепление шин"), 0.7, 1.4, 0.05],
+    ["power", C("Мощность"), 0.6, 1.8, 0.05],
+    ["brake", C("Тормоза"), 0.6, 1.5, 0.05],
+  ],
+  pdzRimCols = ["", "#d9dde2", "#14161a", "#c9a14a", "#8a5a34", "#e9edf0", "#c8102e", "#2d6fd8", "#3a3f45"],
+  pdzCalCols = ["", "#c8102e", "#14161a", "#2d6fd8", "#76b82a", "#e9edf0", "#ff6a13"];
+function pdzSwatch(box, list, cur, fac) {
+  if (box.children.length !== list.length) {
+    box.innerHTML = "";
+    for (let c of list) {
+      let b = document.createElement("button");
+      ((b.type = "button"), (b.dataset.c = c), c || (b.className = "factory"), (b.title = c ? c.toUpperCase() : C("Заводской")), b.setAttribute("aria-label", b.title), box.appendChild(b));
+    }
+  }
+  for (let b of box.children) (b.style.setProperty("--c", b.dataset.c || fac), b.setAttribute("aria-pressed", String(b.dataset.c === cur)));
+}
+function pdzChips(box, items, cur) {
+  let key = items.map((i) => i[0] + i[1]).join("|");
+  if (box.dataset.k !== key) {
+    ((box.dataset.k = key), (box.innerHTML = ""));
+    for (let [v, t, dot] of items) {
+      let b = document.createElement("button");
+      ((b.type = "button"), (b.dataset.v = v), (b.innerHTML = (dot !== void 0 ? `<i style="--c:${dot || "transparent"}"></i>` : "") + Ea(t)), box.appendChild(b));
+    }
+  }
+  for (let b of box.children) b.setAttribute("aria-pressed", String(b.dataset.v === String(cur)));
+}
+function pdzStkThumb(id, cv) {
+  let c = cv.getContext("2d"),
+    a = pdzStkAtlas().image;
+  (c.clearRect(0, 0, cv.width, cv.height), c.drawImage(a, (id % 4) * 256, Math.floor(id / 4) * 256, 256, 256, 0, 0, cv.width, cv.height));
 }
 function pdzGarageUI() {
   let e = I("g-paint");
-  if (!e) return;
-  if (!e.children.length)
-    for (let t of pdzPaints) {
-      let a = document.createElement("button");
-      ((a.type = "button"),
-        (a.dataset.c = t),
-        t || (a.className = "factory"),
-        (a.title = t ? t.toUpperCase() : C("Заводской")),
-        a.setAttribute("aria-label", a.title),
-        e.appendChild(a));
-    }
-  let t = pdzPaintOf(i0);
-  for (let a of e.children)
-    (a.dataset.c || a.style.setProperty("--c", new xt().setRGB(...pdzPaintFactory()).getStyle()),
-      a.dataset.c && a.style.setProperty("--c", a.dataset.c),
-      a.setAttribute("aria-pressed", String(a.dataset.c === t)));
-  let a = ul.indexOf(i0),
-    n = We && We.glass ? We.glass.total : 0,
-    o = (r, s, i, l) => {
-      ((I(r).style.width = Math.round(Math.min(1, s / i) * 100) + "%"), (I(r + "v").textContent = l));
-    };
+  if (!e || !We) return;
+  let c = We.cfg || pdzCfgApply(),
+    gl = We.glass ? We.glass.total : 0,
+    fac = new xt().setRGB(...pdzPaintFactory()).getStyle();
   ((I("g-name").textContent = U0[i0].name),
-    (I("g-idx").textContent = a + 1 + " / " + ul.length),
-    o("g-st-n", J, 1500, Ka.format(J)),
-    o("g-st-b", ke, 12e3, Ka.format(ke)),
-    o("g-st-g", n, 9, String(n)));
+    (I("g-idx").textContent = ul.indexOf(i0) + 1 + " / " + ul.length),
+    (I("g-spec").textContent = It`${Ka.format(J)} узлов · ${Ka.format(ke)} балок · ${gl} стёкол`));
+  for (let b of I("g-tabs").children) b.setAttribute("aria-selected", String(b.dataset.gt === pdzGar.tab));
+  for (let t of document.querySelectorAll(".gar-tab")) t.hidden = t.dataset.gt !== pdzGar.tab;
+  // paint: what, which colour, which finish
+  let tg = pdzGar.target,
+    pc = tg < 0 ? c.paint.c : (c.parts[tg] || {}).c || "",
+    pf = tg < 0 ? c.paint.fin : (c.parts[tg] || {}).fin || "";
+  pdzChips(I("g-ptarget"), [[-1, C("Весь кузов")], ...pdzPaintParts.filter((p) => Ba[p] > 0).map((p) => [p, du[p], (c.parts[p] || {}).c || ""])], tg);
+  pdzSwatch(e, pdzPaints, pc, tg < 0 ? fac : c.paint.c || fac);
+  I("g-pick").value = pc || "#16357a";
+  pdzChips(I("g-fin"), (tg < 0 ? [] : [["", C("Как у кузова")]]).concat(Object.keys(pdzFinish).filter((k) => tg < 0 || k !== "factory").map((k) => [k, pdzFinNames[k]])), pf);
+  // stickers: the sheet, what is on the car, the one being edited
+  let lib = I("g-stk-lib");
+  if (!lib.children.length)
+    pdzStk.forEach((d, k) => {
+      let b = document.createElement("button"),
+        cv = document.createElement("canvas");
+      ((b.type = "button"), (b.dataset.id = k), (b.title = d.n), (cv.width = cv.height = 72), b.appendChild(cv), b.insertAdjacentHTML("beforeend", `<span>${Ea(d.n)}</span>`), lib.appendChild(b));
+    });
+  for (let b of lib.children) (pdzStkThumb(+b.dataset.id, b.firstChild), b.setAttribute("aria-pressed", String(+b.dataset.id === pdzGar.pick)));
+  I("g-stk-hint").textContent =
+    pdzGar.pick >= 0
+      ? C("Нажмите на кузов, куда приклеить.")
+      : pdzGar.move
+        ? C("Нажмите на кузов, куда перенести.")
+        : C("Выберите наклейку и нажмите на кузов, чтобы приклеить. Наклейка мнётся вместе с панелью.");
+  let L = I("g-stk-list");
+  if (L.children.length !== c.stk.length) {
+    L.innerHTML = "";
+    c.stk.forEach((s, i) => {
+      let b = document.createElement("button"),
+        cv = document.createElement("canvas");
+      ((b.type = "button"), (b.dataset.i = i), (cv.width = cv.height = 48), b.appendChild(cv), L.appendChild(b));
+    });
+  }
+  [...L.children].forEach((b, i) => (pdzStkThumb(c.stk[i].id, b.firstChild), b.setAttribute("aria-pressed", String(i === pdzGar.stk))));
+  let S = c.stk[pdzGar.stk];
+  if (((I("g-stk-edit").hidden = !S), S)) {
+    let d = pdzStk[S.id] || {};
+    ((I("g-stk-s").value = S.s), (I("g-stk-r").value = S.r), (I("g-stk-numrow").hidden = S.id !== 0), (I("g-stk-num").value = c.num), (I("g-stk-c").hidden = !d.tint));
+    (d.tint && pdzSwatch(I("g-stk-c"), ["#ffffff", "#111214", "#ffcd1c", "#c8102e", "#2d6fd8", "#76b82a", "#ff6a13", "#e05ab5", "#a7adb3"], S.c || "#ffffff", "#fff"), I("g-stk-m").setAttribute("aria-pressed", String(!!S.m)), I("g-stk-mv").setAttribute("aria-pressed", String(pdzGar.move)));
+  }
+  I("g-stk-clear").hidden = !c.stk.length;
+  // wheels
+  pdzChips(I("g-rim"), pdzRimNames.map((n, i) => [i, n]), c.wheel.style | 0);
+  (pdzSwatch(I("g-rimc"), pdzRimCols, c.wheel.c, "#5a6069"), pdzSwatch(I("g-cal"), pdzCalCols, c.wheel.cal, "#ffc21a"));
+  // tuning
+  let T = I("g-tune");
+  if (!T.children.length)
+    for (let [k, n, a, b, st] of pdzTuneDefs)
+      T.insertAdjacentHTML("beforeend", `<label class="gar-row">${Ea(n)} <input type="range" data-k="${k}" min="${a}" max="${b}" step="${st}"><output data-o="${k}"></output></label>`);
+  for (let [k, , , , , f] of pdzTuneDefs) {
+    let v = c.tune[k];
+    ((T.querySelector(`[data-k="${k}"]`).value = v), (T.querySelector(`[data-o="${k}"]`).textContent = f ? f(v) : "\xD7" + v.toFixed(2)));
+  }
+  // extras
+  (pdzChips(I("g-tint"), pdzTints.map((t, i) => [i, t[0]]), c.extra.tint), pdzChips(I("g-light"), pdzLights.map((t, i) => [i, t[0], t[1]]), c.extra.light), pdzSwatch(I("g-glow"), pdzGlows, c.extra.glow, "#2a2e33"));
+  // inspection
+  ((I("g-ex").value = pdzIns.exT), I("g-bolts").setAttribute("aria-pressed", String(pdzIns.bolts)), I("g-xray").setAttribute("aria-pressed", String(pdzIns.xray)));
+  let jl = I("g-jleg");
+  jl.children.length || (jl.innerHTML = Object.keys(pdzJointName).filter((k) => k !== "hoodlatch").map((k) => `<span style="--c:#${pdzJointCol[k].toString(16).padStart(6, "0")}">${Ea(pdzJointName[k])} · ${(Ms[k] / 1e3).toFixed(1)} ${C("кН")}</span>`).join(""));
+  let P = I("g-parts"),
+    parts = [];
+  for (let p = 0; p < oe; p++) Ba[p] > 0 && parts.push(p);
+  if (P.dataset.car !== i0 + parts.length) {
+    ((P.dataset.car = i0 + parts.length), (P.innerHTML = ""));
+    for (let p of parts) {
+      let g = (ft.panels || []).find((q) => q.part === p),
+        n = g ? g.joints.length : 0;
+      P.insertAdjacentHTML("beforeend", `<button type="button" data-p="${p}">${Ea(du[p])}<small>${p === _.FRAME ? C("основа кузова") : It`${n} креплений`} · ${It`${K0[p].length} узлов`}</small></button>`);
+    }
+  }
+  for (let b of P.children) b.setAttribute("aria-pressed", String(+b.dataset.p === pdzIns.solo));
+}
+// paint
+function pdzSetPaint(col, fin) {
+  let c = We.cfg,
+    t = pdzGar.target;
+  if (t < 0) (col !== void 0 && (c.paint.c = col), fin !== void 0 && (c.paint.fin = fin));
+  else {
+    let p = c.parts[t] || (c.parts[t] = {});
+    (col !== void 0 && (p.c = col), fin !== void 0 && (p.fin = fin), p.c || p.fin || delete c.parts[t]);
+  }
+  (pdzCfgSave(), pdzApplyPaint(), pdzGarageUI());
+}
+// a click on the body in the sticker tab: stick the chosen one there, or move the selected one
+function pdzGarClick(x, y) {
+  if (I0 !== "garage" || pdzGar.tab !== "stk") return;
+  let c = We.cfg;
+  if (pdzGar.pick < 0 && !(pdzGar.move && c.stk[pdzGar.stk])) return;
+  let h = pdzRestHit(x, y);
+  if (!h) return;
+  if (pdzGar.move && c.stk[pdzGar.stk]) ((c.stk[pdzGar.stk].p = h.p), (c.stk[pdzGar.stk].n = h.n), (pdzGar.move = !1));
+  else {
+    if (c.stk.length >= 10) return void k0(C("Не больше 10 наклеек на машину"), 2500);
+    (c.stk.push({ id: pdzGar.pick, p: h.p, n: h.n, s: pdzGar.pick === 0 ? 0.3 : pdzGar.pick === 2 || pdzGar.pick === 12 ? 0.7 : 0.42, r: 0, c: "#ffffff", m: !1 }), (pdzGar.stk = c.stk.length - 1), (pdzGar.pick = -1));
+  }
+  (pdzCfgSave(), pdzApplyStk(), pdzGarageUI());
+}
+function pdzStkEdit(f) {
+  let s = We.cfg.stk[pdzGar.stk];
+  s && (f(s), pdzCfgSave(), pdzApplyStk());
+}
+function pdzGarLeave() {
+  ((pdzIns.exT = pdzIns.ex = 0), (pdzIns.bolts = !1), pdzIns.xray && ((pdzIns.xray = !1), wn(0)), pdzIns.solo >= 0 && pdzSolo(-1), (pdzGar.pick = -1), (pdzGar.move = !1), (I("gar-tip").hidden = !0));
+}
+function pdzGarWire() {
+  if (pdzGar.built) return;
+  pdzGar.built = !0;
+  let on = (id, ev, f) => I(id).addEventListener(ev, f),
+    btn = (ev, sel) => ev.target.closest(sel);
+  on("g-tabs", "click", (e) => {
+    let b = btn(e, "button[data-gt]");
+    b && ((pdzGar.tab = b.dataset.gt), pdzGar.tab !== "stk" && ((pdzGar.pick = -1), (pdzGar.move = !1)), pdzGar.tab !== "insp" && (I("gar-tip").hidden = !0), pdzGarageUI());
+  });
+  on("g-ptarget", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((pdzGar.target = +b.dataset.v), pdzIns.solo >= 0 && pdzSolo(-1), pdzGarageUI());
+  });
+  on("g-paint", "click", (e) => {
+    let b = btn(e, "button");
+    b && pdzSetPaint(b.dataset.c);
+  });
+  on("g-pick", "input", (e) => pdzSetPaint(e.target.value));
+  on("g-fin", "click", (e) => {
+    let b = btn(e, "button");
+    b && pdzSetPaint(void 0, b.dataset.v);
+  });
+  on("g-preset", "click", () => {
+    ((We.cfg.paint = { c: "", fin: "factory" }), (We.cfg.parts = {}), pdzCfgSave(), pdzApplyPaint(), pdzGarageUI());
+  });
+  on("g-stk-lib", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((pdzGar.pick = pdzGar.pick === +b.dataset.id ? -1 : +b.dataset.id), (pdzGar.move = !1), pdzGarageUI());
+  });
+  on("g-stk-list", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((pdzGar.stk = pdzGar.stk === +b.dataset.i ? -1 : +b.dataset.i), (pdzGar.move = !1), pdzGarageUI());
+  });
+  on("g-stk-s", "input", (e) => pdzStkEdit((s) => (s.s = +e.target.value)));
+  on("g-stk-r", "input", (e) => pdzStkEdit((s) => (s.r = +e.target.value)));
+  on("g-stk-num", "input", (e) => {
+    ((We.cfg.num = Math.max(0, Math.min(999, Math.round(+e.target.value) || 0))), pdzCfgSave(), pdzApplyStk(), pdzGarageUI());
+  });
+  on("g-stk-c", "click", (e) => {
+    let b = btn(e, "button");
+    b && (pdzStkEdit((s) => (s.c = b.dataset.c)), pdzGarageUI());
+  });
+  on("g-stk-m", "click", () => (pdzStkEdit((s) => (s.m = !s.m)), pdzGarageUI()));
+  on("g-stk-mv", "click", () => ((pdzGar.move = !pdzGar.move), (pdzGar.pick = -1), pdzGarageUI()));
+  on("g-stk-del", "click", () => {
+    (We.cfg.stk.splice(pdzGar.stk, 1), (pdzGar.stk = -1), (pdzGar.move = !1), pdzCfgSave(), pdzApplyStk(), pdzGarageUI());
+  });
+  on("g-stk-clear", "click", () => {
+    ((We.cfg.stk = []), (pdzGar.stk = -1), pdzCfgSave(), pdzApplyStk(), pdzGarageUI());
+  });
+  on("g-rim", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((We.cfg.wheel.style = +b.dataset.v), pdzCfgSave(), pdzApplyWheels(), pdzGarageUI());
+  });
+  on("g-rimc", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((We.cfg.wheel.c = b.dataset.c), pdzCfgSave(), pdzApplyWheels(), pdzGarageUI());
+  });
+  on("g-cal", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((We.cfg.wheel.cal = b.dataset.c), pdzCfgSave(), pdzApplyWheels(), pdzGarageUI());
+  });
+  on("g-tune", "input", (e) => {
+    let k = e.target.dataset.k;
+    if (!k) return;
+    ((We.cfg.tune[k] = +e.target.value), pdzCfgSave(), pdzApplyTune(), k === "ride" && (pe.settle = Math.max(pe.settle, 0.8)));
+    let d = pdzTuneDefs.find((q) => q[0] === k);
+    I("g-tune").querySelector(`[data-o="${k}"]`).textContent = d[5] ? d[5](+e.target.value) : "\xD7" + (+e.target.value).toFixed(2);
+  });
+  on("g-tune-reset", "click", () => {
+    ((We.cfg.tune = pdzCfgDefault().tune), pdzCfgSave(), pdzApplyTune(), (pe.settle = 1), pdzGarageUI());
+  });
+  on("g-tint", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((We.cfg.extra.tint = +b.dataset.v), pdzCfgSave(), pdzApplyExtra(), pdzGarageUI());
+  });
+  on("g-light", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((We.cfg.extra.light = +b.dataset.v), pdzCfgSave(), pdzApplyExtra(), pdzGarageUI());
+  });
+  on("g-glow", "click", (e) => {
+    let b = btn(e, "button");
+    b && ((We.cfg.extra.glow = b.dataset.c), pdzCfgSave(), pdzApplyExtra(), pdzGarageUI());
+  });
+  on("g-ex", "input", (e) => (pdzIns.exT = +e.target.value));
+  on("g-bolts", "click", () => ((pdzIns.bolts = !pdzIns.bolts), pdzIns.bolts || (I("gar-tip").hidden = !0), pdzGarageUI()));
+  on("g-xray", "click", () => ((pdzIns.xray = !pdzIns.xray), wn(pdzIns.xray ? 1 : 0), pdzGarageUI()));
+  on("g-parts", "click", (e) => {
+    let b = btn(e, "button");
+    b && (pdzSolo(pdzIns.solo === +b.dataset.p ? -1 : +b.dataset.p), pdzGarageUI());
+  });
+  // clicks on the car (not drags) and the joint under the pointer
+  let down = null;
+  (lt.addEventListener("pointerdown", (e) => (down = { x: e.clientX, y: e.clientY })),
+    lt.addEventListener("pointerup", (e) => {
+      down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6 && pdzGarClick(e.clientX, e.clientY);
+      down = null;
+    }),
+    lt.addEventListener("pointermove", (e) => {
+      let t = I("gar-tip");
+      if (I0 !== "garage" || pdzGar.tab !== "insp" || !pdzIns.bolts || e.buttons) return void (t.hidden || (t.hidden = !0));
+      let j = pdzBoltAt(e.clientX, e.clientY);
+      if (!j) return void (t.hidden = !0);
+      ((t.innerHTML = `<b>${Ea(pdzJointName[j.t] || j.t)}</b> · ${Ea(du[j.p])}<br>${It`держит до ${((Ms[j.t] || 0) / 1e3).toFixed(1)} кН`}`), (t.style.left = e.clientX + "px"), (t.style.top = e.clientY + "px"), (t.hidden = !1));
+    }));
 }
 function pdzGarageStep(e) {
   x0 || Fl(ul[(ul.indexOf(i0) + e + ul.length) % ul.length]);
@@ -12488,10 +13623,6 @@ async function ri() {
   I("g-go").addEventListener("click", () => ro("maps")),
   I("g-prev").addEventListener("click", () => pdzGarageStep(-1)),
   I("g-next").addEventListener("click", () => pdzGarageStep(1)),
-  I("g-paint").addEventListener("click", (e) => {
-    let t = e.target.closest("button");
-    t && pdzPaintSet(t.dataset.c);
-  }),
   document.querySelector(".set-tabs").addEventListener("click", (e) => {
     let t = e.target.closest("button[data-tab]");
     if (t) {
@@ -13560,9 +14691,10 @@ function q2(e, t, a) {
   let n = Z[e],
     o = X[e];
   if (n * n + o * o <= Ze.R0 * Ze.R0)
-    return void (Y[e] < t && Mr(e, 0, 1, 0, t - Y[e], a, ws));
+    return void (Y[e] < t && (We.gtouchN++, Mr(e, 0, 1, 0, t - Y[e], a, ws)));
   let r = Ra(n, o);
   if (Y[e] >= r + t) return;
+  We.gtouchN++;
   let s = ho(n, o);
   Mr(e, s[0], s[1], s[2], (r + t - Y[e]) * s[1], Nn * 0.9, ws);
 }
@@ -14521,7 +15653,9 @@ uniform vec4 uMarkDir[${T0}];
 ${hl}
 float dmgAt(float idx) { int i = int(idx + 0.5); return texelFetch(damageTex, ivec2(i % ${yo}, i / ${yo}), 0).r; }
 `),
+          (o += pdzPaintGLSLv),
           (r += `vRest = position;
+vRestN = normal;
 vDmg = skinWeight.x * dmgAt(skinIndex.x) + skinWeight.y * dmgAt(skinIndex.y) + skinWeight.z * dmgAt(skinIndex.z) + skinWeight.w * dmgAt(skinIndex.w);
 vec3 cg; transformed += normal * (crumple(position, cg) + 0.6) * smoothstep(0.08, 1.0, vDmg) * 0.017;   // creases only rise, so the paint never sinks through the inner panels
 for (int k = 0; k < ${T0}; k++) {   // small dents where it was hit
@@ -14533,6 +15667,11 @@ for (int k = 0; k < ${T0}; k++) {   // small dents where it was hit
           (n.uniforms.uMark = a.yo),
           (n.uniforms.uMarkDir = a._o),
           (n.uniforms.carRot = a._d),
+          (() => {
+            let U = pdzPaintU(e);
+            Object.assign(n.uniforms, { uPC: { value: U.pc }, uPF: { value: U.pf }, uDecN: U.dn, uDP: { value: U.dp }, uDQ: { value: U.dq }, uDT: { value: U.dt }, uDecTex: U.tex });
+          })(),
+          (s += pdzPaintGLSLf),
           (s += `varying float vDmg;
 varying vec3 vRest;
 uniform mat3 carRot;
@@ -14594,6 +15733,7 @@ if (((uHide >> int(vPart + 0.5)) & 1) == 1) discard;`,
             .replace(
               "#include <color_fragment>",
               `#include <color_fragment>
+` + pdzPaintColor + `
 // scuffs: thin streaks of bare steel along the body, only where the metal really yielded
 float streak = dmgRidge(vec3(vRest.x * 9.0, vRest.y * 70.0, vRest.z * 3.0)) * dmgRidge(vec3(vRest.x * 60.0 + 1.7, vRest.y * 7.0, vRest.z * 2.0 + 4.1));
 float scr = smoothstep(0.82, 1.0, vDmg) * smoothstep(0.84, 0.97, streak) * 0.45;
@@ -14607,11 +15747,15 @@ scr = max(scr, max(mkChip * 0.8, mkScratch * 0.35));`,
             .replace(
               "#include <metalnessmap_fragment>",
               `#include <metalnessmap_fragment>
+if (uPF[pdzPi].w > 0.5) metalnessFactor = uPF[pdzPi].x;
+metalnessFactor = mix(metalnessFactor, 0.05, pdzVinyl * 0.8);
 metalnessFactor = mix(metalnessFactor, 0.75, scr);`,
             )
             .replace(
               "#include <roughnessmap_fragment>",
               `#include <roughnessmap_fragment>
+if (uPF[pdzPi].w > 0.5) roughnessFactor = uPF[pdzPi].y;
+roughnessFactor = mix(roughnessFactor, 0.42, pdzVinyl * 0.7);
 roughnessFactor = mix(roughnessFactor, 0.55, scr);`,
             )
             .replace(
@@ -14631,6 +15775,7 @@ if (vDmg > 0.01) {
               "#include <lights_physical_fragment>",
               `#include <lights_physical_fragment>
 #ifdef USE_CLEARCOAT
+if (uPF[pdzPi].w > 0.5) material.clearcoat = uPF[pdzPi].z;
 material.clearcoat *= (1.0 - scr) * (1.0 - 0.6 * smoothstep(0.15, 0.7, vDmg)) * (1.0 - 0.7 * mkScuff);
 #endif`,
             )),
@@ -14812,7 +15957,9 @@ function s4(e, t) {
   );
 }
 function Z2() {
-  let e = M2(Je[0].r, Je[0].width);
+  let st = pdzCfgOf(i0).wheel.style | 0,
+    e = M2(Je[0].r, Je[0].width, st);
+  We.rimStyle = st;
   for (let t of Je) {
     let a = new Rt(),
       n = new Rt(),
@@ -16161,6 +17308,7 @@ function wo(e = 0, t = 0, a = 0) {
   v.wheelsLost = 0;
   ((We.calm = 0),
     (We.wake = 1),
+    We.rig && ((We.rig.on = !1), (We.rig.calm = 0)),
     tc(e, t, a),
     ki(),
     d0 && (d0.fill(0), (Q0.needsUpdate = !0), (Wa = -1)),
@@ -16866,17 +18014,18 @@ function gc(e, t, a) {
   (Te.throttle > 0 &&
     (s < -0.6
       ? (f = Te.throttle)
-      : (l = Te.throttle * Math.min(Zr.force, Zr.power / Math.max(i, 1)))),
+      : (l = Te.throttle * Math.min(Zr.force, Zr.power / Math.max(i, 1)) * (We.tn ? We.tn.p : 1))),
     Te.brake > 0 &&
       (s > 0.6
         ? (f = Math.max(f, Te.brake))
         : s > -Zr.revMax && (l = -Te.brake * Zr.rev)));
   for (let c of Je) {
     if (((c.load = 0), !c.contact)) continue;
-    let u = -(c.vx * n + c.vy * o + c.vz * r),
+    let tn = We.tn || pdzTn0,
+      u = -(c.vx * n + c.vy * o + c.vz * r),
       d =
         c.kSpring * Ue.spring * c.comp +
-        wa.damp * Ue.damp * u +
+        wa.damp * Ue.damp * tn.d * u +
         wa.antiRoll * Ue.arb * (c.comp - c.pair.comp);
     (c.s < 0 && (d += wa.bump * Math.min(-c.s, 0.06)), d < 0 && (d = 0), (c.load = d));
     let h = c.front ? v.steer : 0,
@@ -16902,15 +18051,15 @@ function gc(e, t, a) {
     if (
       ((P -= Math.max(-1, Math.min(1, S * 3)) * Jr.roll * F.roll * d), f > 0)
     ) {
-      let K = f * Zr.brake * (c.front ? 0.3 : 0.2);
+      let K = f * Zr.brake * tn.b * (c.front ? 0.3 : 0.2);
       P -= Math.max(-K, Math.min(K, S * Math.min(B, 4e3)));
     }
     if (D) {
       let K = Jr.mu * Ue.grip * F.mu * 0.8 * d;
       P = -Math.max(-K, Math.min(K, S * Math.min(B, 4e3)));
     }
-    let L = -E * Math.min(B, Jr.cLat * F.lat * (D ? Jr.hbGrip : 1)),
-      z = Jr.mu * Ue.grip * F.mu * d * (D ? 0.75 : 1),
+    let L = -E * Math.min(B, Jr.cLat * F.lat * tn.g * (D ? Jr.hbGrip : 1)),
+      z = Jr.mu * Ue.grip * tn.g * F.mu * d * (D ? 0.75 : 1),
       G = Math.hypot(P, L);
     if (G > z) {
       let K = z / G;
@@ -16922,7 +18071,17 @@ function gc(e, t, a) {
     yc(c, j, U, W, c.tx - n * c.s, c.ty - o * c.s, c.tz - r * c.s);
   }
 }
+var pdzTn0 = { d: 1, g: 1, p: 1, b: 1 };
 function yc(e, t, a, n, o, r, s) {
+  if (pdzRigAcc) {
+    let k = pdzRigAcc.c,
+      F = pdzRigF,
+      x = o - k[0],
+      y = r - k[1],
+      z = s - k[2];
+    ((F[0] += t), (F[1] += a), (F[2] += n), (F[3] += y * n - z * a), (F[4] += z * t - x * n), (F[5] += x * a - y * t));
+    return;
+  }
   let i = o - e.ax,
     l = r - e.ay,
     f = s - e.az,
@@ -17047,6 +18206,7 @@ function vc(e) {
     (v.impactDamp *= Math.exp(-e / 0.4)));
   // the guard is on in a crash and while the body leans on something; it tracks the slowest the car got
   ((v.guard = v.impactDamp > 0.25 || We.touchN > 0),
+    (We.touchSeen = We.touchN),
     (We.touchN = 0),
     (v.postMin = v.guard ? Math.min(v.postMin ?? 1e9, v.speed) : 1e9),
     (v.postMinW = v.guard ? Math.min(v.postMinW ?? 1e9, Math.hypot(v.wx, v.wy, v.wz)) : 1e9));
@@ -17092,6 +18252,286 @@ function vc(e) {
     n * e,
   ),
     Rc());
+}
+// ---------- rigid stand-in: when nothing is within reach the car is one rigid body ----------
+// A car cruising on open road does not need 8000 beams eight times a frame. While no wall, post, ramp,
+// other car or loose wheel is within a couple of metres, the body touches the ground only through its
+// tyres, nothing hangs loose and no crash is ringing on, the car is integrated as a single rigid body
+// under the same suspension and tyre code (the wheel forces are summed into one force and torque).
+// Every frame the nodes are placed from that pose, with matching velocities, so the soft body can take
+// over again mid-stride as soon as anything comes near.
+var pdzRigAcc = null,
+  pdzRigF = new Float64Array(6),
+  pdzRigM3 = new Float64Array(9),
+  pdzRigOn = !0;
+function pdzRigQuat(q, w, dt) {
+  let [x, y, z, s] = q,
+    hx = 0.5 * dt * w[0],
+    hy = 0.5 * dt * w[1],
+    hz = 0.5 * dt * w[2];
+  ((q[0] = x + hx * s + hy * z - hz * y),
+    (q[1] = y + hy * s + hz * x - hx * z),
+    (q[2] = z + hz * s + hx * y - hy * x),
+    (q[3] = s - hx * x - hy * y - hz * z));
+  let n = 1 / Math.hypot(q[0], q[1], q[2], q[3]);
+  ((q[0] *= n), (q[1] *= n), (q[2] *= n), (q[3] *= n));
+}
+// world inverse inertia times a vector: R Ib^-1 R^T a
+function pdzRigIw(k, R, a, o) {
+  let x = R[0] * a[0] + R[3] * a[1] + R[6] * a[2],
+    y = R[1] * a[0] + R[4] * a[1] + R[7] * a[2],
+    z = R[2] * a[0] + R[5] * a[1] + R[8] * a[2],
+    B = k.Bi,
+    u = B[0] * x + B[1] * y + B[2] * z,
+    v = B[3] * x + B[4] * y + B[5] * z,
+    w = B[6] * x + B[7] * y + B[8] * z;
+  ((o[0] = R[0] * u + R[1] * v + R[2] * w), (o[1] = R[3] * u + R[4] * v + R[5] * w), (o[2] = R[6] * u + R[7] * v + R[8] * w));
+}
+function pdzRigIwx(k, R, a, o) {
+  // world inertia times a vector: R Ib R^T a
+  let x = R[0] * a[0] + R[3] * a[1] + R[6] * a[2],
+    y = R[1] * a[0] + R[4] * a[1] + R[7] * a[2],
+    z = R[2] * a[0] + R[5] * a[1] + R[8] * a[2],
+    B = k.Ib,
+    u = B[0] * x + B[1] * y + B[2] * z,
+    v = B[3] * x + B[4] * y + B[5] * z,
+    w = B[6] * x + B[7] * y + B[8] * z;
+  ((o[0] = R[0] * u + R[1] * v + R[2] * w), (o[1] = R[3] * u + R[4] * v + R[5] * w), (o[2] = R[6] * u + R[7] * v + R[8] * w));
+}
+// take the current soft state as the rigid shape
+function pdzRigEnter() {
+  let k = We.rig,
+    R = v.R,
+    M = 0,
+    cx = 0,
+    cy = 0,
+    cz = 0;
+  (k.s && k.s.length === J * 3) || ((k.s = new Float64Array(J * 3)), (k.mk = new Uint8Array(J)));
+  let mk = k.mk;
+  for (let i = 0; i < J; i++) mk[i] = _a[Ye[i]];
+  for (let i = 0; i < J; i++) mk[i] && ((M += t0[i]), (cx += t0[i] * Z[i]), (cy += t0[i] * Y[i]), (cz += t0[i] * X[i]));
+  // the engine block rides along as part of the body
+  let me = O.m;
+  ((cx = (cx + me * O.p[0]) / (M + me)), (cy = (cy + me * O.p[1]) / (M + me)), (cz = (cz + me * O.p[2]) / (M + me)), (k.M = M + me), (k.Mn = M));
+  let I = (k.Ib = new Float64Array(9)),
+    vx = 0,
+    vy = 0,
+    vz = 0,
+    lx = 0,
+    ly = 0,
+    lz = 0;
+  for (let i = 0; i < J; i++) {
+    if (!mk[i]) {
+      // a panel lying on the road waits there, still
+      ((Ve[i] = Z[i]), (tt[i] = Y[i]), (Ke[i] = X[i]));
+      continue;
+    }
+    let x = Z[i] - cx,
+      y = Y[i] - cy,
+      z = X[i] - cz,
+      a = R[0] * x + R[3] * y + R[6] * z,
+      b = R[1] * x + R[4] * y + R[7] * z,
+      c = R[2] * x + R[5] * y + R[8] * z,
+      m = t0[i],
+      ux = (Z[i] - Ve[i]) / v.dtPrev,
+      uy = (Y[i] - tt[i]) / v.dtPrev,
+      uz = (X[i] - Ke[i]) / v.dtPrev;
+    ((k.s[i * 3] = a), (k.s[i * 3 + 1] = b), (k.s[i * 3 + 2] = c));
+    ((I[0] += m * (b * b + c * c)), (I[4] += m * (a * a + c * c)), (I[8] += m * (a * a + b * b)), (I[1] -= m * a * b), (I[2] -= m * a * c), (I[5] -= m * b * c));
+    ((vx += m * ux), (vy += m * uy), (vz += m * uz), (lx += m * (y * uz - z * uy)), (ly += m * (z * ux - x * uz)), (lz += m * (x * uy - y * ux)));
+  }
+  {
+    let x = O.p[0] - cx,
+      y = O.p[1] - cy,
+      z = O.p[2] - cz,
+      a = R[0] * x + R[3] * y + R[6] * z,
+      b = R[1] * x + R[4] * y + R[7] * z,
+      c = R[2] * x + R[5] * y + R[8] * z;
+    ((k.ep = [a, b, c]), (I[0] += me * (b * b + c * c) + O.ib[0]), (I[4] += me * (a * a + c * c) + O.ib[1]), (I[8] += me * (a * a + b * b) + O.ib[2]), (I[1] -= me * a * b), (I[2] -= me * a * c), (I[5] -= me * b * c));
+    ((vx += me * O.v[0]), (vy += me * O.v[1]), (vz += me * O.v[2]), (lx += me * (y * O.v[2] - z * O.v[1])), (ly += me * (z * O.v[0] - x * O.v[2])), (lz += me * (x * O.v[1] - y * O.v[0])));
+    // the engine's attitude relative to the body
+    let q = v.q,
+      e = O.q;
+    k.eq = [q[3] * e[0] - q[0] * e[3] - q[1] * e[2] + q[2] * e[1], q[3] * e[1] + q[0] * e[2] - q[1] * e[3] - q[2] * e[0], q[3] * e[2] - q[0] * e[1] + q[1] * e[0] - q[2] * e[3], q[3] * e[3] + q[0] * e[0] + q[1] * e[1] + q[2] * e[2]];
+  }
+  ((I[3] = I[1]), (I[6] = I[2]), (I[7] = I[5]));
+  let d = I[0] * (I[4] * I[8] - I[5] * I[7]) - I[1] * (I[3] * I[8] - I[5] * I[6]) + I[2] * (I[3] * I[7] - I[4] * I[6]),
+    Bi = (k.Bi = new Float64Array(9));
+  ((Bi[0] = (I[4] * I[8] - I[5] * I[7]) / d), (Bi[1] = (I[2] * I[7] - I[1] * I[8]) / d), (Bi[2] = (I[1] * I[5] - I[2] * I[4]) / d));
+  ((Bi[3] = Bi[1]), (Bi[4] = (I[0] * I[8] - I[2] * I[6]) / d), (Bi[5] = (I[2] * I[3] - I[0] * I[5]) / d));
+  ((Bi[6] = Bi[2]), (Bi[7] = Bi[5]), (Bi[8] = (I[0] * I[4] - I[1] * I[3]) / d));
+  // momentum and angular momentum of the soft state carry over exactly
+  ((k.c = [cx, cy, cz]), (k.v = [vx / k.M, vy / k.M, vz / k.M]), (k.q = Float64Array.from(v.q)), (k.R = Float64Array.from(R)), (k.w = [0, 0, 0]));
+  let L = [lx, ly, lz];
+  pdzRigIw(k, R, L, k.w);
+  // the anchors the wheels hang from
+  let A = new Set();
+  for (let c of Je) for (let j of c.anc) A.add(j);
+  ((k.anc = Int32Array.from(A)), (k.on = !0), (k.n = (k.n || 0) + 1));
+}
+// one substep of the rigid body: wheels, gravity, drag
+function pdzRigStep(dt) {
+  let k = We.rig,
+    R = k.R,
+    c = k.c,
+    V = k.v,
+    W = k.w,
+    s = k.s;
+  ((ht = dt), qr++, (v.dtPrev = dt));
+  // the anchors where the rigid pose puts them, moving as it moves
+  for (let j of k.anc) {
+    let a = s[j * 3],
+      b = s[j * 3 + 1],
+      e = s[j * 3 + 2],
+      x = R[0] * a + R[1] * b + R[2] * e,
+      y = R[3] * a + R[4] * b + R[5] * e,
+      z = R[6] * a + R[7] * b + R[8] * e;
+    ((Z[j] = c[0] + x), (Y[j] = c[1] + y), (X[j] = c[2] + z));
+    ((Ve[j] = Z[j] - (V[0] + W[1] * z - W[2] * y) * dt), (tt[j] = Y[j] - (V[1] + W[2] * x - W[0] * z) * dt), (Ke[j] = X[j] - (V[2] + W[0] * y - W[1] * x) * dt));
+  }
+  ((v.vx = V[0]), (v.vy = V[1]), (v.vz = V[2]), (v.wx = W[0]), (v.wy = W[1]), (v.wz = W[2]), v.R.set(R), v.q.set(k.q));
+  let F = pdzRigF;
+  (F.fill(0), (pdzRigAcc = k), gc(dt, 1 / dt, R), (pdzRigAcc = null));
+  let sp = Math.hypot(V[0], V[1], V[2]),
+    dr = (su * sp * k.Mn) / Go;
+  ((F[0] -= dr * V[0]), (F[1] -= dr * V[1] + k.M * F0), (F[2] -= dr * V[2]));
+  ((V[0] += (F[0] / k.M) * dt), (V[1] += (F[1] / k.M) * dt), (V[2] += (F[2] / k.M) * dt));
+  // Euler: dw = Iw^-1 (T - w x Iw w)
+  let L = pdzRigM3,
+    T = [F[3], F[4], F[5]];
+  pdzRigIwx(k, R, W, L);
+  ((T[0] -= W[1] * L[2] - W[2] * L[1]), (T[1] -= W[2] * L[0] - W[0] * L[2]), (T[2] -= W[0] * L[1] - W[1] * L[0]));
+  let dW = [0, 0, 0];
+  (pdzRigIw(k, R, T, dW), (W[0] += dW[0] * dt), (W[1] += dW[1] * dt), (W[2] += dW[2] * dt));
+  ((c[0] += V[0] * dt), (c[1] += V[1] * dt), (c[2] += V[2] * dt), pdzRigQuat(k.q, W, dt), ba(k.q, 0, R));
+}
+// every node where the rigid pose puts it, with its rigid velocity; the engine block too
+function pdzRigPlace() {
+  let k = We.rig,
+    R = k.R,
+    c = k.c,
+    V = k.v,
+    W = k.w,
+    s = k.s,
+    mk = k.mk,
+    dt = v.dtPrev;
+  for (let j = 0; j < J; j++) {
+    if (!mk[j]) {
+      ((Ve[j] = Z[j]), (tt[j] = Y[j]), (Ke[j] = X[j]));
+      continue;
+    }
+    let a = s[j * 3],
+      b = s[j * 3 + 1],
+      e = s[j * 3 + 2],
+      x = R[0] * a + R[1] * b + R[2] * e,
+      y = R[3] * a + R[4] * b + R[5] * e,
+      z = R[6] * a + R[7] * b + R[8] * e;
+    ((Z[j] = c[0] + x), (Y[j] = c[1] + y), (X[j] = c[2] + z));
+    ((Ve[j] = Z[j] - (V[0] + W[1] * z - W[2] * y) * dt), (tt[j] = Y[j] - (V[1] + W[2] * x - W[0] * z) * dt), (Ke[j] = X[j] - (V[2] + W[0] * y - W[1] * x) * dt));
+  }
+  let [a, b, e] = k.ep,
+    x = R[0] * a + R[1] * b + R[2] * e,
+    y = R[3] * a + R[4] * b + R[5] * e,
+    z = R[6] * a + R[7] * b + R[8] * e,
+    q = k.q,
+    r = k.eq;
+  ((O.p[0] = c[0] + x), (O.p[1] = c[1] + y), (O.p[2] = c[2] + z));
+  ((O.v[0] = V[0] + W[1] * z - W[2] * y), (O.v[1] = V[1] + W[2] * x - W[0] * z), (O.v[2] = V[2] + W[0] * y - W[1] * x), O.w.set(W));
+  ((O.q[0] = q[3] * r[0] + q[0] * r[3] + q[1] * r[2] - q[2] * r[1]),
+    (O.q[1] = q[3] * r[1] - q[0] * r[2] + q[1] * r[3] + q[2] * r[0]),
+    (O.q[2] = q[3] * r[2] + q[0] * r[1] - q[1] * r[0] + q[2] * r[3]),
+    (O.q[3] = q[3] * r[3] - q[0] * r[0] - q[1] * r[1] - q[2] * r[2]),
+    ba(O.q, 0, O.R));
+  // the derived rigid data (part frames, centre, velocities) as the solver would have it
+  vo(!0);
+}
+// bounds of the nodes still on the car (torn-off panels left out)
+function pdzBodyBox(t) {
+  ((t[0] = t[1] = t[2] = 1 / 0), (t[3] = t[4] = t[5] = -1 / 0));
+  for (let a = 0; a < J; a++) {
+    if (!_a[Ye[a]]) continue;
+    let n = Z[a],
+      o = Y[a],
+      r = X[a];
+    (n < t[0] && (t[0] = n), o < t[1] && (t[1] = o), r < t[2] && (t[2] = r), n > t[3] && (t[3] = n), o > t[4] && (t[4] = o), r > t[5] && (t[5] = r));
+  }
+}
+// is anything within reach? m: margin in metres
+function pdzRigClear(m) {
+  let b = We.box || (We.box = new Float64Array(6));
+  pdzBodyBox(b);
+  let sp = v.speed,
+    g = m + sp * 0.09;
+  for (let s of ua) if (s.minx < b[3] + g && s.maxx > b[0] - g && s.miny < b[4] + g && s.maxy > b[1] - g && s.minz < b[5] + g && s.maxz > b[2] - g) return !1;
+  for (let o of je) {
+    let q = o.box;
+    if (o !== We && q && q[0] < b[3] + g + 1.5 && q[3] > b[0] - g - 1.5 && q[1] < b[4] + g && q[4] > b[1] - g && q[2] < b[5] + g + 1.5 && q[5] > b[2] - g - 1.5) return !1;
+    for (let w of o.wheels) {
+      let P = w.wb && w.wb.det && !w.wb.sleep && w.wb.P;
+      if (P && P[0] > b[0] - g - 1 && P[0] < b[3] + g + 1 && P[2] > b[2] - g - 1 && P[2] < b[5] + g + 1) return !1;
+    }
+  }
+  // ground clearance under the whole body (terrain as the plane under the car)
+  let out = v.cx * v.cx + v.cz * v.cz > Ze.R0 * Ze.R0,
+    h0 = 0,
+    nx = 0,
+    ny = 1,
+    nz = 0;
+  if (out) {
+    h0 = Ra(v.cx, v.cz);
+    let N = ho(v.cx, v.cz);
+    ((nx = N[0]), (ny = N[1]), (nz = N[2]));
+  }
+  let lim = 0.07 + Math.max(0, -v.vy) * 0.05;
+  for (let i = 0; i < J; i++) {
+    if (!_a[Ye[i]]) continue;
+    let gy = out ? h0 - (nx * (Z[i] - v.cx) + nz * (X[i] - v.cz)) / ny : 0;
+    if (Y[i] - gy < lim + (out ? 0.06 : 0)) return !1;
+  }
+  return !0;
+}
+// per frame: stay rigid, fall back to the soft body, or settle into the rigid stand-in
+function pdzRigFrame(e) {
+  let k = We.rig || (We.rig = { on: !1, calm: 0 });
+  // things the stand-in cannot carry: a crash ringing on, loose or lost panels, a lost wheel, the body on
+  // the ground or on its side, the car being replayed
+  let ok = pdzRigOn && !le.on && v.impactDamp < 0.02 && v.R[4] > 0.75;
+  if (ok && !k.on)
+    for (let l = 0; l < oe && ok; l++)
+      if (!_a[l])
+        for (let i of K0[l]) {
+          let x = Z[i] - Ve[i],
+            y = Y[i] - tt[i],
+            z = X[i] - Ke[i];
+          if (x * x + y * y + z * z > (0.15 * v.dtPrev) ** 2) {
+            ok = !1;
+            break;
+          }
+        }
+  if (ok) for (let c of Je) if (c.wb && c.wb.det) ok = !1;
+  if (k.on) {
+    // the nodes go where the rigid body is now, whether it stays rigid or hands back to the soft body
+    pdzRigPlace();
+    ok && pdzRigClear(0.6) ? 0 : ((k.on = !1), (k.calm = 0));
+    return;
+  }
+  // soft now: count calm time (no contacts this frame, nothing near, no ringing in the body)
+  if (ok && !We.touchSeen && !We.gtouchN && pdzRigClear(1.2)) {
+    let d = 0,
+      t = 1 / v.dtPrev;
+    for (let i = 0; i < J; i += 3) {
+      if (!_a[Ye[i]]) continue;
+      let x = Z[i] - v.cx,
+        y = Y[i] - v.cy,
+        z = X[i] - v.cz,
+        a = (Z[i] - Ve[i]) * t - (v.vx + v.wy * z - v.wz * y),
+        b = (Y[i] - tt[i]) * t - (v.vy + v.wz * x - v.wx * z),
+        c = (X[i] - Ke[i]) * t - (v.vz + v.wx * y - v.wy * x);
+      d += a * a + b * b + c * c;
+    }
+    k.calm = d / Math.ceil(J / 3) < 0.09 ? k.calm + e : 0;
+  } else k.calm = 0;
+  ((We.gtouchN = 0), k.calm > 0.3 && pdzRigEnter());
 }
 var pdzProf = { on: !1, t: {}, n: 0 },
   pdzT0 = 0;
@@ -17141,8 +18581,8 @@ function yl(e) {
   w0(() => wc(e));
   let t = e / Uo;
   (pdzProf.on && pdzProf.n++, w0(pdzWbPrep));
-  for (let a = 0; a < Uo; a++) (w0(() => hc(t)), pdzTic(), L.length > 1 && Mc(), pdzToc("carcar"));
-  (pdzTic(), (pdzDtF = e), w0(pdzWbFrame), w0(() => vc(e)), pdzToc("vc"), Fi(e), pdzToc("Fi"), g2(), pdzToc("g2"), Vs(e), pdzToc("Vs"), Pu(e), v0(() => pdzWheelFx(e)), pdzFxTick(e), pdzToc("fx"));
+  for (let a = 0; a < Uo; a++) (w0(() => (We.rig && We.rig.on ? pdzRigStep(t) : hc(t))), pdzTic(), L.length > 1 && Mc(), pdzToc("carcar"));
+  (pdzTic(), (pdzDtF = e), w0(pdzWbFrame), w0(() => vc(e)), w0(() => pdzRigFrame(e)), pdzToc("vc"), Fi(e), pdzToc("Fi"), g2(), pdzToc("g2"), Vs(e), pdzToc("Vs"), Pu(e), v0(() => pdzWheelFx(e)), pdzFxTick(e), pdzToc("fx"));
 }
 var bc = 0.2,
   xr = new Float64Array(6),
@@ -17944,6 +19384,61 @@ var Ti = new Za(),
   Li = new Za(),
   Lc = new He(0, 1, 0),
   xl = Array.from({ length: oe }, (e, t) => ur.subarray(t * 9, t * 9 + 9));
+// skinning matrices written straight into the skeleton: a bone sits at its node's rest position with no
+// rotation, so its matrix is [R | p - R*rest]; three.js no longer composes and multiplies 900 bones a frame
+var pdzBM = null;
+function pdzSkel() {
+  let s = We.skel;
+  if (!s) {
+    let m = ka.find((k) => k.isSkinnedMesh);
+    if (!m) return null;
+    ((s = We.skel = m.skeleton),
+      (s.update = function () {
+        this.boneTexture && (this.boneTexture.needsUpdate = !0);
+      }));
+    // only the few bones carrying something (steering wheel, airbags) stay in the scene graph
+    for (let b of xa) b.children.length ? (b.pdzKid = 1) : (pn.remove(b), (b.matrixAutoUpdate = !1));
+  }
+  return s.boneMatrices;
+}
+var pdzBEx = null;
+function pdzBone(b, e, x, y, z, qx, qy, qz, qw) {
+  if (pdzBEx) {
+    let p = Ye[e] * 3;
+    ((x += pdzBEx[p]), (y += pdzBEx[p + 1]), (z += pdzBEx[p + 2]));
+  }
+  let m = pdzBM,
+    j = e * 16,
+    x2 = qx + qx,
+    y2 = qy + qy,
+    z2 = qz + qz,
+    xx = qx * x2,
+    xy = qx * y2,
+    xz = qx * z2,
+    yy = qy * y2,
+    yz = qy * z2,
+    zz = qz * z2,
+    wx = qw * x2,
+    wy = qw * y2,
+    wz = qw * z2,
+    a = 1 - (yy + zz),
+    c = xy + wz,
+    d = xz - wy,
+    f = xy - wz,
+    g = 1 - (xx + zz),
+    h = yz + wx,
+    k = xz + wy,
+    l = yz - wx,
+    n = 1 - (xx + yy),
+    sx = ve[e],
+    sy = ge[e],
+    sz = ye[e];
+  ((m[j] = a), (m[j + 1] = c), (m[j + 2] = d), (m[j + 3] = 0));
+  ((m[j + 4] = f), (m[j + 5] = g), (m[j + 6] = h), (m[j + 7] = 0));
+  ((m[j + 8] = k), (m[j + 9] = l), (m[j + 10] = n), (m[j + 11] = 0));
+  ((m[j + 12] = x - (a * sx + f * sy + k * sz)), (m[j + 13] = y - (c * sx + g * sy + l * sz)), (m[j + 14] = z - (d * sx + h * sy + n * sz)), (m[j + 15] = 1));
+  b.pdzKid && (b.position.set(x, y, z), b.quaternion.set(qx, qy, qz, qw));
+}
 // nodes whose every beam is still at its original length: their bone simply follows the panel
 function pdzQuiet() {
   let k = v.nDeformed + v.nBroken * 1e6,
@@ -17960,7 +19455,11 @@ function Ii() {
   let fresh = !We.qShowOk;
   We.qShowOk = 1;
   let kq = 1 - Math.exp(-pdzDt * 32),
-    qa = pdzQuiet();
+    qa = pdzQuiet(),
+    // riding the rigid stand-in nothing in the body bends, so each bent node keeps the turn it settled on
+    rq = !fresh && !le.on && We.rig && We.rig.on && We.rig.qsOk;
+  if (!(pdzBM = pdzSkel())) return;
+  ((pdzBEx = I0 === "garage" ? pdzExplodeOffsets() : null), We.rig && (We.rig.qsOk = We.rig.on));
   for (let e = 0; e < J; e++) {
     let t = Ye[e],
       bd = V0[t] === oe,
@@ -17981,7 +19480,33 @@ function Ii() {
       ((Ct[e4] = pq[po]), (Ct[e4 + 1] = pq[po + 1]), (Ct[e4 + 2] = pq[po + 2]), (Ct[e4 + 3] = pq[po + 3]));
       ((qs[e4] = qs[e4 + 1] = qs[e4 + 2] = 0), (qs[e4 + 3] = 1));
       let c = xa[e];
-      (c.position.set(n, o, r), c.quaternion.set(pq[po], pq[po + 1], pq[po + 2], pq[po + 3]));
+      pdzBone(c, e, n, o, r, pq[po], pq[po + 1], pq[po + 2], pq[po + 3]);
+      continue;
+    }
+    if (rq) {
+      let pq = bd ? v.q : H0,
+        po = bd ? 0 : t * 4,
+        e4 = e * 4,
+        ax = pq[po],
+        ay = pq[po + 1],
+        az = pq[po + 2],
+        aw = pq[po + 3],
+        lx = qs[e4],
+        ly = qs[e4 + 1],
+        lz = qs[e4 + 2],
+        lw = qs[e4 + 3],
+        Qx = aw * lx + ax * lw + ay * lz - az * ly,
+        Qy = aw * ly - ax * lz + ay * lw + az * lx,
+        Qz = aw * lz + ax * ly - ay * lx + az * lw,
+        Qw = aw * lw - ax * lx - ay * ly - az * lz,
+        u = u0[e * 3],
+        d = u0[e * 3 + 1],
+        h = u0[e * 3 + 2],
+        k = 2 * (Qy * h - Qz * d),
+        b = 2 * (Qz * u - Qx * h),
+        M = 2 * (Qx * d - Qy * u);
+      ((Ct[e4] = Qx), (Ct[e4 + 1] = Qy), (Ct[e4 + 2] = Qz), (Ct[e4 + 3] = Qw));
+      pdzBone(xa[e], e, n + u + Qw * k + Qy * M - Qz * b, o + d + Qw * b + Qz * k - Qx * M, r + h + Qw * M + Qx * b - Qy * k, Qx, Qy, Qz, Qw);
       continue;
     }
 
@@ -18054,13 +19579,8 @@ function Ii() {
         k = 2 * (m * h - y * d),
         b = 2 * (y * u - p * h),
         M = 2 * (p * d - m * u);
-      c.position.set(
-        n + u + w * k + m * M - y * b,
-        o + d + w * b + y * k - p * M,
-        r + h + w * M + p * b - m * k,
-      );
-    } else c.position.set(n, o, r);
-    c.quaternion.set(Qx, Qy, Qz, Qw);
+      pdzBone(c, e, n + u + w * k + m * M - y * b, o + d + w * b + y * k - p * M, r + h + w * M + p * b - m * k, Qx, Qy, Qz, Qw);
+    } else pdzBone(c, e, n, o, r, Qx, Qy, Qz, Qw);
   }
 }
 
@@ -18088,14 +19608,15 @@ function Di() {
   for (let t of Je) {
     if (pdzWbShow(t)) continue;
     let a = Math.min(Math.max(t.s, -0.04), t.sMax);
-    (t.group.position.set(t.tx - e[1] * a, t.ty - e[4] * a, t.tz - e[7] * a),
+    let xo = I0 === "garage" ? pdzIns.ex * (t.left ? 0.75 : -0.75) : 0;
+    (t.group.position.set(t.tx - e[1] * a + e[0] * xo, t.ty - e[4] * a + e[3] * xo, t.tz - e[7] * a + e[6] * xo),
       Li.setFromAxisAngle(Lc, t.front ? v.steer : 0),
       t.group.quaternion.copy(Ti).multiply(Li),
       (t.spinner.rotation.x = t.left || t.model ? t.spin : -t.spin));
   }
 }
 function Pi() {
-  (O.mesh.position.set(O.p[0], O.p[1], O.p[2]),
+  (O.mesh.position.set(O.p[0], O.p[1] + (I0 === "garage" ? pdzIns.ex * 0.75 : 0), O.p[2]),
     O.mesh.quaternion.set(O.q[0], O.q[1], O.q[2], O.q[3]));
 }
 function Bi() {
@@ -18522,6 +20043,8 @@ function Wi() {
   for (let t of ka) e(t);
   for (let t of Je) (e(t.group), t.wb && t.wb.tex.dispose());
   We.blob && (e(We.blob), (We.blob = null));
+  We.glow && (We.glow.material.map.dispose(), e(We.glow), (We.glow = null));
+  We.bolts && (e(We.bolts.m), (We.bolts = null));
 
   for (let t of [pn, O.mesh, Xt, ea, pa, ta]) e(t);
   if (q.v) {
@@ -18556,6 +20079,7 @@ async function Ao(e, t, a, n) {
     Wu(),
     Z2(),
     Ic(),
+    pdzCfgApply(),
     wo(t, a, n),
     go(r),
     ao(r),
@@ -20503,6 +22027,8 @@ function pdzWbFrame() {
     let w = c.wb;
     if (!w) continue;
     if (!w.det) {
+      // a car running as one rigid body keeps its shape: nothing can have shoved the mount (and the nodes the reading uses are not stepped)
+      if (We.rig && We.rig.on) continue;
       // how far the mount has been shoved relative to the passenger cell: the suspension is torn out
       let k = pdzWbCell(),
         Q = pdzWbRot,
@@ -21118,9 +22644,196 @@ function pdzForestBuild() {
       r[B].setColorAt(h[B], d),
       h[B]++);
   }
-  for (let b = 0; b < 4; b++)
-    ((pdzForest.max[b] = r[b].count = h[b]), (r[b].frustumCulled = !1), r[b].computeBoundingSphere(), ie.add(r[b]));
-  ((pdzForest.meshes = r), pdzForestDensity());
+  // each species split into angular sectors with real bounds, so the trees behind the camera are skipped
+  let S = 10,
+    T = [],
+    mx = [];
+  for (let b = 0; b < 4; b++) {
+    let q = Array.from({ length: S }, () => []);
+    for (let k = 0; k < h[b]; k++) {
+      r[b].getMatrixAt(k, i);
+      let a = Math.atan2(i.elements[12], i.elements[14]);
+      q[Math.min(S - 1, Math.floor(((a + Math.PI) / (Math.PI * 2)) * S))].push(k);
+    }
+    for (let g of q) {
+      if (!g.length) continue;
+      let m = new e.InstancedMesh(r[b].geometry, o, g.length);
+      g.forEach((k, j) => (r[b].getMatrixAt(k, i), m.setMatrixAt(j, i), r[b].getColorAt(k, d), m.setColorAt(j, d)));
+      (m.computeBoundingSphere(), (m.boundingSphere.radius += 14), T.push(m), mx.push(g.length), ie.add(m));
+    }
+    r[b].dispose();
+  }
+  ((pdzForest.meshes = T), (pdzForest.max = mx), pdzForestDensity());
+}
+// static scenery merged by material in 48 m chunks: hundreds of small meshes become a few dozen draw calls,
+// and each chunk is still culled against the view on its own
+function pdzBatchStatic(keep) {
+  let G = ga,
+    bk = new Map(),
+    base = G.Object3D.prototype.onBeforeRender,
+    v3 = new He(),
+    nm = new rs();
+  ie.updateMatrixWorld(!0);
+  let take = (o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material) || o.onBeforeRender !== base) return !1;
+    let g = o.geometry,
+      m = o.material;
+    if (!g.attributes.position || !g.attributes.normal || g.morphAttributes.position || (g.groups && g.groups.length > 1) || m.transparent || !o.visible) return !1;
+    for (let p = o; p; p = p.parent) if (keep.has(p) || !p.visible) return !1;
+    return !0;
+  };
+  // materials that differ only by identity are one material
+  let canon = new Map(),
+    mb = G.Material.prototype.onBeforeCompile,
+    hx = (c) => (c ? c.getHex() : ""),
+    tx = (t) => (t ? t.uuid : ""),
+    msig = (m) =>
+      m.onBeforeCompile !== mb
+        ? m.uuid
+        : [m.type, hx(m.color), hx(m.emissive), m.emissiveIntensity, m.roughness, m.metalness, m.envMapIntensity, tx(m.map), tx(m.normalMap), tx(m.roughnessMap), tx(m.metalnessMap), tx(m.bumpMap), m.bumpScale, tx(m.alphaMap), tx(m.emissiveMap), tx(m.aoMap), m.vertexColors, m.side, m.opacity, m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits, m.depthWrite, m.depthTest, m.flatShading, m.fog, m.toneMapped, m.alphaTest, m.clearcoat, m.sheen].join(",");
+  ie.traverse((o) => {
+    if (!take(o)) return;
+    let ms = msig(o.material);
+    canon.has(ms) ? (o.material = canon.get(ms)) : canon.set(ms, o.material);
+    let g = o.geometry;
+    (g.boundingSphere || g.computeBoundingSphere(), v3.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld));
+    let sig = ["uv", "color"].filter((a) => g.attributes[a]).join(","),
+      key = [o.material.uuid, sig, o.castShadow, o.receiveShadow, o.renderOrder, Math.floor(v3.x / 80), Math.floor(v3.z / 80)].join("|"),
+      b = bk.get(key);
+    (b || bk.set(key, (b = [])), b.push(o));
+  });
+  let made = 0,
+    gone = 0;
+  for (let [key, list] of bk) {
+    if (list.length < 2) continue;
+    let nv = 0,
+      ni = 0,
+      g0 = list[0].geometry;
+    for (let o of list) ((nv += o.geometry.attributes.position.count), (ni += o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count));
+    let P = new Float32Array(nv * 3),
+      N = new Float32Array(nv * 3),
+      U = g0.attributes.uv ? new Float32Array(nv * 2) : null,
+      Cc = g0.attributes.color ? new Float32Array(nv * g0.attributes.color.itemSize) : null,
+      cs = Cc ? g0.attributes.color.itemSize : 0,
+      Ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni),
+      vo_ = 0,
+      io_ = 0;
+    for (let o of list) {
+      let g = o.geometry,
+        p = g.attributes.position,
+        n = g.attributes.normal,
+        w = o.matrixWorld;
+      nm.getNormalMatrix(w);
+      for (let k = 0; k < p.count; k++) {
+        (v3.fromBufferAttribute(p, k).applyMatrix4(w), v3.toArray(P, (vo_ + k) * 3));
+        (v3.fromBufferAttribute(n, k).applyMatrix3(nm).normalize(), v3.toArray(N, (vo_ + k) * 3));
+        U && ((U[(vo_ + k) * 2] = g.attributes.uv.getX(k)), (U[(vo_ + k) * 2 + 1] = g.attributes.uv.getY(k)));
+        if (Cc) for (let c = 0; c < cs; c++) Cc[(vo_ + k) * cs + c] = g.attributes.color.array[k * cs + c];
+      }
+      if (g.index) for (let k = 0; k < g.index.count; k++) Ix[io_++] = g.index.getX(k) + vo_;
+      else for (let k = 0; k < p.count; k++) Ix[io_++] = k + vo_;
+      ((vo_ += p.count), o.parent.remove(o), g.dispose(), gone++);
+    }
+    let g = new Lt();
+    (g.setAttribute("position", new Mt(P, 3)),
+      g.setAttribute("normal", new Mt(N, 3)),
+      U && g.setAttribute("uv", new Mt(U, 2)),
+      Cc && g.setAttribute("color", new Mt(Cc, cs)),
+      g.setIndex(new Mt(Ix, 1)),
+      g.computeBoundingSphere());
+    let m = new ce(g, list[0].material);
+    ((m.castShadow = list[0].castShadow), (m.receiveShadow = list[0].receiveShadow), (m.renderOrder = list[0].renderOrder), (m.matrixAutoUpdate = !1), ie.add(m), made++);
+  }
+  // whatever stays separate and never moves: no per-frame matrix work
+  ie.traverse((o) => {
+    if (keep.has(o)) return;
+    for (let p = o.parent; p; p = p.parent) if (keep.has(p)) return;
+    o !== ie && !o.isLight && o.matrixAutoUpdate && (o.updateMatrix(), (o.matrixAutoUpdate = !1));
+  });
+  return (pdzBatchInfo = { made, gone });
+}
+var pdzBatchInfo = null;
+// floor lettering: every label in one atlas texture and one mesh instead of a texture, a material and a
+// draw call each
+function pdzLabelsBuild() {
+  let L = pdzLabels;
+  if (((pdzLabels = null), !L.length)) return;
+  let cols = 4,
+    rows = Math.ceil(L.length / cols),
+    tex = St(512 * cols, 128 * rows, (s, w, h) => {
+      (s.clearRect(0, 0, w, h), (s.fillStyle = "#f2f0e6"), (s.font = '700 74px "Barlow Condensed", Arial Narrow, sans-serif'), (s.textAlign = "center"), (s.textBaseline = "middle"));
+      L.forEach(([e], k) => s.fillText(e, (k % cols) * 512 + 256, Math.floor(k / cols) * 128 + 68, 500));
+    }),
+    P = [],
+    U = [],
+    I = [];
+  ((tex.repeat.set(1, 1), (tex.wrapS = tex.wrapT = ga.ClampToEdgeWrapping)),
+    L.forEach(([e, t, a, n], k) => {
+      let c = Math.cos(n),
+        sn = Math.sin(n),
+        u0_ = (k % cols) / cols,
+        u1 = u0_ + 1 / cols,
+        v1 = 1 - Math.floor(k / cols) / rows,
+        v0_ = v1 - 1 / rows,
+        b = P.length / 3;
+      // the plane lay flat (rotated -90 deg about x), then turned by n about the vertical
+      for (let [x, y, u, w] of [
+        [-3, 0.75, u0_, v1],
+        [3, 0.75, u1, v1],
+        [-3, -0.75, u0_, v0_],
+        [3, -0.75, u1, v0_],
+      ])
+        (P.push(t + x * c + y * sn, 0.01, a - x * sn + y * c), U.push(u, w));
+      I.push(b, b + 2, b + 1, b + 2, b + 3, b + 1);
+    }));
+  let g = new Lt();
+  (g.setAttribute("position", new _e(P, 3)), g.setAttribute("uv", new _e(U, 2)), g.setIndex(I), g.computeVertexNormals(), g.computeBoundingSphere());
+  let m = new ce(g, new Hr({ map: tex, transparent: !0, polygonOffset: !0, polygonOffsetFactor: -2 }));
+  ie.add(m);
+}
+// kickable props (cones, tyre stacks, barrels...): one instanced mesh per kind and part; the props keep
+// their invisible groups for the physics, and a prop's instance follows it only when it has moved
+var pdzProps = [];
+function pdzPropsBuild() {
+  let kinds = new Map(),
+    inv = new mt(),
+    sig = (g) => g.type + JSON.stringify(g.parameters || g.uuid);
+  ie.updateMatrixWorld(!0);
+  for (let t of La) {
+    let parts = [];
+    (inv.copy(t.g.matrixWorld).invert(),
+      t.g.traverse((o) => {
+        o.isMesh && !o.isInstancedMesh && o.visible && parts.push({ o, rel: new mt().multiplyMatrices(inv, o.matrixWorld) });
+      }));
+    if (!parts.length) continue;
+    let k = parts.map((p) => sig(p.o.geometry) + p.o.material.uuid + p.o.castShadow).join("|"),
+      K = kinds.get(k);
+    (K || kinds.set(k, (K = { parts, props: [] })), K.props.push(t), (t.parts = parts));
+  }
+  for (let K of kinds.values()) {
+    if (K.props.length < 2) continue;
+    K.meshes = K.parts.map((p) => {
+      let m = new ts(p.o.geometry, p.o.material, K.props.length);
+      return ((m.castShadow = p.o.castShadow), (m.receiveShadow = p.o.receiveShadow), ie.add(m), m);
+    });
+    for (let t of K.props) for (let p of t.parts) p.o.visible = !1;
+    ((K.key = new Float64Array(K.props.length).fill(NaN)), pdzProps.push(K));
+  }
+  pdzPropsSync();
+}
+var pdzPM = new mt();
+function pdzPropsSync() {
+  for (let K of pdzProps) {
+    let d = !1;
+    K.props.forEach((t, i) => {
+      let g = t.g,
+        h = g.position.x + g.position.y * 3.1 + g.position.z * 7.3 + g.rotation.x * 11 + g.rotation.y * 13 + g.rotation.z * 17;
+      if (h === K.key[i]) return;
+      ((K.key[i] = h), g.updateMatrix(), (d = !0));
+      K.parts.forEach((p, j) => K.meshes[j].setMatrixAt(i, pdzPM.multiplyMatrices(g.matrix, p.rel)));
+    });
+    if (d) for (let m of K.meshes) ((m.instanceMatrix.needsUpdate = !0), m.computeBoundingSphere());
+  }
 }
 // the preset decides how many of the planted trees are drawn; they were planted in random order, so this thins evenly
 function pdzForestDensity() {
@@ -21294,6 +23007,19 @@ function pdzBlobTick() {
     b.matrix.copy(pdzBlobM),
     (b.matrixWorldNeedsUpdate = !0),
     (b.material.opacity = 0.72 * al));
+  // underglow: a coloured pool of light on the ground under the car
+  if (e.glowC) {
+    if (!e.glow) {
+      let t = St(128, 128, (c) => {
+          let g = c.createRadialGradient(64, 64, 4, 64, 64, 64);
+          (g.addColorStop(0, "rgba(255,255,255,0.9)"), g.addColorStop(0.55, "rgba(255,255,255,0.35)"), g.addColorStop(1, "rgba(255,255,255,0)"), (c.fillStyle = g), c.fillRect(0, 0, 128, 128));
+        }),
+        m = new ce(new Nt(1, 1), new Hr({ map: t, transparent: !0, depthWrite: !1, blending: _o, polygonOffset: !0, polygonOffsetFactor: -5, polygonOffsetUnits: -5 }));
+      ((m.matrixAutoUpdate = !1), (m.renderOrder = 2), ie.add(m), (e.glow = m));
+    }
+    let g = e.glow;
+    (g.material.color.set(e.glowC).multiplyScalar(1.6 * al), g.matrix.copy(pdzBlobM).scale(new He(0.95, 1.05, 1)), (g.matrixWorldNeedsUpdate = !0), (g.visible = !0));
+  } else e.glow && (e.glow.visible = !1);
 }
 function Eo(e) {
   if (pdzProf.on) {
@@ -21305,7 +23031,8 @@ function Eo(e) {
 }
 function pdzEo(e) {
   pdzDt = Math.min(0.1, Math.max(1e-3, e));
-  (pdzTic(),
+  (pdzPropsSync(),
+    pdzTic(),
     v0(() => {
       let z = !le.on && We.calm > 1.5 && We.calmDrawn;
       ((We.calmDrawn = !le.on && We.calm > 1.5),
@@ -21321,6 +23048,7 @@ function pdzEo(e) {
         z || Ei(),
         pdzToc("r.Ei"),
         pdzBlobTick(),
+        pdzBoltsTick(),
         M0 > 0 && Pc());
     }),
     Nc(e),
@@ -21396,6 +23124,9 @@ async function Kc() {
     ),
     await new Promise(requestAnimationFrame),
     C2(),
+    pdzLabelsBuild(),
+    pdzPropsBuild(),
+    pdzBatchStatic(new Set([...La.map((t) => t.g), m0, m0.target, ...pdzProps.flatMap((K) => K.meshes)])),
     kc(),
     (pe.worldObjs = ie.children.slice()),
     (pe.worldFog = ie.fog));
@@ -21484,6 +23215,71 @@ async function Kc() {
       useCar: Zt,
       saveCar: go,
       obst: () => jn,
+      rig: () => We.rig,
+      batchInfo: () => pdzBatchInfo,
+      leftovers() {
+        let t = new Map(),
+          a = (o) => {
+            let m = o.material;
+            return [o.type, m.type, m.transparent ? "T" : "", m.map ? "map" : "", m.vertexColors ? "vc" : "", "#" + (m.color ? m.color.getHexString() : ""), o.castShadow ? "sh" : ""].join(" ");
+          };
+        ie.traverseVisible((o) => {
+          if (!o.isMesh || o.isSkinnedMesh) return;
+          let k = a(o),
+            n = t.get(k) || { n: 0, mats: new Set(), tris: 0 };
+          (n.n++, n.mats.add(o.material.uuid), (n.tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3), t.set(k, n));
+        });
+        return [...t.entries()].sort((x, y) => y[1].n - x[1].n).slice(0, 30).map(([k, v]) => `${v.n} objs ${v.mats.size} mats ${Math.round(v.tris)} tris :: ${k}`);
+      },
+      rigDbg: () => ({ ua: ua.length, clear: pdzRigClear(0.6), box: Array.from(We.box || []), near: ua.slice(0, 6).map((s) => [s.minx, s.maxx, s.miny, s.maxy, s.minz, s.maxz].map((x) => +x.toFixed(2))) }),
+      rigOn(t) {
+        ((pdzRigOn = t), t || !We.rig || (We.rig.on = !1));
+      },
+      sceneStats() {
+        let t = [];
+        ie.traverseVisible((a) => {
+          if (!a.isMesh && !a.isPoints && !a.isLine) return;
+          let n = a.geometry,
+            o = n.index ? n.index.count : n.attributes.position ? n.attributes.position.count : 0,
+            r = a.isInstancedMesh ? a.count : 1;
+          t.push({ name: (a.name || a.material?.name || a.type) + (a.isSkinnedMesh ? "[skin]" : "") + (a.isInstancedMesh ? "[inst " + r + "]" : ""), tris: Math.round((o / 3) * r), shadow: a.castShadow ? 1 : 0, mat: a.material?.type });
+        });
+        return t;
+      },
+      drawLog() {
+        let t = gt.renderBufferDirect,
+          a = new Map(),
+          n = 0;
+        gt.renderBufferDirect = function (o, r, s, i, l, f) {
+          let c = (gt.getRenderTarget() === m0.shadow.map ? "SHADOW " : gt.getRenderTarget() ? "RT " : "") + (l.name || l.type) + (l.isInstancedMesh ? "[inst]" : "") + " " + i.type + (i.name ? ":" + i.name : "");
+          window.__drawDetail && i.type === "MeshStandardMaterial" && !gt.getRenderTarget() && !l.isInstancedMesh && (c += " geo=" + s.type + " #" + (i.color ? i.color.getHexString() : "") + (i.map ? " map" : "") + (i.vertexColors ? " vc" : "") + (i.onBeforeCompile !== ga.Material.prototype.onBeforeCompile ? " obc" : "") + (l.parent !== ie ? " child" : "") + (l.matrixAutoUpdate ? " auto" : "") + " v" + (s.attributes.position.count));
+          return (a.set(c, (a.get(c) || 0) + 1), n++, t.apply(this, arguments));
+        };
+        try {
+          I0 === "game" ? Eo(1 / 60) : ti(1 / 60);
+        } finally {
+          gt.renderBufferDirect = t;
+        }
+        return [n, ...[...a.entries()].sort((o, r) => r[1] - o[1]).map(([o, r]) => r + " " + o)];
+      },
+      gar() {
+        return { cfg: We.cfg, gar: pdzGar, ins: { ex: pdzIns.ex, exT: pdzIns.exT, bolts: pdzIns.bolts, xray: pdzIns.xray, solo: pdzIns.solo }, rim: We.rimStyle, tn: We.tn, glow: We.glowC || "" };
+      },
+      restHit(x, y) {
+        let h = pdzRestHit(x, y);
+        return h && { p: Array.from(h.p), n: Array.from(h.n) };
+      },
+      boltAt(x, y) {
+        return pdzBoltAt(x, y);
+      },
+      glInfo() {
+        ((gt.info.autoReset = !1), gt.info.reset());
+        let t = performance.now();
+        I0 === "game" ? Eo(1 / 60) : ti(1 / 60);
+        let a = performance.now() - t,
+          n = { calls: gt.info.render.calls, tris: gt.info.render.triangles, geos: gt.info.memory.geometries, tex: gt.info.memory.textures, progs: gt.info.programs.length, ms: +a.toFixed(1) };
+        return ((gt.info.autoReset = !0), n);
+      },
       wbDbg: pdzWbDbg,
       dentWheel(t, a, n, o, r, s) {
         let l = Je[t];
@@ -21551,7 +23347,7 @@ async function Kc() {
           Rn());
       },
       launch(t, a, n, o, r, s, i) {
-        ((We.calm = 0), (We.wake = 1));
+        ((We.calm = 0), (We.wake = 1), We.rig && ((We.rig.on = !1), (We.rig.calm = 0)));
         for (let l = 0; l < J; l++) {
           ((Y[l] += t), (tt[l] += t));
           let f = Z[l] - v.cx,
@@ -21664,7 +23460,7 @@ function Qc() {
     Балки: "Beams",
     Язык: "Language",
     Гараж: "Garage",
-    "машина и цвет": "car and paint",
+    "покраска, наклейки, тюнинг": "paint, stickers, tuning",
     "графика, физика, управление": "graphics, physics, controls",
     "Предыдущая машина": "Previous car",
     "Следующая машина": "Next car",
@@ -22107,6 +23903,98 @@ function Qc() {
     "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 three.js\u2026":
       "Loading three.js\u2026",
     "Загрузка…": "Loading…",
+    // garage editor
+    "Отделка краски": "Paint finish",
+    Покраска: "Paint",
+    Наклейки: "Stickers",
+    Диски: "Wheels",
+    Тюнинг: "Tuning",
+    Опции: "Extras",
+    Осмотр: "Inspect",
+    "Что красим": "What to paint",
+    "Весь кузов": "Whole body",
+    "Как у кузова": "Same as body",
+    "Свой цвет": "Custom colour",
+    "Сбросить покраску": "Reset paint",
+    Дизайн: "Design",
+    Заводское: "Factory",
+    Глянец: "Gloss",
+    Металлик: "Metallic",
+    Перламутр: "Pearl",
+    Сатин: "Satin",
+    Мат: "Matte",
+    Хром: "Chrome",
+    "Выберите наклейку и нажмите на кузов, чтобы приклеить. Наклейка мнётся вместе с панелью.":
+      "Pick a sticker, then tap the body to apply it. Stickers crumple with the panel.",
+    "Нажмите на кузов, куда приклеить.": "Tap the body where it should go.",
+    "Нажмите на кузов, куда перенести.": "Tap the body where it should move to.",
+    "Не больше 10 наклеек на машину": "No more than 10 stickers per car",
+    Размер: "Size",
+    Поворот: "Rotation",
+    Номер: "Number",
+    "Цвет наклейки": "Sticker colour",
+    "Зеркально на другой бок": "Mirror to the other side",
+    Переклеить: "Move",
+    Удалить: "Remove",
+    "Снять все наклейки": "Remove all stickers",
+    Пламя: "Flames",
+    Полосы: "Stripes",
+    Флаг: "Flag",
+    Молния: "Lightning",
+    Звезда: "Star",
+    Зубы: "Shark teeth",
+    Волна: "Wave",
+    Глаза: "Eyes",
+    Опасность: "Hazard",
+    Шевроны: "Chevrons",
+    Сердце: "Heart",
+    "Дизайн дисков": "Rim design",
+    "Цвет дисков": "Rim colour",
+    "Цвет суппортов": "Caliper colour",
+    Суппорты: "Calipers",
+    "Двойные лучи": "Twin spoke",
+    "Спорт 5": "Sport 5",
+    Сетка: "Mesh",
+    Штамповка: "Steel",
+    Турбина: "Turbine",
+    Клиренс: "Ride height",
+    см: "cm",
+    Пружины: "Springs",
+    Мощность: "Power",
+    Тормоза: "Brakes",
+    "Заводские настройки": "Factory settings",
+    "Настройки сохраняются для этой машины и действуют в заезде.": "Settings are saved for this car and apply when you drive.",
+    "Тонировка стёкол": "Window tint",
+    Тонировка: "Tint",
+    Нет: "None",
+    Лёгкая: "Light",
+    Тёмная: "Dark",
+    Лимузин: "Limo",
+    "Цвет фар": "Headlight colour",
+    Фары: "Headlights",
+    Тёплые: "Warm",
+    Белые: "White",
+    Синие: "Blue",
+    Жёлтые: "Yellow",
+    "Подсветка днища": "Underglow",
+    Цвет: "Colour",
+    "Разнести детали": "Exploded view",
+    Крепёж: "Fasteners",
+    "Каркас из балок": "Beam frame",
+    "Наведите на болт или петлю, чтобы увидеть, что она держит и при какой силе сорвётся. Нажмите на деталь, чтобы осмотреть её отдельно.":
+      "Hover over a bolt or hinge to see what it holds and the force that breaks it. Tap a part to inspect it on its own.",
+    Петля: "Hinge",
+    Замок: "Latch",
+    "Замок капота": "Hood latch",
+    Болт: "Bolt",
+    Клипса: "Clip",
+    "Крепление крыла": "Wing mount",
+    Сварка: "Weld",
+    кН: "kN",
+    "основа кузова": "body base",
+    "{} креплений": "{} mounts",
+    "{} узлов": "{} nodes",
+    "держит до {} кН": "holds up to {} kN",
   };
 }
 function Jc() {
