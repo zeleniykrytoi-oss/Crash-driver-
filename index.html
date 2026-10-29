@@ -34,6 +34,8 @@
   color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); overflow: hidden; overscroll-behavior: none; }
+/* at night the free-standing HUD text turns light on a dark halo */
+body[data-time="night"] { --hud-ink: #f3e8d2; --hud-muted: #cbb894; --hud-halo: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.65); }
 body { font-family: var(--font-display); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
 #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
 #hud { position: fixed; inset: 0; pointer-events: none; }
@@ -73,6 +75,18 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 .tog[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .tog[aria-pressed="true"] i { color: var(--accent-ink); }
 
+/* --- settings panel (flows under the toggles in the tools column) --- */
+.settings { width: 300px; max-width: calc(100vw - 2 * var(--edge) - var(--safe-l) - var(--safe-r)); box-sizing: border-box; padding: 10px 12px 12px; background: rgba(22, 16, 8, 0.82); border: 1px solid var(--panel-edge); border-radius: 3px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); pointer-events: auto; z-index: 2; }
+.settings[hidden] { display: none; }
+.set-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 15px; letter-spacing: 0.1em; color: var(--ink); }
+.set-x { background: none; border: 0; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 4px; }
+.set-row { margin-top: 10px; }
+.set-lbl { display: block; font-family: var(--font-data); font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 5px; }
+.seg { display: flex; gap: 4px; }
+.seg button { flex: 1 1 0; min-width: 0; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; padding: 8px 4px; color: var(--ink); background: rgba(255, 236, 205, 0.08); border: 1px solid var(--panel-edge); border-radius: 3px; }
+.seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.set-note { margin: 10px 0 0; font-family: var(--font-data); font-size: 10.5px; line-height: 1.45; color: var(--muted); letter-spacing: 0.03em; }
+
 /* --- bottom-centre: speedo --- */
 .gauge { position: absolute; left: 50%; bottom: calc(10px + var(--safe-b)); transform: translateX(-50%); text-align: center; }
 .speed { font-weight: 800; font-style: italic; font-size: 54px; line-height: 0.9; font-variant-numeric: tabular-nums; color: var(--hud-ink); text-shadow: var(--hud-halo); }
@@ -111,7 +125,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 }
 @media (max-width: 560px) {
   .brand-title { font-size: 20px; }
-  .brand-sub, .stats, .dyn { display: none; }
+  .brand-sub, .stats, .dyn, .keys { display: none; }
   .statline { display: block; }
   .feed li { font-size: 12px; }
   .reset { font-size: 14px; padding: 9px 12px; }
@@ -180,7 +194,29 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
       <button id="btnCam" class="tog" type="button">CAM<i id="camName">CHASE</i></button>
       <button id="btnNodes" class="tog" type="button" aria-pressed="false">F-NODES</button>
       <button id="btnSlow" class="tog" type="button" aria-pressed="false">SLOW-MO<i>×20</i></button>
+      <button id="btnSettings" class="tog" type="button" aria-expanded="false" aria-controls="settings">SETTINGS</button>
     </div>
+    <section id="settings" class="settings" hidden aria-label="Settings">
+      <div class="set-head"><span>SETTINGS</span><button id="btnSetClose" class="set-x" type="button" aria-label="Close settings">×</button></div>
+      <div class="set-row">
+        <span class="set-lbl" id="lblTime">TIME OF DAY</span>
+        <div class="seg" role="radiogroup" aria-labelledby="lblTime" data-set="time">
+          <button type="button" role="radio" aria-checked="false" data-v="day">DAY</button>
+          <button type="button" role="radio" aria-checked="false" data-v="evening">EVENING</button>
+          <button type="button" role="radio" aria-checked="false" data-v="night">NIGHT</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <span class="set-lbl" id="lblGfx">GRAPHICS</span>
+        <div class="seg" role="radiogroup" aria-labelledby="lblGfx" data-set="gfx">
+          <button type="button" role="radio" aria-checked="false" data-v="low">LOW</button>
+          <button type="button" role="radio" aria-checked="false" data-v="medium">MEDIUM</button>
+          <button type="button" role="radio" aria-checked="false" data-v="high">HIGH</button>
+          <button type="button" role="radio" aria-checked="false" data-v="ultra">ULTRA</button>
+        </div>
+      </div>
+      <p class="set-note" id="setNote"></p>
+    </section>
   </div>
 
   <div class="gauge">
@@ -189,7 +225,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
     <div class="credit" id="credit">Vehicle model: “Gavril_D_ Beamng” by <a href="https://sketchfab.com/akhikavi7" target="_blank" rel="noopener">akhikavi7</a>, <a href="https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5" target="_blank" rel="noopener">Sketchfab</a>, CC-BY-4.0</div>
   </div>
 
-  <p class="keys">W/S or ↑/↓ throttle · brake (hold at a stop to reverse) · A/D or ←/→ steer · R reset · C camera · N f-node view · T slow-mo</p>
+  <p class="keys">W/S or ↑/↓ throttle · brake (hold at a stop to reverse) · A/D or ←/→ steer · R reset · C camera · N f-node view · T slow-mo · G settings</p>
 
   <div class="pad pad-steer">
     <button class="ctl steer" type="button" data-ctl="left" aria-label="Steer left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></button>
@@ -299,11 +335,13 @@ function physicsLib() {
       cross:      { E: 7.5e5, yieldT: 0.012, zeta: 0.08 },           // crumple-zone cross members: weak in tension, so crushed bays bulge
       frameX:     { E: 2.5e6, zeta: 0.08 },                          // rail-to-rail twist bracing
       hood:       { E: 4.0e4, zeta: 0.18 },
-      hoodFold:   { E: 4.0e4, yieldC: 0.02, zeta: 0.18 },            // underside chords give first: the hood tents upward
+      hoodFold:   { E: 4.0e4, yield: 0.012, zeta: 0.18 },            // underside around the hood's middle row: gives first, so the hood folds up into a ridge
+      hoodPanel:  { E: 1.2e5, zeta: 0.18 },                          // the hood's outer segments: stiff, so the two halves of the fold stay flat
       door:       { E: 6.5e4, zeta: 0.1 },
       bumper:     { E: 5.5e4, zeta: 0.35 },
       attach:     { E: 5.5e4, yield: 0.035, brP: 0.18, brC: 0.4, zeta: 0.3 },
       attachHood: { E: 6.0e4, yield: 0.035, brP: 0.2, brC: 0.55, zeta: 0.25 },
+      hoodLatch:  { E: 6.0e4, yield: 0.06, brP: 0.6, brC: 9, zeta: 0.25 },   // a hook: tears open in tension, but keeps pushing the hood back when the front crushes
       attachDoor: { E: 9.0e4, yield: 0.035, brP: 0.22, brk: 0.45, brC: 0.6, zeta: 0.25 },
       support:    { E: 4.0e4, yield: 9, brk: 99, zeta: 0.15 },       // part rests: the hood on the fenders, doors on the sills
       cabSupport: { E: 1.2e6, yield: 9, brk: 99, slack: 0.12, zeta: 0.2 },   // hidden struts across and along the cab
@@ -346,6 +384,8 @@ function physicsLib() {
   const CRUMPLE = stepsIn(0.04);    // skin over structure that flowed plastically this recently counts as crumpling
   const SETTLE = stepsIn(0.2);      // an awake flexnode untouched this long settles and sleeps
   const CALM = stepsIn(0.04);       // ... or one calm for this long
+  const PLEAT = 0.24;               // rest wavelength of the accordion pleats in a crushed bay (m)
+  const PLEAT_GAIN = 1.4;           // pleat depth over the inextensible-sheet value, so the folds read clearly
 
   /* ----------------------------------- math helpers ----------------------------------- */
   function mulberry32(seed) {
@@ -2056,21 +2096,22 @@ function physicsLib() {
       }
       return fallback;
     };
-    // famFn(layer, direction) can override the beam family per layer and direction ('a', 'b', 'c' axes,
-    // 'ab' face diagonals)
-    const lattice = (p, na, nb, nc, place, fam, famFn, vfam) => {
+    // famFn(layer, direction, row) can override the beam family per layer, direction ('a', 'b', 'c' axes,
+    // 'ab' / 'ac' / 'bc' face diagonals) and row j along b; `skip` lists diagonal directions left out
+    const lattice = (p, na, nb, nc, place, fam, famFn, vfam, skip) => {
       const n0 = sim.nNodes, ids = [];
       for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) for (let k = 0; k < nc; k++) { const q = place(i, j, k); ids.push(sim.addNode(q[0], q[1], q[2], 1, NODE_STRUCT, p)); }
       const id = (i, j, k) => ids[(i * nb + j) * nc + k];
       // lattice edges are structural, face diagonals are shear beams
-      const pb = (a, b, k, dir) => sim.addBeam(a, b, (famFn && famFn(k, dir)) || fam, dir === 'a' || dir === 'b' || dir === 'c' ? BEAM_STRUCT : BEAM_SHEAR, p);
+      const pb = (a, b, k, dir, j) => sim.addBeam(a, b, (famFn && famFn(k, dir, j)) || fam, dir === 'a' || dir === 'b' || dir === 'c' ? BEAM_STRUCT : BEAM_SHEAR, p);
+      const ac = !(skip && skip.includes('ac'));
       for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) for (let k = 0; k < nc; k++) {
-        if (i + 1 < na) pb(id(i, j, k), id(i + 1, j, k), k, 'a');
-        if (j + 1 < nb) pb(id(i, j, k), id(i, j + 1, k), k, 'b');
-        if (k + 1 < nc) pb(id(i, j, k), id(i, j, k + 1), k, 'c');
-        if (i + 1 < na && j + 1 < nb) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i + 1, j + 1, k), k, 'ab'); else pb(id(i + 1, j, k), id(i, j + 1, k), k, 'ab'); }
-        if (i + 1 < na && k + 1 < nc) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i + 1, j, k + 1), k, 'ac'); else pb(id(i + 1, j, k), id(i, j, k + 1), k, 'ac'); }
-        if (j + 1 < nb && k + 1 < nc) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i, j + 1, k + 1), k, 'bc'); else pb(id(i, j + 1, k), id(i, j, k + 1), k, 'bc'); }
+        if (i + 1 < na) pb(id(i, j, k), id(i + 1, j, k), k, 'a', j);
+        if (j + 1 < nb) pb(id(i, j, k), id(i, j + 1, k), k, 'b', j);
+        if (k + 1 < nc) pb(id(i, j, k), id(i, j, k + 1), k, 'c', j);
+        if (i + 1 < na && j + 1 < nb) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i + 1, j + 1, k), k, 'ab', j); else pb(id(i + 1, j, k), id(i, j + 1, k), k, 'ab', j); }
+        if (ac && i + 1 < na && k + 1 < nc) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i + 1, j, k + 1), k, 'ac', j); else pb(id(i + 1, j, k), id(i, j, k + 1), k, 'ac', j); }
+        if (j + 1 < nb && k + 1 < nc) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i, j + 1, k + 1), k, 'bc', j); else pb(id(i, j + 1, k), id(i, j, k + 1), k, 'bc', j); }
       }
       for (let i = 0; i + 1 < na; i++) for (let j = 0; j + 1 < nb; j++) for (let k = 0; k + 1 < nc; k++) {
         const c = [];
@@ -2119,18 +2160,25 @@ function physicsLib() {
     const hb = partBox[P_HOOD];
     if (hb) {
       const V = partV[P_HOOD], hw = Math.max(Math.abs(hb.min[0]), Math.abs(hb.max[0]));
-      // 3 x 4 x 2 lattice; the underside chords along the hood yield first, so a hood pushed back from the
-      // front buckles upward into a tent fold (and the supports below stop it folding down)
-      const H = lattice(P_HOOD, 3, 4, 2, (i, j, k) => {
-        const x = lerp(0.84 * hw, -0.84 * hw, i / 2), z = lerp(hb.min[2] + 0.07, hb.max[2] - 0.07, j / 3);
+      // 3 x 5 x 2 lattice (rows j from the hinges at the cowl to the latch at the front). Around the middle
+      // row the underside chords and through-thickness diagonals give first while the top skin and the
+      // stiffer outer segments hold, so a hood pushed back from the front folds up into a ridge, like a
+      // roof with two flat halves (the supports below stop it folding down). The side faces carry no diagonals: that
+      // keeps the beam budget, and the hood's width needs no shear bracing through its thickness.
+      const H = lattice(P_HOOD, 3, 5, 2, (i, j, k) => {
+        const x = lerp(0.84 * hw, -0.84 * hw, i / 2), z = lerp(hb.min[2] + 0.07, hb.max[2] - 0.07, j / 4);
         const top = surfaceExtreme(V, 0, 2, 1, x, z, 1, hb.max[1]) - 0.012;
         return [x, top - 0.09 * k, z];
-      }, BF.hood, (k, dir) => (k === 1 && (dir === 'b' || dir === 'ab') ? BF.hoodFold : null), VF.hood);
+      }, BF.hood, (k, dir, j) => {
+        const seg = dir === 'b' || dir === 'ab' || dir === 'bc';
+        if (seg && (j === 1 || j === 2) && (k === 1 || dir === 'bc')) return BF.hoodFold;
+        return seg && (j === 0 || j === 3) ? BF.hoodPanel : null;
+      }, VF.hood, ['ac']);
       for (const i of [0, 2]) for (const k of [0, 1]) attach(P_HOOD, H.id(i, 0, k), 3, BF.attachHood, i === 0 ? 'hingeL' : 'hingeR');
-      attach(P_HOOD, H.id(1, 3, 1), 3, BF.attachHood, 'latch');
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 3; j++) sim.airQuads.push({ part: P_HOOD, n: Int32Array.of(H.id(i, j, 0), H.id(i + 1, j, 0), H.id(i + 1, j + 1, 0), H.id(i, j + 1, 0)) });
-      for (const i of [0, 2]) for (const j of [2, 3]) support(P_HOOD, H.id(i, j, 1), c => R[c * 3 + 1] < R[H.id(i, j, 1) * 3 + 1]);
-      for (const j of [0, 1, 2, 3]) support(P_HOOD, H.id(1, j, 1), c => R[c * 3 + 1] < R[H.id(1, j, 1) * 3 + 1] - 0.05);
+      attach(P_HOOD, H.id(1, 4, 1), 3, BF.hoodLatch, 'latch');
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 4; j++) sim.airQuads.push({ part: P_HOOD, n: Int32Array.of(H.id(i, j, 0), H.id(i + 1, j, 0), H.id(i + 1, j + 1, 0), H.id(i, j + 1, 0)) });
+      for (const i of [0, 2]) for (const j of [3, 4]) support(P_HOOD, H.id(i, j, 1), c => R[c * 3 + 1] < R[H.id(i, j, 1) * 3 + 1]);
+      for (const j of [1, 3]) support(P_HOOD, H.id(1, j, 1), c => R[c * 3 + 1] < R[H.id(1, j, 1) * 3 + 1] - 0.05);
     }
     for (const p of [P_DOOR_L, P_DOOR_R]) {
       const db = partBox[p];
@@ -2582,6 +2630,7 @@ function physicsLib() {
       meshes.forEach((m, i) => this.items.push(this.bind(m, i)));
       this.tears = [];
       this.sheetTris = this.buildSheetTris();
+      this.setupPleats();
       sim.onDent = (f) => { const S = this.skins; for (let k = 0; k < S.length; k++) if (S[k].uses[f]) S[k].dented = true; };
       this._r9 = new Float64Array(9); this._s9 = new Float64Array(9); this._o9 = new Float64Array(9);
     }
@@ -2658,7 +2707,7 @@ function physicsLib() {
           rest2[t * 3 + e] = (P[b] - P[a]) ** 2 + (P[b + 1] - P[a + 1]) ** 2 + (P[b + 2] - P[a + 2]) ** 2;
         }
         this.skins.push({ fid, phi, off, restP: P, restN: Nr, refN: new Float32Array(nv * 3), nrm: new Float32Array(nv * 3), index, index0: index.slice(),
-          rest2, torn: new Uint8Array(nt), dented: false, nv, frame: 0, panel: m.cat === 'panel', meshIndex, uses, item });
+          rest2, torn: new Uint8Array(nt), dented: false, nv, frame: 0, panel: m.cat === 'panel', part: m.part, meshIndex, uses, item, pw: null, pb: null, pt: null, pz: null });
         return item;
       }
       if (m.cat === 'axle' && sim.wheels.length === 4) {
@@ -2677,7 +2726,68 @@ function physicsLib() {
       return item;
     }
 
-    reset() { for (const s of this.skins) { s.dented = false; s.frame = 0; s.index.set(s.index0); s.torn.fill(0); } this.tears.length = 0; }
+    reset() { for (const s of this.skins) { s.dented = false; s.frame = 0; s.index.set(s.index0); s.torn.fill(0); } this.tears.length = 0; this.frontCrush = 0; }
+
+    // Accordion pleats. A crushed bay can't shorten its sheet metal, so the fenders, the wheel tubs and the
+    // body's sides ahead of the cowl fold into sharp pleats across the bay: flat facets between creases, a
+    // triangle wave of rest wavelength PLEAT. Squeezed to a fraction r of its length, a facet keeps its
+    // length when the fold stands (PLEAT / 4) sqrt(1 - r^2) high; each vertex takes that from the
+    // compression of the bays around it and folds in and out along its normal. Faces looking along the
+    // truck (the fascia) don't pleat.
+    setupPleats() {
+      const st = this.meta.stations.slice().sort((a, b) => a.z - b.z), nb = st.length - 1, R = this.sim.rest, cowl = this.meta.cowlZ;
+      this.pSt = st; this.frontCrush = 0;
+      this.pC = new Float64Array(st.length * 3); this.pL0 = new Float64Array(nb); this.pRb = new Float64Array(nb).fill(1); this.pFront = new Uint8Array(nb);
+      const zc = new Float64Array(nb);
+      this.ringCentroids(R, this.pC);
+      for (let i = 0; i < nb; i++) {
+        const a = i * 3, b = a + 3;
+        this.pL0[i] = Math.hypot(this.pC[b] - this.pC[a], this.pC[b + 1] - this.pC[a + 1], this.pC[b + 2] - this.pC[a + 2]);
+        zc[i] = (st[i].z + st[i + 1].z) / 2; this.pFront[i] = zc[i] > cowl ? 1 : 0;
+      }
+      for (const s of this.skins) {
+        if (!s.panel || s.part !== P_CHASSIS) continue;
+        const nv = s.nv, P = s.restP, N = s.restN, pw = new Float32Array(nv), pb = new Uint8Array(nv), pt = new Float32Array(nv), pz = new Float32Array(nv);
+        let any = false;
+        for (let v = 0; v < nv; v++) {
+          const z = P[v * 3 + 2], nz = N[v * 3 + 2];
+          if (z < cowl - 0.05) continue;
+          let i = 0;
+          while (i < nb - 2 && zc[i + 1] < z) i++;
+          pb[v] = i; pt[v] = Math.min(1, Math.max(0, (z - zc[i]) / ((zc[i + 1] - zc[i]) || 1)));
+          pw[v] = Math.sqrt(Math.max(0, 1 - nz * nz)) * Math.min(1, (z - cowl + 0.05) / 0.15);
+          const ph = z / PLEAT - Math.floor(z / PLEAT);
+          pz[v] = 1 - 4 * Math.abs(ph - 0.5);   // triangle wave: flat facets, sharp creases
+          any = any || pw[v] > 0;
+        }
+        if (any) { s.pw = pw; s.pb = pb; s.pt = pt; s.pz = pz; }
+      }
+    }
+
+    ringCentroids(P, out) {
+      const st = this.pSt;
+      for (let i = 0; i < st.length; i++) {
+        const s = st[i], o = i * 3;
+        out[o] = out[o + 1] = out[o + 2] = 0;
+        for (const n of [s.BL, s.BR, s.ML, s.MR, s.TL, s.TR]) { out[o] += P[n * 3] / 6; out[o + 1] += P[n * 3 + 1] / 6; out[o + 2] += P[n * 3 + 2] / 6; }
+      }
+    }
+
+    // Compression of every bay this frame; returns true while any bay is squeezed enough to pleat.
+    bayCompression() {
+      const C = this.pC, nb = this.pL0.length;
+      this.ringCentroids(this.sim.pos, C);
+      let squeezed = false, crush = 0;
+      for (let i = 0; i < nb; i++) {
+        const a = i * 3, b = a + 3;
+        const L = Math.hypot(C[b] - C[a], C[b + 1] - C[a + 1], C[b + 2] - C[a + 2]), r = L / this.pL0[i];
+        this.pRb[i] = r;
+        if (r < 0.99) squeezed = true;
+        if (this.pFront[i]) crush += this.pL0[i] - L;
+      }
+      this.frontCrush = crush;
+      return squeezed;
+    }
 
     // Coarse skin mesh for the sheet constraints by vertex clustering: every panel vertex belongs to its
     // nearest flexnode, and each panel triangle whose corners land on three different flexnodes becomes a
@@ -2719,9 +2829,12 @@ function physicsLib() {
       const sim = this.sim;
       sim.syncVisualState();
       const pos = sim.pos, Rt = sim.frameR, FR = sim.fRot, fs3 = sim.fStart * 3;
+      const pleating = this.bayCompression(), Rb = this.pRb, PA = PLEAT_GAIN * PLEAT / 4;
       for (const s of this.skins) {
         const po = s.item.offset, no = po + s.nv * 3;
         const { fid, phi, off, restP, restN, refN, nv } = s;
+        const plW = pleating ? s.pw : null, plB = s.pb, plT = s.pt, plS = s.pz;
+        if (plW) s.dented = true;   // pleated panels need real normals: the shading is what makes the folds read
         const recompute = s.dented;
         for (let v = 0, v3 = 0, v4 = 0, v12 = 0; v < nv; v++, v3 += 3, v4 += 4, v12 += 12) {
           let px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0;
@@ -2739,6 +2852,10 @@ function physicsLib() {
           }
           const l = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
           nx *= l; ny *= l; nz *= l;
+          if (plW && plW[v] > 0) {
+            const i = plB[v], t = plT[v], r = Rb[i] * (1 - t) + Rb[i + 1] * t;
+            if (r < 0.99) { const d = Math.min(0.065, PA * Math.sqrt(1 - r * r)) * plW[v] * plS[v]; px += d * nx; py += d * ny; pz += d * nz; }
+          }
           out[po + v3] = px; out[po + v3 + 1] = py; out[po + v3 + 2] = pz;
           refN[v3] = nx; refN[v3 + 1] = ny; refN[v3 + 2] = nz;
           if (!recompute) { out[no + v3] = nx; out[no + v3 + 1] = ny; out[no + v3 + 2] = nz; }
@@ -2747,7 +2864,7 @@ function physicsLib() {
           // a dented or folded panel needs real normals (bigger meshes refresh them every second or third frame)
           if (s.frame++ % (nv > 2500 ? 3 : (nv > 800 ? 2 : 1)) === 0) computeNormalsFast(out.subarray(po, po + nv * 3), s.index, s.nrm, refN);
           out.set(s.nrm, no);
-          if (s.panel && (s.frame & 3) === 1) this.tearCheck(s, out, po);
+          if (s.panel && !plW && (s.frame & 3) === 1) this.tearCheck(s, out, po);   // pleats lengthen triangles on purpose
         }
       }
       for (const r of this.rigids) {
@@ -2895,6 +3012,7 @@ function physicsLib() {
       out[25] = mask; out[26] = sim.contexts.length;
       sim.wheels.forEach((w, i) => { out[28 + i] = w.load; out[32 + i] = w.sliding ? -w.slip - 0.001 : w.slip; });
       out[36] = this.gLat; out[37] = this.gLon; out[38] = this.ctrl.input.steer;
+      out[41] = this.binder.frontCrush;   // shortening of the crumple zone (m): the page hides the engine bay's loose parts once it crumples
       let vr = 0, vn = 0;
       for (const c of sim.cells) if (c.part === P_CHASSIS) { vr += c.V0 / c.V0o; vn++; }
       out[39] = vn ? 1 - vr / vn : 0;
@@ -3579,6 +3697,7 @@ class VehicleView {
     model.meshes.forEach((m, i) => {
       const b = summary.meshes[i];
       const mesh = new THREE.Mesh(m.geom, m.mat);
+      mesh.name = m.name; mesh.userData.cat = m.cat; mesh.userData.part = m.part;
       this.meshes.push(mesh);
       mesh.castShadow = m.mat !== mats.glass && m.mat !== mats.lens;
       mesh.receiveShadow = true;
@@ -3594,8 +3713,32 @@ class VehicleView {
       }
     });
     summary.wheels.forEach(w => this.wheelVis.push(this.makeWheel(w)));
+    // The engine bay's dark mechanical parts (engine, manifold, battery and airbox, radiator and hoses, front
+    // suspension and steering) sit inside the crumple zone. Crushed, they read as black shards poking through the
+    // panels or a black hole under a folded hood, so they leave the picture as soon as the front crumples.
+    const cowl = summary.meta.cowlZ;
+    this.bayParts = this.meshes.filter((m) => {
+      if (m.userData.cat !== 'rigid' || m.userData.part !== P_CHASSIS) return false;
+      const b = m.geometry.boundingBox || (m.geometry.computeBoundingBox(), m.geometry.boundingBox);
+      return (b.min.z + b.max.z) / 2 > cowl - 0.05 && !/wiper/.test(m.name);
+    });
+    this.bayShown = true;
+    // headlight reflectors (left, right): their skinned vertices place the headlight beams
+    this.lamps = [/headlight_l/, /headlight_r/].map(rx => this.meshes.findIndex(m => rx.test(m.name) && m.material === mats.headlight))
+      .map(i => (i >= 0 ? this.meshes[i].geometry.attributes.position : null));
     this.debug = false;
     this.buildDebug();
+  }
+
+  // Centre of headlight `side` (0 left, 1 right) this frame; false if the model has none.
+  lampPos(side, out) {
+    const pa = this.lamps[side];
+    if (!pa) return false;
+    const a = pa.array, n = a.length / 3;
+    let x = 0, y = 0, z = 0;
+    for (let i = 0; i < a.length; i += 3) { x += a[i]; y += a[i + 1]; z += a[i + 2]; }
+    out.set(x / n, y / n, z / n);
+    return true;
   }
 
   // Bind one frame buffer: skinned attributes become views into it, rigid parts take their matrices.
@@ -3608,6 +3751,8 @@ class VehicleView {
     }
     for (let k = 0; k < this.rigid.length; k++) { const r = this.rigid[k]; r.mesh.matrix.fromArray(f, r.o); r.mesh.matrixWorldNeedsUpdate = true; }
     for (let i = 0; i < this.wheelVis.length; i++) this.updateWheel(this.wheelVis[i], f, L.wheels + i * L.wheelStride);
+    const bay = f[41] < 0.03;
+    if (bay !== this.bayShown) { this.bayShown = bay; for (const m of this.bayParts) m.visible = bay; }
     if (this.debug) this.updateDebug(f);
     return f;
   }
@@ -3808,20 +3953,25 @@ function speckle(ctx, w, h, n, alpha, rng) {
 
 function buildEnvironment(scene, renderer, world) {
   const rng = mulberry32(7);
-  // sky dome: pale blue zenith, near-white horizon, a modest sun glow
+  // sky dome: zenith-to-horizon gradient, a glow and disc around the sun (or moon), stars at night. The
+  // colours come from the time of day (TIMES, set in main); these defaults are the daytime sky.
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { uSun: { value: SUN_DIR.clone() } },
+    uniforms: {
+      uSun: { value: SUN_DIR.clone() }, uZen: { value: new THREE.Color(0.36, 0.52, 0.80) }, uHor: { value: new THREE.Color(1.02, 1.02, 1.0) },
+      uGnd: { value: new THREE.Color(0.8, 0.8, 0.8) }, uGlow: { value: new THREE.Color(1.0, 0.96, 0.88) }, uHalo: { value: 0 }, uDisc: { value: 1 }, uStars: { value: 0 },
+    },
     vertexShader: `varying vec3 vDir; void main(){ vec4 wp = modelMatrix * vec4(position,1.0); vDir = normalize(wp.xyz - cameraPosition); gl_Position = projectionMatrix * viewMatrix * wp; gl_Position.z = gl_Position.w; }`,
-    fragmentShader: `uniform vec3 uSun; varying vec3 vDir;
+    fragmentShader: `uniform vec3 uSun, uZen, uHor, uGnd, uGlow; uniform float uHalo, uDisc, uStars; varying vec3 vDir;
+      float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       void main(){
         vec3 d = normalize(vDir); float h = d.y;
-        vec3 zen = vec3(0.36, 0.52, 0.80), hor = vec3(1.02, 1.02, 1.0), gnd = vec3(0.80, 0.80, 0.80);
-        vec3 col = mix(hor, zen, pow(clamp(h, 0.0, 1.0), 0.42));
-        col = mix(col, gnd, smoothstep(0.0, -0.05, h));
+        vec3 col = mix(uHor, uZen, pow(clamp(h, 0.0, 1.0), 0.42));
+        col = mix(col, uGnd, smoothstep(0.0, -0.05, h));
         float s = max(dot(d, uSun), 0.0);
-        col += vec3(1.0, 0.96, 0.88) * (pow(s, 24.0) * 0.22 + pow(s, 400.0) * 1.2);
-        col += vec3(1.0, 0.97, 0.9) * smoothstep(0.9995, 0.9998, s) * 10.0;
+        col += uGlow * (pow(s, 6.0) * uHalo + pow(s, 24.0) * 0.22 + pow(s, 400.0) * 1.2);
+        col += uGlow * smoothstep(0.9995, 0.9998, s) * 10.0 * uDisc;
+        if (uStars > 0.0 && h > 0.0) col += vec3(step(0.9986, hash(floor(d * 420.0)))) * uStars * smoothstep(0.02, 0.3, h);
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -3829,17 +3979,17 @@ function buildEnvironment(scene, renderer, world) {
   sky.frustumCulled = false; sky.renderOrder = -1;
   scene.add(sky);
 
-  // reflection probe from the sky
-  const pm = new THREE.PMREMGenerator(renderer);
+  // reflection probe from the sky (re-rendered when the time of day changes)
   const envScene = new THREE.Scene();
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), skyMat));
-  const env = pm.fromScene(envScene, 0.02).texture;
-  pm.dispose();
+  const makeEnv = () => { const pm = new THREE.PMREMGenerator(renderer), t = pm.fromScene(envScene, 0.02).texture; pm.dispose(); return t; };
+  const env = makeEnv();
 
   // neutral distance haze only. No ambient light: the sun (a directional light with cascaded shadow
   // maps, created in main) plus a hemisphere sky-bounce fill and the sky's own reflections.
   scene.fog = new THREE.Fog(0xe7eaed, 260, 1500);
-  scene.add(new THREE.HemisphereLight(0xdfe9f5, 0x8a8782, 0.62));
+  const hemi = new THREE.HemisphereLight(0xdfe9f5, 0x8a8782, 0.62);
+  scene.add(hemi);
 
   const line = (ctx, x0, y0, x1, y1) => { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
   // ground: gridmap of 2 m light / mid-grey checker tiles, each split by thin 0.5 m lines
@@ -3897,7 +4047,32 @@ function buildEnvironment(scene, renderer, world) {
     ramp.castShadow = ramp.receiveShadow = true;
     scene.add(ramp);
   }
-  return { sky, env };
+
+  // floodlight poles around the test bench, lit in the evening and at night
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.6, metalness: 0.6, envMap: env, envMapIntensity: 0.4 });
+  const headMat = new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.5, metalness: 0.4 });
+  const glowMat = new THREE.MeshStandardMaterial({ color: 0xfff1d8, emissive: 0xffd9a8, emissiveIntensity: 0, roughness: 0.3 });
+  const floods = [];
+  for (const [x, z, tx, tz] of [[-11, 44, -3, 38], [11, 44, 3, 38], [-28, 25, -20, 25], [28, 24, 20, 24], [9, 4, 0, 6]]) {
+    const pole = new THREE.Group();
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 9, 10), poleMat);
+    post.position.set(x, 4.5, z);
+    const ang = Math.atan2(tx - x, tz - z);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.22, 0.55), headMat);
+    head.position.set(x + Math.sin(ang) * 0.3, 9.05, z + Math.cos(ang) * 0.3); head.rotation.y = ang;
+    const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), glowMat);
+    lens.position.set(head.position.x, 8.93, head.position.z); lens.rotation.set(Math.PI / 2, 0, -ang);
+    post.castShadow = head.castShadow = true;
+    pole.add(post, head, lens);
+    scene.add(pole);
+    const light = new THREE.SpotLight(0xffdcae, 0, 70, 0.8, 0.6, 2);
+    light.position.set(head.position.x, 8.85, head.position.z);
+    light.target.position.set(tx, 0, tz);
+    light.visible = false;
+    scene.add(light, light.target);
+    floods.push(light);
+  }
+  return { sky, env, skyMat, hemi, makeEnv, floods, glowMat };
 }
 
 function rampGeometry(c) {
@@ -4066,29 +4241,119 @@ async function main() {
     for (const mt of list) if (mt.isMeshStandardMaterial && !mt.userData.csm) { csm.setupMaterial(mt); mt.userData.csm = true; }
   });
 
-  // post-processing: HDR render -> light bloom -> ACES tone map -> subtle warm balance
-  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: coarse ? 0 : 4 });
+  // post-processing: HDR render -> light bloom -> ACES tone map -> subtle warm balance -> FXAA (when the
+  // graphics preset renders without MSAA)
+  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 0 });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.2, 0.4, 0.95));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.2, 0.4, 0.95);
+  composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const grade = new ShaderPass(WarmBalanceShader);
   composer.addPass(grade);
-  // touch devices render without MSAA: smooth the edges with FXAA instead
-  const fxaa = coarse ? new ShaderPass(FXAAShader) : null;
-  if (fxaa) composer.addPass(fxaa);
+  const fxaa = new ShaderPass(FXAAShader);
+  composer.addPass(fxaa);
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight, pr = renderer.getPixelRatio();
     renderer.setSize(w, h, false);
     composer.setPixelRatio(pr);
     composer.setSize(w, h);
     grade.uniforms.uRes.value.set(w * pr, h * pr);
-    if (fxaa) fxaa.material.uniforms.resolution.value.set(1 / (w * pr), 1 / (h * pr));
+    fxaa.material.uniforms.resolution.value.set(1 / (w * pr), 1 / (h * pr));
     camera.aspect = w / h; camera.updateProjectionMatrix();
     csm.updateFrustums();
   };
   window.addEventListener('resize', resize);
-  resize();
+
+  // headlight beams, placed on the headlight reflectors every frame
+  const beams = [0, 1].map(() => {
+    const l = new THREE.SpotLight(0xfff1d8, 0, 60, 0.42, 0.45, 2);
+    l.shadow.mapSize.set(1024, 1024); l.shadow.camera.near = 0.2; l.shadow.camera.far = 45; l.shadow.bias = -0.0005;
+    l.visible = false;
+    scene.add(l, l.target);
+    return l;
+  });
+
+  // Time of day: sky colours, the sun (or moon) direction, colour and strength, the sky-bounce fill,
+  // exposure, haze and bloom, and how far the lamps are lit: floodlights, headlights and tail lights.
+  const TIMES = {
+    day: { sun: [-0.55, 0.72, -0.42], sunColor: 0xfff3e4, sunI: 3.3, sky: 0xdfe9f5, gnd: 0x8a8782, hemiI: 0.62, exposure: 0.92, fog: 0xe7eaed,
+      zen: [0.36, 0.52, 0.80], hor: [1.02, 1.02, 1.0], below: [0.8, 0.8, 0.8], glow: [1.0, 0.96, 0.88], halo: 0, disc: 1, stars: 0, lamps: 0, beams: 0, bloom: 0.2 },
+    evening: { sun: [-0.78, 0.13, -0.61], sunColor: 0xffa35c, sunI: 2.2, sky: 0x8d93bd, gnd: 0x6a5244, hemiI: 0.42, exposure: 1.0, fog: 0xc79a7e,
+      zen: [0.16, 0.22, 0.46], hor: [1.08, 0.6, 0.34], below: [0.42, 0.36, 0.33], glow: [1.0, 0.58, 0.28], halo: 0.55, disc: 1, stars: 0, lamps: 0.45, beams: 0.7, bloom: 0.32 },
+    night: { sun: [0.36, 0.64, 0.68], sunColor: 0x9db6ff, sunI: 0.3, sky: 0x26365a, gnd: 0x0c0e13, hemiI: 0.2, exposure: 1.08, fog: 0x0a0d15,
+      zen: [0.008, 0.013, 0.034], hor: [0.045, 0.06, 0.1], below: [0.02, 0.02, 0.025], glow: [0.75, 0.82, 1.0], halo: 0, disc: 0.35, stars: 1, lamps: 1, beams: 1, bloom: 0.45 },
+  };
+  // Graphics presets: render resolution, sun shadows and their map size, anti-aliasing (MSAA, or FXAA
+  // without it), bloom, how many floodlights render, and shadows from the headlight beams.
+  const GFX = {
+    low: { pr: 0.75, shadows: false, size: 512, msaa: 0, bloom: false, floods: 2, beamShadows: false, label: '¾ resolution · no shadows · FXAA' },
+    medium: { pr: 1.0, shadows: true, size: 1024, msaa: 0, bloom: true, floods: 5, beamShadows: false, label: '1× resolution · 1024 px shadows · FXAA · bloom' },
+    high: { pr: 1.5, shadows: true, size: 2048, msaa: 4, bloom: true, floods: 5, beamShadows: false, label: 'up to 1.5× resolution · 2048 px shadows · 4× MSAA · bloom' },
+    ultra: { pr: 2.0, shadows: true, size: 4096, msaa: 8, bloom: true, floods: 5, beamShadows: true, label: 'up to 2× resolution · 4096 px shadows · 8× MSAA · bloom · headlight shadows' },
+  };
+  const envCache = { day: envr.env };
+  const litMaterials = () => {
+    const out = new Set(Object.values(mats));
+    scene.traverse((o) => { for (const mt of (Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []))) out.add(mt); });
+    return [...out];
+  };
+  const settings = { time: 'day', gfx: coarse ? 'medium' : 'high' };
+  try { Object.assign(settings, JSON.parse(localStorage.getItem('crashDriver.settings') || '{}')); } catch (_) { /* storage may be unavailable */ }
+  if (TIMES[params.get('time')]) settings.time = params.get('time');
+  if (GFX[params.get('gfx')]) settings.gfx = params.get('gfx');
+  if (!TIMES[settings.time]) settings.time = 'day';
+  if (!GFX[settings.gfx]) settings.gfx = 'high';
+  let lampLevel = 0, beamLevel = 0;
+
+  function applyTime(name) {
+    const T = TIMES[name], u = envr.skyMat.uniforms, sun = new THREE.Vector3(...T.sun).normalize();
+    u.uSun.value.copy(sun); u.uZen.value.setRGB(...T.zen); u.uHor.value.setRGB(...T.hor); u.uGnd.value.setRGB(...T.below);
+    u.uGlow.value.setRGB(...T.glow); u.uHalo.value = T.halo; u.uDisc.value = T.disc; u.uStars.value = T.stars;
+    csm.lightDirection.copy(sun).negate();
+    for (const l of csm.lights) { l.color.set(T.sunColor); l.intensity = T.sunI; }
+    envr.hemi.color.set(T.sky); envr.hemi.groundColor.set(T.gnd); envr.hemi.intensity = T.hemiI;
+    renderer.toneMappingExposure = T.exposure;
+    scene.fog.color.set(T.fog);
+    bloom.strength = T.bloom;
+    // reflections follow the sky
+    if (!envCache[name]) envCache[name] = envr.makeEnv();
+    for (const mt of litMaterials()) if (mt.envMap) mt.envMap = envCache[name];
+    // lamps: floodlights, headlights (and their glass), tail and parking lights
+    lampLevel = T.lamps; beamLevel = T.beams;
+    envr.glowMat.emissiveIntensity = 3.5 * lampLevel;
+    document.body.dataset.time = name;
+    mats.headlight.emissiveIntensity = 2.4 + 5 * beamLevel;
+    mats.lens.emissiveIntensity = 0.22 + 1.6 * beamLevel;
+    mats.parking.emissiveIntensity = 0.8 + 1.6 * beamLevel;
+    mats.taillight.emissiveIntensity = 0.8 + 2.4 * beamLevel;
+    updateLights();
+    needFrame = true;
+  }
+  function updateLights() {
+    const G = GFX[settings.gfx];
+    envr.floods.forEach((l, i) => { l.visible = lampLevel > 0 && i < G.floods; l.intensity = 300 * lampLevel; });
+    for (const b of beams) { b.visible = beamLevel > 0; b.intensity = 240 * beamLevel; b.castShadow = G.beamShadows; }
+  }
+  function applyGfx(name) {
+    const G = GFX[name], dpr = window.devicePixelRatio || 1;
+    renderer.setPixelRatio(name === 'low' ? Math.min(dpr, 1) * G.pr : Math.min(dpr, G.pr));
+    const shadowsChanged = renderer.shadowMap.enabled !== G.shadows;
+    renderer.shadowMap.enabled = G.shadows;
+    const size = Math.min(G.size, renderer.capabilities.maxTextureSize);
+    for (const l of csm.lights) {
+      l.castShadow = G.shadows;
+      if (l.shadow.mapSize.x !== size) { l.shadow.mapSize.set(size, size); if (l.shadow.map) { l.shadow.map.dispose(); l.shadow.map = null; } }
+    }
+    const samples = Math.min(G.msaa, renderer.capabilities.maxSamples || 0);
+    for (const t of [composer.renderTarget1, composer.renderTarget2]) if (t.samples !== samples) { t.samples = samples; t.dispose(); }
+    fxaa.enabled = samples === 0;
+    bloom.enabled = G.bloom;
+    if (shadowsChanged) for (const mt of litMaterials()) mt.needsUpdate = true;
+    updateLights();
+    resize();
+    needFrame = true;
+  }
 
   // --- input
   const keys = new Set(), touch = { left: false, right: false, throttle: false, brake: false };
@@ -4100,6 +4365,8 @@ async function main() {
     if (e.code === 'KeyC') cycleCam();
     if (e.code === 'KeyN') toggleNodes();
     if (e.code === 'KeyT') toggleSlow();
+    if (e.code === 'KeyG') showSettings(panel.hidden);
+    if (e.code === 'Escape') showSettings(false);
   });
   window.addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
   window.addEventListener('blur', () => { keys.clear(); for (const k in touch) touch[k] = false; document.querySelectorAll('.ctl.on').forEach(b => b.classList.remove('on')); });
@@ -4165,9 +4432,30 @@ async function main() {
   $('btnNodes').addEventListener('click', toggleNodes);
   $('btnSlow').addEventListener('click', toggleSlow);
 
+  // settings panel: time of day and graphics, remembered in this browser
+  const panel = $('settings');
+  const showSettings = (on) => { panel.hidden = !on; $('btnSettings').setAttribute('aria-expanded', String(on)); };
+  const syncSettingsUI = () => {
+    for (const grp of panel.querySelectorAll('.seg')) for (const b of grp.children) b.setAttribute('aria-checked', String(settings[grp.dataset.set] === b.dataset.v));
+    $('setNote').textContent = settings.gfx.toUpperCase() + ': ' + GFX[settings.gfx].label + '.';
+  };
+  const choose = (key, v) => {
+    if (settings[key] === v) return;
+    settings[key] = v;
+    if (key === 'time') applyTime(v); else applyGfx(v);
+    try { localStorage.setItem('crashDriver.settings', JSON.stringify(settings)); } catch (_) { /* not remembered */ }
+    syncSettingsUI();
+  };
+  for (const grp of panel.querySelectorAll('.seg')) for (const b of grp.children) b.addEventListener('click', () => choose(grp.dataset.set, b.dataset.v));
+  $('btnSettings').addEventListener('click', () => showSettings(panel.hidden));
+  $('btnSetClose').addEventListener('click', () => showSettings(false));
+  applyGfx(settings.gfx);
+  applyTime(settings.time);
+  syncSettingsUI();
+
   // console / automation hook: hook.call(op, args) runs commands inside the physics thread
   const hook = window.__crashDriver = {
-    link, summary, view, rig, renderer, composer, scene, camera, csm, state, stats, mode: link.mode, paused: false,
+    link, summary, view, rig, renderer, composer, scene, camera, csm, state, stats, settings, mode: link.mode, paused: false,
     call: (op, args) => link.call(op, args),
     reset: () => doReset(true),
     refresh: () => { needFrame = true; },
@@ -4223,6 +4511,14 @@ async function main() {
     }
 
     rig.update(state, dtF);
+    if (beamLevel > 0) {
+      for (let s = 0; s < 2; s++) {
+        const b = beams[s];
+        if (!view.lampPos(s, b.position)) { b.position.copy(state.cm).addScaledVector(state.fwd, 2.2).addScaledVector(state.left, s ? -0.7 : 0.7); b.position.y = state.cm.y + 0.2; }
+        b.position.addScaledVector(state.fwd, 0.1);
+        b.target.position.copy(b.position).addScaledVector(state.fwd, 12).addScaledVector(state.up, -1.1);
+      }
+    }
     if (Math.abs(camera.fov - csmFov) > 0.4) { csm.updateFrustums(); csmFov = camera.fov; }
     camera.updateMatrixWorld();
     csm.update();

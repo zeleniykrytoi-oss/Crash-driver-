@@ -2,11 +2,11 @@
 
 A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
-- 738 beams: structural, shear (diagonal) and support;
+- 749 beams: structural, shear (diagonal) and support;
 - 30 volume cells;
-- a sheet-metal skin of 5789 stretch springs and 3686 dihedral bending springs.
+- a sheet-metal skin of 5780 stretch springs and 3643 dihedral bending springs.
 
-In a crash the crumple zone folds progressively and bulges sideways. The front piles up against a rigid engine block, and the hood folds into wide creases and arches up. A corner hit twists the frame. Bumpers, hood and doors hang from their hinges or tear off when their brackets fail.
+In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood and doors hang from their hinges or tear off when their brackets fail.
 
 The tyres use a contact-patch friction model with slip ratio, slip angle and static/kinetic friction, on coil-over suspension with asymmetric dampers and anti-roll bars.
 
@@ -26,6 +26,7 @@ python3 -m http.server 8000
 - `?model=path/to/vehicle.glb` loads another model (`.gltf` works too).
 - `?worker=0` runs the solver on the main thread instead of the worker. The page also falls back to this on its own if workers are unavailable.
 - `?tune={...}` deep-merges a JSON object into the vehicle constants (`VEHICLE`) before the truck is built, for example `?tune={"plastic":{"H":0.5}}`.
+- `?time=day|evening|night` and `?gfx=low|medium|high|ultra` override the settings panel for that visit.
 
 ## Controls
 
@@ -38,6 +39,7 @@ python3 -m http.server 8000
 | Cycle camera (chase, orbit, trackside) | C | CAM |
 | f-node debug view | N | F-NODES |
 | Slow motion: 20× slower (×0.05), still whole 0.5 ms substeps | T | SLOW-MO |
+| Settings: time of day and graphics | G (Esc closes) | SETTINGS |
 | Orbit camera | drag on the view | drag on the view |
 
 The test bench has a concrete wall 45 m straight ahead of the spawn, a 10° ramp on the left lane and a 22° ramp on the right lane.
@@ -81,7 +83,7 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 - **Rigid blocks:** 8 corner nodes each for the engine and the gearbox.
 - **Hubs:** 4, one per wheel centre.
 - **Tread probes:** 256, a fixed 2 × 32 ring per wheel.
-- **Flexnodes:** 4066 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
+- **Flexnodes:** 4060 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
 
 **Beams.** Each beam is a spring-damper along its axis: F = k·(L − L0) + c·v<sub>rel</sub>, with k = E/L0 and c set by the family's damping ratio. There are three kinds:
 
@@ -121,7 +123,7 @@ Ten mechanics run inside the mass-spring loop on top of the beams, cells and she
 3. **Stress-induced volume expansion.** A bay crushed lengthwise keeps its pressure, which pushes its side walls out against cross members that yield in tension at just 1.2 % (`cross.yieldT`). The crushed bay therefore bursts outward: fenders bulge and the hood arches up into its fold. The pressure always acts along the exact volume gradient. An earlier version pushed only sideways, but that force is non-conservative and pumped energy into the ringing structure after a crash.
 4. **Delayed impulse shockwave.** Explicit integration carries an impulse at most one beam further per 0.5 ms substep, so a hit runs from the bumper back to the cab as a wave at the structure's speed of sound, visible frame by frame in slow motion.
 5. **Non-linear plastic flow (viscoplasticity).** Fast deformation raises the yield, following Cowper-Symonds: y·(1 + (ε̇/D)<sup>1/q</sup>) (`plastic.D`, `plastic.q`). In the peak milliseconds of a crash a member carries more than its static yield and flows like heavy, viscous metal rather than giving at once.
-6. **Hinged hood flapping.** The hood's latch bracket lets go after its first beam fails, while its two rear hinge brackets keep holding. Each hood and door panel carries flat-plate aerodynamic pressure (`aeroParts()`, `air.Cn`). With the inertia of its lattice, that lifts an unlatched hood: it flaps, slams, and pivots on its rear hinges.
+6. **Hinged hood flapping.** The hood's latch tears open after its first beam fails in tension, while its two rear hinge brackets keep holding. Each hood and door panel carries flat-plate aerodynamic pressure (`aeroParts()`, `air.Cn`). With the inertia of its lattice, that lifts an unlatched hood: it flaps, slams, and pivots on its rear hinges.
 7. **Edge-tearing propagation.** When an attachment beam snaps, every unbroken attachment beam next to it along the panel edge has its tensile stress doubled, capped at 4× (`concentrate()`). Its neighbours are the beams on the same panel node or one lattice beam away. A torn corner therefore unzips along the seam, and a bracket that has lost half its beams fails as a unit.
 8. **Frictional plastic damping.** A beam whose rest length has changed by more than 10 % of its factory length (`plastic.lockStrain`) gets Coulomb friction between its two nodes: up to `plastic.lockDecel` (40 m/s²) of their relative motion is taken off (`beamFriction()`). It acts at the velocity level, beam by beam, so it can stick without overshooting the way an explicit friction force would. Crushed metal locks into shape instead of wobbling like jelly once the crash is over.
 9. **Stretch-limit thinning.** Plastic stretch thins the metal: a beam's breaking strain shrinks to max(`thinMin`, 1 − `thin`·ε<sub>stretch</sub>) of its original value. Sheet edges tear the same way. Panel triangles stretched past 1.8× are cut out of the rendered mesh, so overstretched metal splits into strips.
@@ -140,6 +142,14 @@ Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, 
 - **Bracket failure:** a bracket lets go as a unit after losing half its beams (a hood latch after its first). Failures stay local, so a door whose upper hinge and latch tear off swings and hangs on its lower hinge.
 - **Load sharing:** each snapped beam concentrates stress in its bracket neighbours (mechanic 7). A moderate hit leaves a part hanging; a severe one tears it free as one panel.
 - **Free parts:** a part with no brackets left moves into its own simulation context with exactly the momentum it had, keeps deforming, and goes to sleep once it comes to rest.
+
+**The hood's roof fold.** The hood is a 3 × 5 × 2 lattice, from the hinge row at the cowl to the latch at the front:
+
+- Around the middle row, its underside chords and through-thickness diagonals give first (`hoodFold`, 1.2 % yield).
+- Its top skin and outer segments stay stiff (`hoodPanel`).
+- The latch is a hook: it tears open in tension, but under compression it keeps pushing the hood back as the front crushes.
+
+A frontal hit therefore folds the hood up into a ridge with two flat halves, like a roof: about 35 cm high after a 60 km/h wall hit and 24 cm after 40 km/h. The supports underneath stop it folding down onto the engine.
 
 ## Vehicle dynamics
 
@@ -160,16 +170,42 @@ Laterally and fore-aft the hub is held by a stiff link that bends plastically in
 
 **Drivetrain.** A 5-speed automatic with a torque converter, 4WD with viscous limited-slip axles, and four-channel ABS. Steering uses Ackermann geometry, with less lock at speed.
 
+## Settings
+
+The SETTINGS button (or G) opens a panel with two choices. They are remembered in this browser.
+
+**Time of day:**
+
+| Time | Sky | Light |
+| --- | --- | --- |
+| Day | Pale blue | High sun |
+| Evening | Orange horizon under a deep blue zenith | Low warm sun, long shadows; headlights and floodlights at half strength |
+| Night | Dark, with stars | Dim blue moonlight; working headlight beams, glowing tail lights and five floodlight poles over the test area |
+
+Each time sets the sky colours, the sun or moon direction, colour and strength, the hemisphere fill, the reflections (re-rendered from that sky), exposure, haze and bloom. At night the HUD text turns light on a dark halo.
+
+**Graphics:**
+
+| Preset | Resolution | Sun shadows | Anti-aliasing | Extras |
+| --- | --- | --- | --- | --- |
+| LOW | ¾ | off | FXAA | no bloom, two floodlights |
+| MEDIUM | 1× | 1024 px | FXAA | bloom |
+| HIGH | up to 1.5× | 2048 px | 4× MSAA | bloom |
+| ULTRA | up to 2× | 4096 px | 8× MSAA | bloom, headlight shadows |
+
+The default is HIGH on desktop and MEDIUM on touch devices.
+
 ## Rendering
 
 - **Lighting:**
   - **Sun:** a directional light with cascaded shadow maps. The nearest cascade covers only about 11 m around the car, which gives sharp contact shadows under the chassis.
   - **Fill:** a hemisphere sky-bounce light, with image-based reflections from the sky. There is no flat ambient light.
-  - **Post:** an HDR render goes through a light bloom and ACES tone mapping. Desktop renders with 4× MSAA; touch devices use FXAA.
+  - **Post:** an HDR render goes through a light bloom and ACES tone mapping, then MSAA or FXAA depending on the graphics preset.
 - **Materials:** physically based. Clearcoat sand paint, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, a dark radiator with a micro-grid texture, and chrome bumpers. The ground is a clean grey checker gridmap.
 - **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Normals are recomputed once a panel is dented.
+- **Accordion pleats:** a crushed bay can't shorten its sheet metal, so the fenders, wheel tubs and body sides ahead of the cowl fold into sharp pleats across it. The pleats are a triangle wave of 24 cm rest wavelength, standing (λ/4)·√(1 − r²) high (deepened 1.4× so they read clearly) for a bay squeezed to a fraction r of its length. Normals are recomputed, so the folds catch the light.
 - **Torn metal:** triangles of a dented panel that stretch past 1.8× along an edge are removed from the mesh on both the worker and the page, so the panel opens up into strips.
-- **Rigid parts:** the engine and gearbox meshes ride on their blocks. Radiator and suspension parts in the engine bay are skinned to the structure.
+- **Rigid parts:** the engine and gearbox meshes ride on their blocks. Radiator and suspension parts in the engine bay are skinned to the structure. All the dark mechanical parts ahead of the cowl (engine, manifold, battery and airbox, radiator, front suspension and steering) are hidden once the crumple zone shortens by 3 cm, so a crash never shows them as black shards through the panels.
 - **Wheels:** the stock GLTF wheels are measured and removed. The generated wheels (tyre, rim, instanced lug nuts, disc and caliper) spin, steer, and squash where the probes report compression.
 
 ## Vehicle model and licence
