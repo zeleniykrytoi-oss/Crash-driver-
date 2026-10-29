@@ -151,11 +151,11 @@ Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, 
 
 **The hood's roof fold.** The hood is a 3 × 5 × 2 lattice, from the hinge row at the cowl to the latch at the front:
 
-- Around the middle row, its underside chords and through-thickness diagonals give first (`hoodFold`, 1.2 % yield).
-- Its top skin and outer segments stay stiff (`hoodPanel`).
+- Around the middle row, every member gives early and sets plastically (`hoodFold`, 1.2 % yield).
+- Its outer segments stay stiff (`hoodPanel`). The hood is crowned, so it folds up rather than down.
 - The latch is a hook: it tears open in tension, but under compression it keeps pushing the hood back as the front crushes.
 
-A frontal hit therefore folds the hood up into a ridge with two flat halves, like a roof: about 35 cm high after a 60 km/h wall hit and 24 cm after 40 km/h. The supports underneath stop it folding down onto the engine.
+A frontal hit therefore folds the hood up into a ridge with two flat halves, like a roof: about 45 cm high after a 60 km/h wall hit and 29 cm after 40 km/h. The supports underneath stop it folding down onto the engine.
 
 ## Vehicle dynamics
 
