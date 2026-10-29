@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Share+Tech+Mono&display=swap">
 <style>
 /* Layout: full-bleed WebGL canvas; HUD pinned to the four screen corners inside the safe-area insets.
-   One deliberate look (warm 2013 tech-demo amber on smoked glass), so there is no light theme. */
+   One deliberate look over a bright daylight scene: dark ink with a light halo for free-standing text,
+   smoked-glass panels with cream text, amber accents. No separate dark/light themes. */
 :root {
   --bg: #0d0b07;
   --panel: rgba(22, 16, 8, 0.56);
@@ -20,6 +21,9 @@
   --accent-ink: #1c1104;
   --danger: #ff5a36;
   --go: #b9e27c;
+  --hud-ink: #1a1d20;
+  --hud-muted: #464b51;
+  --hud-halo: 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 255, 255, 0.55);
   --font-display: 'Saira Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
   --font-data: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --edge: 16px;
@@ -38,14 +42,14 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 
 /* --- top-left: brand + live physics telemetry --- */
 .brand { position: absolute; top: calc(var(--edge) + var(--safe-t)); left: calc(var(--edge) + var(--safe-l)); }
-.brand-title { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.04em; line-height: 0.9; color: var(--ink); text-shadow: 0 2px 14px rgba(255, 150, 40, 0.45); }
+.brand-title { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.04em; line-height: 0.9; color: var(--hud-ink); text-shadow: var(--hud-halo); }
 .brand-title span { color: var(--accent); margin-left: 0.18em; }
-.brand-sub { font-family: var(--font-data); font-size: 11px; letter-spacing: 0.08em; color: var(--muted); margin-top: 4px; text-transform: uppercase; }
+.brand-sub { font-family: var(--font-data); font-size: 11px; letter-spacing: 0.08em; color: var(--hud-muted); text-shadow: var(--hud-halo); margin-top: 4px; text-transform: uppercase; }
 .stats { margin-top: 10px; display: grid; grid-template-columns: auto auto; column-gap: 12px; row-gap: 1px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px; font-family: var(--font-data); font-size: 11.5px; font-variant-numeric: tabular-nums; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); width: max-content; }
 .stats dt { color: var(--muted); letter-spacing: 0.08em; }
 .stats dd { margin: 0; text-align: right; color: var(--ink); }
 .stats dd.hot { color: var(--danger); }
-.statline { display: none; max-width: 44vw; margin-top: 4px; font-family: var(--font-data); font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+.statline { display: none; max-width: 44vw; margin-top: 4px; font-family: var(--font-data); font-size: 10px; color: var(--hud-muted); text-shadow: var(--hud-halo); letter-spacing: 0.04em; }
 .feed { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .feed li { font-weight: 700; font-size: 15px; letter-spacing: 0.06em; color: var(--accent-ink); background: var(--accent); padding: 2px 8px; width: max-content; transition: opacity 0.6s, transform 0.6s; }
 .feed li.warn { background: var(--danger); color: var(--ink); }
@@ -62,21 +66,21 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 
 /* --- bottom-centre: speedo --- */
 .gauge { position: absolute; left: 50%; bottom: calc(10px + var(--safe-b)); transform: translateX(-50%); text-align: center; }
-.speed { font-weight: 800; font-style: italic; font-size: 54px; line-height: 0.9; font-variant-numeric: tabular-nums; text-shadow: 0 2px 18px rgba(255, 160, 50, 0.35); }
-.speed small { font-size: 16px; font-style: normal; font-weight: 700; color: var(--muted); margin-left: 4px; letter-spacing: 0.06em; }
-.gear-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 2px; font-family: var(--font-data); font-size: 13px; color: var(--muted); }
+.speed { font-weight: 800; font-style: italic; font-size: 54px; line-height: 0.9; font-variant-numeric: tabular-nums; color: var(--hud-ink); text-shadow: var(--hud-halo); }
+.speed small { font-size: 16px; font-style: normal; font-weight: 700; color: var(--hud-muted); margin-left: 4px; letter-spacing: 0.06em; }
+.gear-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 2px; font-family: var(--font-data); font-size: 13px; color: var(--hud-muted); text-shadow: var(--hud-halo); }
 .gear-row #gear { color: var(--accent); font-size: 18px; min-width: 1.2em; }
-.rpm { width: 120px; height: 6px; background: rgba(255, 220, 160, 0.16); border-radius: 2px; overflow: hidden; }
+.rpm { width: 120px; height: 6px; background: rgba(26, 29, 32, 0.25); border-radius: 2px; overflow: hidden; }
 .rpm i { display: block; height: 100%; width: 10%; background: linear-gradient(90deg, var(--go), var(--accent) 70%, var(--danger)); }
-.credit { margin-top: 6px; font-family: var(--font-data); font-size: 9.5px; color: var(--muted); opacity: 0.8; max-width: 60vw; }
-.credit a { color: var(--muted); }
+.credit { margin-top: 6px; font-family: var(--font-data); font-size: 9.5px; color: var(--hud-muted); text-shadow: var(--hud-halo); max-width: 60vw; }
+.credit a { color: var(--hud-muted); }
 .credit a { pointer-events: auto; }
 
 /* --- touch controls --- */
 .pad { position: absolute; bottom: calc(var(--edge) + var(--safe-b)); display: flex; gap: 12px; align-items: flex-end; }
 .pad-steer { left: calc(var(--edge) + var(--safe-l)); }
 .pad-pedals { right: calc(var(--edge) + var(--safe-r)); }
-.ctl { border: 2px solid rgba(255, 220, 170, 0.42); background: rgba(24, 18, 10, 0.34); color: var(--ink); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; transition: background 0.08s, border-color 0.08s, transform 0.08s; }
+.ctl { border: 2px solid rgba(255, 236, 205, 0.6); background: rgba(22, 24, 27, 0.42); color: var(--ink); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; transition: background 0.08s, border-color 0.08s, transform 0.08s; }
 .ctl.on { transform: scale(0.95); border-color: var(--accent); background: rgba(255, 164, 36, 0.38); }
 .steer { width: 88px; height: 88px; border-radius: 50%; }
 .steer svg { width: 38px; height: 38px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
@@ -85,7 +89,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 .paddle.throttle { height: 178px; border-color: rgba(190, 230, 130, 0.55); }
 .paddle.brake.on { background: rgba(255, 90, 54, 0.42); border-color: var(--danger); }
 .paddle.throttle.on { background: rgba(185, 226, 124, 0.38); border-color: var(--go); }
-.keys { position: absolute; bottom: calc(var(--edge) + var(--safe-b) + 108px); left: calc(var(--edge) + var(--safe-l)); margin: 0; font-family: var(--font-data); font-size: 10.5px; color: var(--muted); letter-spacing: 0.04em; max-width: 46vw; }
+.keys { position: absolute; bottom: calc(var(--edge) + var(--safe-b) + 108px); left: calc(var(--edge) + var(--safe-l)); margin: 0; font-family: var(--font-data); font-size: 10.5px; color: var(--hud-muted); text-shadow: var(--hud-halo); letter-spacing: 0.04em; max-width: 46vw; }
 @media (hover: none) and (pointer: coarse) { .keys { display: none; } }
 @media (max-width: 720px) {
   .brand-title { font-size: 23px; }
@@ -161,7 +165,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
     <div class="toggles">
       <button id="btnCam" class="tog" type="button">CAM<i id="camName">CHASE</i></button>
       <button id="btnNodes" class="tog" type="button" aria-pressed="false">F-NODES</button>
-      <button id="btnSlow" class="tog" type="button" aria-pressed="false">SLOW-MO</button>
+      <button id="btnSlow" class="tog" type="button" aria-pressed="false">SLOW-MO<i>×20</i></button>
     </div>
   </div>
 
@@ -224,27 +228,36 @@ const VEHICLE = {
   hubMass: 42,
   partMass: [0, 22, 20, 26, 26, 20],
   flexMassTotal: 108,
-  stationMerge: 0.22, stationMaxGap: 0.62,
+  stationMerge: 0.22, stationMaxGap: 0.62, crumpleGap: 0.42,
   wheel: { I: 1.9, kT: 42000, cT: 260, rays: 32, rowFrac: 0.36 },
   susp: { kVf: 46000, kVr: 52000, zeta: 0.34, couple: 0.65, bump: 0.11, droop: 0.16, kB: 6e5, kS: 6e5, cS: 5000, yieldS: 0.05, maxBend: 0.22 },
   flex: { omega: 520, zeta: 0.5 },
-  // Beam families: E is an axial rigidity (k = E / L0), def is the elastic strain limit (beyond it
-  // the rest length flows plastically), brT / brC are the tension / compression strains (relative to
-  // the factory length) that snap the beam.
+  // Beam families. E is an axial rigidity (k = E / L0); def is the tension elastic strain limit; defC is
+  // the compression strain (5 %) past which the rest length shortens permanently; soft is the share of
+  // that yield strength a member keeps once it has buckled, which localises the crush into successive
+  // accordion folds; brT / brC are the tension / compression strains (relative to the factory length)
+  // that snap the beam.
   beams: {
-    chassis: { E: 1.2e6, def: 0.03, brT: 0.4, brC: 9, zeta: 0.08 },
-    cab:     { E: 1.8e6, def: 0.07, brT: 0.5, brC: 9, zeta: 0.08 },     // passenger safety cell
-    hood:    { E: 2.6e5, def: 0.012, brT: 0.5, brC: 9, zeta: 0.1 },
-    door:    { E: 3.0e5, def: 0.02, brT: 0.5, brC: 9, zeta: 0.1 },
-    bumper:  { E: 4.0e5, def: 0.025, brT: 0.5, brC: 9, zeta: 0.1 },
-    attach:  { E: 3.0e5, def: 0.035, brT: 0.18, brC: 0.27, zeta: 0.1 },
-    attachHood: { E: 3.0e5, def: 0.035, brT: 0.2, brC: 0.5, zeta: 0.1 },
-    attachDoor: { E: 3.5e5, def: 0.035, brT: 0.36, brC: 0.42, zeta: 0.1 },
+    chassis:  { E: 1.5e6, def: 0.03, defC: 0.05, soft: 0.6, brT: 0.4, brC: 9, zeta: 0.08 },
+    cab:      { E: 1.3e6, def: 0.06, defC: 0.08, soft: 0.6, brT: 0.5, brC: 9, zeta: 0.08 },     // passenger safety cell
+    hood:     { E: 2.0e5, def: 0.02, defC: 0.05, soft: 0.4, brT: 0.5, brC: 9, zeta: 0.18 },
+    hoodFold: { E: 2.0e5, def: 0.02, defC: 0.02, soft: 0.35, brT: 0.5, brC: 9, zeta: 0.18 },   // underside chords: the hood folds upward
+    door:     { E: 3.0e5, def: 0.02, defC: 0.05, soft: 0.45, brT: 0.5, brC: 9, zeta: 0.1 },
+    bumper:   { E: 4.0e5, def: 0.025, defC: 0.06, soft: 0.85, brT: 0.5, brC: 9, zeta: 0.1 },     // steel bar: little softening
+    // mounting brackets also tear once their accumulated plastic deformation (brP) is used up, which makes
+    // part loss grow steadily with crash severity instead of hinging on one instantaneous peak
+    attach:  { E: 3.0e5, def: 0.035, brP: 0.18, brT: 0.3, brC: 0.4, zeta: 0.1 },
+    attachHood: { E: 3.0e5, def: 0.035, brP: 0.2, brT: 0.3, brC: 0.55, zeta: 0.1 },
+    attachDoor: { E: 3.5e5, def: 0.035, brP: 0.22, brT: 0.45, brC: 0.6, zeta: 0.1 },
     support: { E: 1.5e5, def: 9, brT: 99, brC: 99, zeta: 0.15 },
   },
+  densify: 0.32, // crushed below 32 % of its length a beam is packed metal: no further plastic flow
   stabK: 2.2,    // Gershgorin bound on (omega*dt)^2 per node from beams + suspension
   stabC: 0.55,   // bound on sum(c)*dt/m per node
 };
+
+const FLEX_REACH = 0.15;                 // max distance of a flexnode target from its shape-matched estimate
+const FOLD_LAMBDA = 0.26, FOLD_K = 2 * Math.PI / FOLD_LAMBDA, FOLD_K2 = 2 * Math.PI / 0.47;   // skin fold wavelength
 
 const MODEL_URL = new URLSearchParams(location.search).get('model') || 'models/gavril_d/scene.glb';
 
@@ -438,24 +451,27 @@ class FNodeSim {
     this.L0 = new Float64Array(NB); this.L0o = new Float64Array(NB);
     this.bk = new Float64Array(NB); this.bc = new Float64Array(NB); this.bz = new Float64Array(NB);
     this.bdef = new Float64Array(NB); this.bbrT = new Float64Array(NB); this.bbrC = new Float64Array(NB);
+    this.bdefC = new Float64Array(NB); this.bsoft = new Float64Array(NB); this.bBreak = new Int32Array(NB); this.bbrP = new Float64Array(NB);
     this.btype = new Uint8Array(NB); this.bpart = new Uint8Array(NB);
     this.broken = new Uint8Array(NB);   // 0 intact, 1 snapped, 2 disabled (support beam of a detached part)
     this.bgroup = new Int16Array(NB).fill(-1); this.groups = [];   // break groups (brackets): enough snaps -> the whole bracket fails
     this.groupNeed = []; this.groupHits = [];
     this.fStart = 0; this.nFlex = 0;
     this.fAnc = new Int32Array(NN * 4); this.fW = new Float64Array(NN * 4); this.fW0 = new Float64Array(NN * 4);
-    this.fTet = new Int32Array(NN); this.fActive = new Uint8Array(NN); this.fCalm = new Uint16Array(NN);
+    this.fFrame = new Int32Array(NN); this.fActive = new Uint8Array(NN); this.fCalm = new Uint16Array(NN);
     this.fDev = new Float32Array(NN); this.fList = new Int32Array(NN); this.nActive = 0;
     this.fBent = new Uint8Array(NN);
+    this.fRestD = new Float64Array(NN * 3);           // rest-space position of each flexnode including its dents
+    this.fNrm = new Float32Array(NN * 3);             // rest surface normal at each flexnode
+    this.fNb = new Int32Array(NN * 4).fill(-1);       // up to four neighbours on the same surface
     this.fp = [];
-    this.nTets = 0; this.tetKey = new Map();
-    this.tetN = new Int32Array(NN * 4); this.tetF0 = new Float64Array(NN * 9); this.tetR = new Float64Array(NN * 9);
+    this.frames = []; this.frameR = null; this.frameAmp = null; this.frameAxis = null; this.framePhase = null;
     this.clusters = []; this.parts = []; this.contexts = []; this.wheels = [];
     this.vehicle = null;
     this.steps = 0; this.nBroken = 0; this.dentEvents = 0;
     this.events = [];
     this.onDent = null;
-    this._F = new Float64Array(9); this._w = new Float64Array(4);
+    this._F = new Float64Array(9); this._w = new Float64Array(4); this._t = new Float64Array(3); this._t2 = new Float64Array(3);
   }
 
   addNode(x, y, z, m, kind, part) {
@@ -479,21 +495,121 @@ class FNodeSim {
     this.ba[j] = a; this.bb[j] = b; this.L0[j] = this.L0o[j] = L;
     this.bk[j] = fam.E / Math.max(L, 0.05); this.bz[j] = fam.zeta;
     this.bdef[j] = Math.max(fam.def, 0.004 / Math.max(L, 0.01)); this.bbrT[j] = fam.brT; this.bbrC[j] = fam.brC;
+    this.bdefC[j] = Math.max(fam.defC !== undefined ? fam.defC : fam.def, 0.004 / Math.max(L, 0.01)); this.bsoft[j] = fam.soft || 1;
+    this.bbrP[j] = fam.brP || 1e9;
     this.btype[j] = type; this.bpart[j] = part;
     return j;
   }
 
-  // Tetra table entry, used for flexnode skin rotation; deduplicated by its node set.
-  addTet(n) {
-    const s = n.slice().sort((x, y) => x - y);
-    const key = s.join(',');
-    if (this.tetKey.has(key)) return this.tetKey.get(key);
-    const t = this.nTets++;
-    this.tetN.set(s, t * 4);
-    frame3(this.rest, s[0], s[1], s[2], this.tetF0, t * 9);
-    this.tetR.set([1, 0, 0, 0, 1, 0, 0, 0, 1], t * 9);
-    this.tetKey.set(key, t);
-    return t;
+  // Shape-matching frame over a node set: rest centroid, rest offsets and the inverse rest second
+  // moment (for the deformation gradient used by the skin folds).
+  addFrame(nodes) {
+    const R = this.rest, n = nodes.length;
+    let cx = 0, cy = 0, cz = 0;
+    for (const i of nodes) { cx += R[i * 3]; cy += R[i * 3 + 1]; cz += R[i * 3 + 2]; }
+    cx /= n; cy /= n; cz /= n;
+    const off = new Float64Array(n * 3);
+    let m00 = 1e-4, m01 = 0, m02 = 0, m11 = 1e-4, m12 = 0, m22 = 1e-4;
+    nodes.forEach((i, k) => {
+      const x = R[i * 3] - cx, y = R[i * 3 + 1] - cy, z = R[i * 3 + 2] - cz;
+      off[k * 3] = x; off[k * 3 + 1] = y; off[k * 3 + 2] = z;
+      m00 += x * x; m01 += x * y; m02 += x * z; m11 += y * y; m12 += y * z; m22 += z * z;
+    });
+    const c00 = m11 * m22 - m12 * m12, c01 = m02 * m12 - m01 * m22, c02 = m01 * m12 - m02 * m11;
+    const c11 = m00 * m22 - m02 * m02, c12 = m01 * m02 - m00 * m12, c22 = m00 * m11 - m01 * m01;
+    const det = m00 * c00 + m01 * c01 + m02 * c02;
+    const Minv = Float64Array.from([c00, c01, c02, c01, c11, c12, c02, c12, c22], v => v / det);
+    this.frames.push({ nodes: Int32Array.from(nodes), off, C: Float64Array.from([cx, cy, cz]), c: Float64Array.from([cx, cy, cz]),
+      q: Float64Array.from([1, 0, 0, 0]), R: Float64Array.from([1, 0, 0, 0, 1, 0, 0, 0, 1]), Minv, step: -1, amp: 0, axis: 2 });
+    return this.frames.length - 1;
+  }
+
+  // Best-fit rotation of a frame's nodes (Mueller et al. 2016 iterative extraction, warm-started from
+  // the previous quaternion). It is robust under crushing and never returns a reflection, unlike a
+  // frame built from three nodes of a collapsing tetrahedron.
+  updateFrame(fr, wantShape) {
+    const pos = this.pos, N = fr.nodes, O = fr.off, n = N.length;
+    let cx = 0, cy = 0, cz = 0;
+    for (let k = 0; k < n; k++) { const j = N[k] * 3; cx += pos[j]; cy += pos[j + 1]; cz += pos[j + 2]; }
+    cx /= n; cy /= n; cz /= n;
+    let a00 = 0, a01 = 0, a02 = 0, a10 = 0, a11 = 0, a12 = 0, a20 = 0, a21 = 0, a22 = 0;
+    for (let k = 0; k < n; k++) {
+      const j = N[k] * 3, o = k * 3;
+      const dx = pos[j] - cx, dy = pos[j + 1] - cy, dz = pos[j + 2] - cz, ox = O[o], oy = O[o + 1], oz = O[o + 2];
+      a00 += dx * ox; a01 += dx * oy; a02 += dx * oz;
+      a10 += dy * ox; a11 += dy * oy; a12 += dy * oz;
+      a20 += dz * ox; a21 += dz * oy; a22 += dz * oz;
+    }
+    const q = fr.q;
+    let qw = q[0], qx = q[1], qy = q[2], qz = q[3];
+    let r00, r01, r02, r10, r11, r12, r20, r21, r22;
+    for (let it = 0; it < 9; it++) {
+      r00 = 1 - 2 * (qy * qy + qz * qz); r01 = 2 * (qx * qy - qw * qz); r02 = 2 * (qx * qz + qw * qy);
+      r10 = 2 * (qx * qy + qw * qz); r11 = 1 - 2 * (qx * qx + qz * qz); r12 = 2 * (qy * qz - qw * qx);
+      r20 = 2 * (qx * qz - qw * qy); r21 = 2 * (qy * qz + qw * qx); r22 = 1 - 2 * (qx * qx + qy * qy);
+      if (it === 8) break;
+      const den = Math.abs(r00 * a00 + r10 * a10 + r20 * a20 + r01 * a01 + r11 * a11 + r21 * a21 + r02 * a02 + r12 * a12 + r22 * a22) + 1e-9;
+      const wx = ((r10 * a20 - r20 * a10) + (r11 * a21 - r21 * a11) + (r12 * a22 - r22 * a12)) / den;
+      const wy = ((r20 * a00 - r00 * a20) + (r21 * a01 - r01 * a21) + (r22 * a02 - r02 * a22)) / den;
+      const wz = ((r00 * a10 - r10 * a00) + (r01 * a11 - r11 * a01) + (r02 * a12 - r12 * a02)) / den;
+      const w = Math.sqrt(wx * wx + wy * wy + wz * wz);
+      if (w < 1e-7) {
+        r00 = 1 - 2 * (qy * qy + qz * qz); r01 = 2 * (qx * qy - qw * qz); r02 = 2 * (qx * qz + qw * qy);
+        r10 = 2 * (qx * qy + qw * qz); r11 = 1 - 2 * (qx * qx + qz * qz); r12 = 2 * (qy * qz - qw * qx);
+        r20 = 2 * (qx * qz - qw * qy); r21 = 2 * (qy * qz + qw * qx); r22 = 1 - 2 * (qx * qx + qy * qy);
+        break;
+      }
+      const sh = Math.sin(w / 2) / w, dw = Math.cos(w / 2), dx = wx * sh, dy = wy * sh, dz = wz * sh;
+      const nw = dw * qw - dx * qx - dy * qy - dz * qz;
+      const nx = dw * qx + dx * qw + dy * qz - dz * qy;
+      const ny = dw * qy - dx * qz + dy * qw + dz * qx;
+      const nz = dw * qz + dx * qy - dy * qx + dz * qw;
+      const l = 1 / Math.sqrt(nw * nw + nx * nx + ny * ny + nz * nz);
+      qw = nw * l; qx = nx * l; qy = ny * l; qz = nz * l;
+    }
+    q[0] = qw; q[1] = qx; q[2] = qy; q[3] = qz;
+    const R = fr.R;
+    R[0] = r00; R[1] = r01; R[2] = r02; R[3] = r10; R[4] = r11; R[5] = r12; R[6] = r20; R[7] = r21; R[8] = r22;
+    fr.c[0] = cx; fr.c[1] = cy; fr.c[2] = cz;
+    if (wantShape) {
+      // deformation gradient F = A * Minv: how far each rest axis has been squeezed. A sheet squeezed to
+      // ratio r folds with amplitude ~ (lambda / 4) * sqrt(1 - r^2): small ripples for a light crush,
+      // deep accordion pleats as r -> 0. The first 5 % is elastic and leaves no folds.
+      const M = fr.Minv;
+      let best = 9, axis = 2;
+      for (let k = 0; k < 3; k++) {
+        const fx = a00 * M[k] + a01 * M[3 + k] + a02 * M[6 + k];
+        const fy = a10 * M[k] + a11 * M[3 + k] + a12 * M[6 + k];
+        const fz = a20 * M[k] + a21 * M[3 + k] + a22 * M[6 + k];
+        const st = Math.sqrt(fx * fx + fy * fy + fz * fz);
+        if (st < best) { best = st; axis = k; }
+      }
+      const r = Math.min(1, best / 0.95);
+      fr.amp = r < 0.995 ? 1.15 * (FOLD_LAMBDA / 4) * Math.sqrt(1 - r * r) : 0;
+      fr.axis = axis;
+    }
+    fr.step = this.steps;
+  }
+
+  // Affine target of flexnode f, kept within FLEX_REACH of the shape-matched estimate of its dented
+  // rest position, so an inverted or collapsed anchor tetrahedron can't fling the skin around.
+  flexTarget(f, T) {
+    const pos = this.pos, A = this.fAnc, W = this.fW, f4 = f * 4;
+    const a0 = A[f4] * 3, a1 = A[f4 + 1] * 3, a2 = A[f4 + 2] * 3, a3 = A[f4 + 3] * 3;
+    const w0 = W[f4], w1 = W[f4 + 1], w2 = W[f4 + 2], w3 = W[f4 + 3];
+    let tx = w0 * pos[a0] + w1 * pos[a1] + w2 * pos[a2] + w3 * pos[a3];
+    let ty = w0 * pos[a0 + 1] + w1 * pos[a1 + 1] + w2 * pos[a2 + 1] + w3 * pos[a3 + 1];
+    let tz = w0 * pos[a0 + 2] + w1 * pos[a1 + 2] + w2 * pos[a2 + 2] + w3 * pos[a3 + 2];
+    const fr = this.frames[this.fFrame[f]];
+    if (fr.step !== this.steps) this.updateFrame(fr, false);
+    const R = fr.R, c = fr.c, C = fr.C, D = this.fRestD, r = f * 3;
+    const ox = D[r] - C[0], oy = D[r + 1] - C[1], oz = D[r + 2] - C[2];
+    const ex = c[0] + R[0] * ox + R[1] * oy + R[2] * oz;
+    const ey = c[1] + R[3] * ox + R[4] * oy + R[5] * oz;
+    const ez = c[2] + R[6] * ox + R[7] * oy + R[8] * oz;
+    const qx = tx - ex, qy = ty - ey, qz = tz - ez, q2 = qx * qx + qy * qy + qz * qz;
+    if (q2 > FLEX_REACH * FLEX_REACH) { const s = FLEX_REACH / Math.sqrt(q2); tx = ex + qx * s; ty = ey + qy * s; tz = ez + qz * s; }
+    T[0] = tx; T[1] = ty; T[2] = tz;
   }
 
   makeContext(name, parts, id) {
@@ -520,8 +636,9 @@ class FNodeSim {
     this.pos.set(this.rest.subarray(0, n3)); this.vel.fill(0, 0, n3); this.frc.fill(0, 0, n3);
     this.L0.set(this.snapshot.L0); this.broken.fill(0); this.nBroken = 0;
     this.fW.set(this.snapshot.fW); this.fActive.fill(0); this.fCalm.fill(0); this.fBent.fill(0); this.nActive = 0;
-    this.tetR.fill(0);
-    for (let t = 0; t < this.nTets; t++) { this.tetR[t * 9] = 1; this.tetR[t * 9 + 4] = 1; this.tetR[t * 9 + 8] = 1; }
+    for (const fr of this.frames) { fr.q.set([1, 0, 0, 0]); fr.R.set([1, 0, 0, 0, 1, 0, 0, 0, 1]); fr.c.set(fr.C); fr.step = -1; fr.amp = 0; fr.axis = 2; }
+    this.fRestD.set(this.rest.subarray(this.fStart * 3, (this.fStart + this.nFlex) * 3));
+    this.bBreak.fill(0);
     this.wheels.forEach((w, i) => {
       w.w.set(this.snapshot.wheels[i]); w.omega = 0; w.theta = 0; w.steer = 0; w.depth.fill(0); w.bent = 0;
       w.R.set([1, 0, 0, 0, 1, 0, 0, 0, 1]); w.load = 0;
@@ -564,7 +681,8 @@ class FNodeSim {
   beamForces(list) {
     const pos = this.pos, vel = this.vel, frc = this.frc;
     const ba = this.ba, bb = this.bb, L0 = this.L0, L0o = this.L0o, bk = this.bk, bc = this.bc;
-    const bdef = this.bdef, bbrT = this.bbrT, bbrC = this.bbrC, broken = this.broken, btype = this.btype;
+    const bdef = this.bdef, bdefC = this.bdefC, bsoft = this.bsoft, bbrT = this.bbrT, bbrC = this.bbrC, broken = this.broken, btype = this.btype;
+    const DENSE = VEHICLE.densify;
     for (let q = 0; q < list.length; q++) {
       const j = list[q];
       if (broken[j]) continue;
@@ -575,11 +693,19 @@ class FNodeSim {
       if (btype[j] === BEAM_SUPPORT && L >= l0) continue;          // support beams only push
       const lo = L0o[j];
       const strain = (L - lo) / lo;
-      if (strain > bbrT[j] || strain < -bbrC[j]) { broken[j] = 1; this.nBroken++; if (this.bgroup[j] >= 0) this.breakGroup(this.bgroup[j]); continue; }
+      if (strain > bbrT[j] || strain < -bbrC[j]) { broken[j] = 1; this.bBreak[j] = this.steps; this.nBroken++; if (this.bgroup[j] >= 0) this.breakGroup(this.bgroup[j]); continue; }
       let ext = L - l0;
-      const lim = bdef[j] * lo;
-      if (ext > lim) { l0 = L - lim; L0[j] = l0; ext = lim; }
-      else if (ext < -lim) { l0 = L + lim; L0[j] = l0; ext = -lim; }
+      if (ext > 0) {
+        const lim = bdef[j] * lo;                                    // tension: plastic stretch past the elastic limit
+        if (ext > lim) { l0 = L - lim; L0[j] = l0; ext = lim; }
+      } else if (L > DENSE * lo) {
+        // compression: past 5 % the rest length shortens for good. A member that has already buckled
+        // keeps only part of its strength, so one bay folds completely before the next one starts.
+        const lim = bdefC[j] * lo * Math.max(bsoft[j], 1 - 2 * (lo - l0) / lo);
+        if (-ext > lim) { l0 = Math.max(L + lim, DENSE * lo); L0[j] = l0; ext = L - l0; }
+      }
+      // below DENSE * lo the folds are packed solid: no more flow, the elastic term keeps rising
+      if (Math.abs(l0 - lo) > this.bbrP[j] * lo) { broken[j] = 1; this.bBreak[j] = this.steps; this.nBroken++; if (this.bgroup[j] >= 0) this.breakGroup(this.bgroup[j]); continue; }
       const ix = 1 / L, nx = dx * ix, ny = dy * ix, nz = dz * ix;
       const vr = (vel[b] - vel[a]) * nx + (vel[b + 1] - vel[a + 1]) * ny + (vel[b + 2] - vel[a + 2]) * nz;
       const f = bk[j] * ext + bc[j] * vr;
@@ -591,7 +717,7 @@ class FNodeSim {
 
   breakGroup(g) {
     if (++this.groupHits[g] < this.groupNeed[g]) return;
-    for (const j of this.groups[g]) if (!this.broken[j]) { this.broken[j] = 1; this.nBroken++; }
+    for (const j of this.groups[g]) if (!this.broken[j]) { this.broken[j] = 1; this.bBreak[j] = this.steps; this.nBroken++; }
   }
 
   ctxSleeping(part) { return this.contexts[this.parts[part].ctx].sleeping; }
@@ -624,17 +750,12 @@ class FNodeSim {
       }
       const pad = cl.pad;
       if (mny - pad > 0.03 && !world.near(mnx - pad, mny - pad, mnz - pad, mxx + pad, mxy + pad, mxz + pad)) continue;
-      const fl = cl.flex;
+      const fl = cl.flex, T = this._t;
       for (let q = 0; q < fl.length; q++) {
         const f = fl[q];
         if (active[f]) continue;
-        const f4 = f * 4;
-        const a0 = A[f4] * 3, a1 = A[f4 + 1] * 3, a2 = A[f4 + 2] * 3, a3 = A[f4 + 3] * 3;
-        const w0 = W[f4], w1 = W[f4 + 1], w2 = W[f4 + 2], w3 = W[f4 + 3];
-        const ty = w0 * pos[a0 + 1] + w1 * pos[a1 + 1] + w2 * pos[a2 + 1] + w3 * pos[a3 + 1];
-        const tx = w0 * pos[a0] + w1 * pos[a1] + w2 * pos[a2] + w3 * pos[a3];
-        const tz = w0 * pos[a0 + 2] + w1 * pos[a1 + 2] + w2 * pos[a2 + 2] + w3 * pos[a3 + 2];
-        if (ty < 0.025 || world.insideMargin(tx, ty, tz, 0.025)) this.activate(f, tx, ty, tz);
+        this.flexTarget(f, T);
+        if (T[1] < 0.025 || world.insideMargin(T[0], T[1], T[2], 0.025)) this.activate(f, T[0], T[1], T[2]);
       }
     }
     // Flex constraint: spring-damper between each active flexnode and its affine target.
@@ -643,21 +764,16 @@ class FNodeSim {
       const f = list[q], i = fs + f, i3 = i * 3, f4 = f * 4;
       const part = this.part[i];
       if (this.ctxSleeping(part)) continue;
-      const fp = this.fp[part];
-      const a0 = A[f4] * 3, a1 = A[f4 + 1] * 3, a2 = A[f4 + 2] * 3, a3 = A[f4 + 3] * 3;
-      let w0 = W[f4], w1 = W[f4 + 1], w2 = W[f4 + 2], w3 = W[f4 + 3];
-      let tx = w0 * pos[a0] + w1 * pos[a1] + w2 * pos[a2] + w3 * pos[a3];
-      let ty = w0 * pos[a0 + 1] + w1 * pos[a1 + 1] + w2 * pos[a2 + 1] + w3 * pos[a3 + 1];
-      let tz = w0 * pos[a0 + 2] + w1 * pos[a1 + 2] + w2 * pos[a2 + 2] + w3 * pos[a3 + 2];
-      let dx = tx - pos[i3], dy = ty - pos[i3 + 1], dz = tz - pos[i3 + 2];
+      const fp = this.fp[part], T = this._t;
+      this.flexTarget(f, T);
+      let dx = T[0] - pos[i3], dy = T[1] - pos[i3 + 1], dz = T[2] - pos[i3 + 2];
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 > fp.y2 && this.flexYield(f, i3, dx, dy, dz, Math.sqrt(d2), fp)) {
-        w0 = W[f4]; w1 = W[f4 + 1]; w2 = W[f4 + 2]; w3 = W[f4 + 3];
-        tx = w0 * pos[a0] + w1 * pos[a1] + w2 * pos[a2] + w3 * pos[a3];
-        ty = w0 * pos[a0 + 1] + w1 * pos[a1 + 1] + w2 * pos[a2 + 1] + w3 * pos[a3 + 1];
-        tz = w0 * pos[a0 + 2] + w1 * pos[a1 + 2] + w2 * pos[a2 + 2] + w3 * pos[a3 + 2];
-        dx = tx - pos[i3]; dy = ty - pos[i3 + 1]; dz = tz - pos[i3 + 2];
+        this.flexTarget(f, T);
+        dx = T[0] - pos[i3]; dy = T[1] - pos[i3 + 1]; dz = T[2] - pos[i3 + 2];
       }
+      const a0 = A[f4] * 3, a1 = A[f4 + 1] * 3, a2 = A[f4 + 2] * 3, a3 = A[f4 + 3] * 3;
+      const w0 = W[f4], w1 = W[f4 + 1], w2 = W[f4 + 2], w3 = W[f4 + 3];
       const tvx = w0 * vel[a0] + w1 * vel[a1] + w2 * vel[a2] + w3 * vel[a3];
       const tvy = w0 * vel[a0 + 1] + w1 * vel[a1 + 1] + w2 * vel[a2 + 1] + w3 * vel[a3 + 1];
       const tvz = w0 * vel[a0 + 2] + w1 * vel[a1 + 2] + w2 * vel[a2 + 2] + w3 * vel[a3 + 2];
@@ -673,21 +789,44 @@ class FNodeSim {
   }
 
   // Plastic dent: re-anchor the flexnode's rest target inside its (deformed) tetrahedron so the
-  // elastic deviation stays at the yield distance.
+  // elastic deviation stays at the yield distance. Its surface neighbours take 40 % of the push, which
+  // turns a dent into a smooth bowl in the sheet instead of a single spike.
   flexYield(f, i3, dx, dy, dz, d, fp) {
     const pos = this.pos, A = this.fAnc, f4 = f * 4, s = fp.yield / d;
+    const tx = pos[i3] + dx, ty = pos[i3 + 1] + dy, tz = pos[i3 + 2] + dz;
     let px = pos[i3] + dx * s, py = pos[i3 + 1] + dy * s, pz = pos[i3 + 2] + dz * s;
     let ox = 0, oy = 0, oz = 0;
     for (let k = 0; k < 4; k++) { const a = A[f4 + k] * 3, w = this.fW0[f4 + k]; ox += w * pos[a]; oy += w * pos[a + 1]; oz += w * pos[a + 2]; }
     const ex = px - ox, ey = py - oy, ez = pz - oz, e2 = ex * ex + ey * ey + ez * ez;
     if (e2 > fp.maxP * fp.maxP) { const r = fp.maxP / Math.sqrt(e2); px = ox + ex * r; py = oy + ey * r; pz = oz + ez * r; }
-    const w = this._w;
-    if (!bary4(pos, A[f4], A[f4 + 1], A[f4 + 2], A[f4 + 3], px, py, pz, w, 0)) return false;
-    if (Math.abs(w[0]) > 12 || Math.abs(w[1]) > 12 || Math.abs(w[2]) > 12 || Math.abs(w[3]) > 12) return false;
-    this.fW[f4] = w[0]; this.fW[f4 + 1] = w[1]; this.fW[f4 + 2] = w[2]; this.fW[f4 + 3] = w[3];
-    if (!this.fBent[f]) { this.fBent[f] = 1; if (this.onDent) this.onDent(f); }
+    if (!this.reanchor(f, px, py, pz)) return false;
+    const mx = (px - tx) * 0.4, my = (py - ty) * 0.4, mz = (pz - tz) * 0.4, T = this._t2;
+    for (let k = 0; k < 4; k++) {
+      const n = this.fNb[f4 + k];
+      if (n < 0) continue;
+      this.flexTarget(n, T);
+      this.reanchor(n, T[0] + mx, T[1] + my, T[2] + mz);
+    }
     this.parts[this.part[this.fStart + f]].dent++;
     this.dentEvents++;
+    return true;
+  }
+
+  // Move flexnode f's rest target to p: new affine weights in its tetrahedron (bounded, so a squashed
+  // tetrahedron can't produce runaway extrapolation) and the matching dented rest-space position.
+  reanchor(f, px, py, pz) {
+    const A = this.fAnc, f4 = f * 4, w = this._w;
+    if (!bary4(this.pos, A[f4], A[f4 + 1], A[f4 + 2], A[f4 + 3], px, py, pz, w, 0)) return false;
+    if (Math.abs(w[0]) > 3 || Math.abs(w[1]) > 3 || Math.abs(w[2]) > 3 || Math.abs(w[3]) > 3) return false;
+    this.fW[f4] = w[0]; this.fW[f4 + 1] = w[1]; this.fW[f4 + 2] = w[2]; this.fW[f4 + 3] = w[3];
+    const fr = this.frames[this.fFrame[f]];
+    if (fr.step !== this.steps) this.updateFrame(fr, false);
+    const R = fr.R, c = fr.c, C = fr.C, D = this.fRestD, r = f * 3;
+    const qx = px - c[0], qy = py - c[1], qz = pz - c[2];
+    D[r] = C[0] + R[0] * qx + R[3] * qy + R[6] * qz;
+    D[r + 1] = C[1] + R[1] * qx + R[4] * qy + R[7] * qz;
+    D[r + 2] = C[2] + R[2] * qx + R[5] * qy + R[8] * qz;
+    if (!this.fBent[f]) { this.fBent[f] = 1; if (this.onDent) this.onDent(f); }
     return true;
   }
 
@@ -973,21 +1112,26 @@ class FNodeSim {
     }
   }
 
-  // Per render frame: kinematic flexnodes are placed on their targets, skin rotations refreshed.
+  // Per render frame: refresh every shape-matching frame (rotation + fold amplitude) and place the
+  // kinematic flexnodes on their targets.
   syncVisualState() {
-    const pos = this.pos, A = this.fAnc, W = this.fW, fs = this.fStart, act = this.fActive;
+    const nF = this.frames.length;
+    if (!this.frameR || this.frameR.length !== nF * 9) {
+      this.frameR = new Float64Array(nF * 9); this.frameAmp = new Float32Array(nF);
+      this.frameAxis = new Uint8Array(nF); this.framePhase = new Float32Array(nF);
+      for (let k = 0; k < nF; k++) this.framePhase[k] = (k * 2.399963) % 6.283185;
+    }
+    for (let k = 0; k < nF; k++) {
+      const fr = this.frames[k];
+      this.updateFrame(fr, true);
+      this.frameR.set(fr.R, k * 9); this.frameAmp[k] = fr.amp; this.frameAxis[k] = fr.axis;
+    }
+    const pos = this.pos, fs = this.fStart, act = this.fActive, T = this._t;
     for (let f = 0; f < this.nFlex; f++) {
       if (act[f]) continue;
-      const f4 = f * 4, i3 = (fs + f) * 3;
-      const a0 = A[f4] * 3, a1 = A[f4 + 1] * 3, a2 = A[f4 + 2] * 3, a3 = A[f4 + 3] * 3;
-      const w0 = W[f4], w1 = W[f4 + 1], w2 = W[f4 + 2], w3 = W[f4 + 3];
-      pos[i3] = w0 * pos[a0] + w1 * pos[a1] + w2 * pos[a2] + w3 * pos[a3];
-      pos[i3 + 1] = w0 * pos[a0 + 1] + w1 * pos[a1 + 1] + w2 * pos[a2 + 1] + w3 * pos[a3 + 1];
-      pos[i3 + 2] = w0 * pos[a0 + 2] + w1 * pos[a1 + 2] + w2 * pos[a2 + 2] + w3 * pos[a3 + 2];
-    }
-    const F = this._F;
-    for (let t = 0; t < this.nTets; t++) {
-      if (frame3(pos, this.tetN[t * 4], this.tetN[t * 4 + 1], this.tetN[t * 4 + 2], F, 0)) rotFromFrames(F, 0, this.tetF0, t * 9, this.tetR, t * 9);
+      this.flexTarget(f, T);
+      const i3 = (fs + f) * 3;
+      pos[i3] = T[0]; pos[i3 + 1] = T[1]; pos[i3 + 2] = T[2];
     }
   }
 
@@ -1238,10 +1382,13 @@ function buildFNodeMatrix(sim, model) {
     const g = merged[merged.length - 1];
     if (g && k - g.z < VEHICLE.stationMerge) { g.sum += k; g.n++; g.z = g.sum / g.n; } else merged.push({ z: k, sum: k, n: 1 });
   }
+  // stations sit closer together ahead of the cowl so the crumple zone can fold in several bays
+  const cowlZ = partBox[P_HOOD] ? partBox[P_HOOD].min[2] : zF - 0.6;
   const stZ = [];
   for (let i = 0; i < merged.length; i++) {
     if (i > 0) {
-      const a = merged[i - 1].z, gap = merged[i].z - a, nseg = Math.ceil(gap / VEHICLE.stationMaxGap);
+      const a = merged[i - 1].z, gap = merged[i].z - a;
+      const nseg = Math.ceil(gap / (a >= cowlZ - 0.15 ? VEHICLE.crumpleGap : VEHICLE.stationMaxGap));
       for (let s = 1; s < nseg; s++) stZ.push(a + gap * s / nseg);
     }
     stZ.push(merged[i].z);
@@ -1310,16 +1457,18 @@ function buildFNodeMatrix(sim, model) {
     }
     return fallback;
   };
-  const lattice = (p, na, nb, nc, place, fam) => {
+  // famFn(layer, direction) can override the beam family per layer and direction ('a', 'b', 'c' axes,
+  // 'ab', 'ac', 'bc' face diagonals)
+  const lattice = (p, na, nb, nc, place, fam, famFn) => {
     const n0 = sim.nNodes, ids = [];
     for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) for (let k = 0; k < nc; k++) { const q = place(i, j, k); ids.push(sim.addNode(q[0], q[1], q[2], 1, NODE_STRUCT, p)); }
     const id = (i, j, k) => ids[(i * nb + j) * nc + k];
-    const pb = (a, b) => sim.addBeam(a, b, fam, BEAM_STRUCT, p);
+    const pb = (a, b, k, dir) => sim.addBeam(a, b, (famFn && famFn(k, dir)) || fam, BEAM_STRUCT, p);
     for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) for (let k = 0; k < nc; k++) {
-      if (i + 1 < na) pb(id(i, j, k), id(i + 1, j, k));
-      if (j + 1 < nb) pb(id(i, j, k), id(i, j + 1, k));
-      if (k + 1 < nc) pb(id(i, j, k), id(i, j, k + 1));
-      if (i + 1 < na && j + 1 < nb) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i + 1, j + 1, k)); else pb(id(i + 1, j, k), id(i, j + 1, k)); }
+      if (i + 1 < na) pb(id(i, j, k), id(i + 1, j, k), k, 'a');
+      if (j + 1 < nb) pb(id(i, j, k), id(i, j + 1, k), k, 'b');
+      if (k + 1 < nc) pb(id(i, j, k), id(i, j, k + 1), k, 'c');
+      if (i + 1 < na && j + 1 < nb) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i + 1, j + 1, k), k, 'ab'); else pb(id(i + 1, j, k), id(i, j + 1, k), k, 'ab'); }
       if (i + 1 < na && k + 1 < nc) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i + 1, j, k + 1)); else pb(id(i + 1, j, k), id(i, j, k + 1)); }
       if (j + 1 < nb && k + 1 < nc) { if ((i + j + k) % 2 === 0) pb(id(i, j, k), id(i, j + 1, k + 1)); else pb(id(i, j + 1, k), id(i, j, k + 1)); }
     }
@@ -1363,14 +1512,17 @@ function buildFNodeMatrix(sim, model) {
   const hb = partBox[P_HOOD];
   if (hb) {
     const V = partV[P_HOOD], hw = Math.max(Math.abs(hb.min[0]), Math.abs(hb.max[0]));
-    const H = lattice(P_HOOD, 3, 3, 2, (i, j, k) => {
-      const x = lerp(0.84 * hw, -0.84 * hw, i / 2), z = lerp(hb.min[2] + 0.07, hb.max[2] - 0.07, j / 2);
+    // 3 x 4 x 2 lattice; the underside chords along the hood yield first, so a hood pushed back from the
+    // front buckles upward into a tent fold (and the supports below stop it folding down)
+    const H = lattice(P_HOOD, 3, 4, 2, (i, j, k) => {
+      const x = lerp(0.84 * hw, -0.84 * hw, i / 2), z = lerp(hb.min[2] + 0.07, hb.max[2] - 0.07, j / 3);
       const top = surfaceExtreme(V, 0, 2, 1, x, z, 1, hb.max[1]) - 0.012;
-      return [x, top - 0.07 * k, z];
-    }, BF.hood);
+      return [x, top - 0.09 * k, z];
+    }, BF.hood, (k, dir) => (k === 1 && (dir === 'b' || dir === 'ab') ? BF.hoodFold : null));
     for (const i of [0, 2]) for (const k of [0, 1]) attach(P_HOOD, H.id(i, 0, k), 3, BF.attachHood);
-    attach(P_HOOD, H.id(1, 2, 1), 3, BF.attachHood);
-    for (const i of [0, 2]) for (const j of [1, 2]) support(P_HOOD, H.id(i, j, 1), c => R[c * 3 + 1] < R[H.id(i, j, 1) * 3 + 1]);
+    attach(P_HOOD, H.id(1, 3, 1), 3, BF.attachHood);
+    for (const i of [0, 2]) for (const j of [2, 3]) support(P_HOOD, H.id(i, j, 1), c => R[c * 3 + 1] < R[H.id(i, j, 1) * 3 + 1]);
+    for (const j of [0, 1, 2, 3]) support(P_HOOD, H.id(1, j, 1), c => R[c * 3 + 1] < R[H.id(1, j, 1) * 3 + 1] - 0.05);   // centre line rests on the bay
   }
   for (const p of [P_DOOR_L, P_DOOR_R]) {
     const db = partBox[p];
@@ -1481,7 +1633,7 @@ function buildFNodeMatrix(sim, model) {
     if (m.cat !== 'panel') continue;
     const P = m.geom.attributes.position.array, I = m.geom.index.array, wgt = /frame/.test(m.name) ? 0.5 : 1;
     if (sim.parts[m.part].n1 === sim.parts[m.part].n0) continue;
-    partTris[m.part].push({ P, I, wgt });
+    partTris[m.part].push({ P, I, N: m.geom.attributes.normal.array, wgt });
   }
   const areas = partTris.map(list => {
     let A = 0;
@@ -1495,10 +1647,10 @@ function buildFNodeMatrix(sim, model) {
   const fl = VEHICLE.flex;
   for (let p = 0; p < 6; p++) {
     const k = mFlex * fl.omega * fl.omega;
-    sim.fp[p] = { k, c: 2 * fl.zeta * Math.sqrt(k * mFlex), yield: p === P_BUMPER_F || p === P_BUMPER_R ? 0.015 : (p === 0 ? 0.012 : 0.01), maxP: 0.55 };
+    sim.fp[p] = { k, c: 2 * fl.zeta * Math.sqrt(k * mFlex), yield: p === P_BUMPER_F || p === P_BUMPER_R ? 0.015 : (p === 0 ? 0.012 : 0.01), maxP: 0.3 };
     sim.fp[p].y2 = sim.fp[p].yield * sim.fp[p].yield;
     if (!counts[p]) continue;
-    const pts = sampleSurface(partTris[p], counts[p], rng);
+    const smp = sampleSurface(partTris[p], counts[p], rng), pts = smp.pos;
     const P = sim.parts[p];
     const cand = [];
     for (let i = P.n0; i < P.n1; i++) cand.push(i);
@@ -1507,7 +1659,7 @@ function buildFNodeMatrix(sim, model) {
       const f = n - sim.fStart;
       const tet = chooseTet(R, cand, pts[s], pts[s + 1], pts[s + 2], 9);
       sim.fAnc.set(tet.n, f * 4); sim.fW.set(tet.w, f * 4); sim.fW0.set(tet.w, f * 4);
-      sim.fTet[f] = sim.addTet(tet.n);
+      sim.fNrm[f * 3] = smp.nrm[s]; sim.fNrm[f * 3 + 1] = smp.nrm[s + 1]; sim.fNrm[f * 3 + 2] = smp.nrm[s + 2];
       let ws = 0;
       for (const ww of tet.w) ws += Math.abs(ww);
       for (let q = 0; q < 4; q++) sim.mass[tet.n[q]] += mFlex * Math.abs(tet.w[q]) / ws;   // lumped while kinematic
@@ -1537,7 +1689,35 @@ function buildFNodeMatrix(sim, model) {
       for (let k = 0; k < 3; k++) { const v = R[i * 3 + k], e = Math.max(mn[k] - v, 0, v - mx[k]); d2 += e * e; }
       pad = Math.max(pad, Math.sqrt(d2));
     }
-    sim.clusters.push({ part: cl.part, flex: Int32Array.from(cl.flex), anchors: Int32Array.from(an), pad: pad * 1.25 + 0.08 });
+    // each cluster also owns a shape-matching frame over its anchors: skin rotation, target guard, folds
+    const frame = sim.addFrame(an);
+    for (const f of cl.flex) sim.fFrame[f] = frame;
+    sim.clusters.push({ part: cl.part, flex: Int32Array.from(cl.flex), anchors: Int32Array.from(an), pad: pad * 1.25 + 0.08, frame });
+  }
+
+  // --- flexnode neighbours on the same surface (same part, similar normal) for dent diffusion
+  const nbMap = new Map(), NH = 0.2;
+  const nbKey = (x, y, z) => (Math.floor(x / NH) + 256) + 512 * ((Math.floor(y / NH) + 256) + 512 * (Math.floor(z / NH) + 256));
+  for (let f = 0; f < sim.nFlex; f++) {
+    const i = (sim.fStart + f) * 3, key = nbKey(R[i], R[i + 1], R[i + 2]);
+    if (!nbMap.has(key)) nbMap.set(key, []);
+    nbMap.get(key).push(f);
+  }
+  for (let f = 0; f < sim.nFlex; f++) {
+    const i = (sim.fStart + f) * 3, x = R[i], y = R[i + 1], z = R[i + 2], p = sim.part[sim.fStart + f];
+    const found = [];
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+      const l = nbMap.get(nbKey(x + dx * NH, y + dy * NH, z + dz * NH));
+      if (!l) continue;
+      for (const g of l) {
+        if (g === f || sim.part[sim.fStart + g] !== p) continue;
+        const j = (sim.fStart + g) * 3, d = Math.hypot(R[j] - x, R[j + 1] - y, R[j + 2] - z);
+        const dot = sim.fNrm[f * 3] * sim.fNrm[g * 3] + sim.fNrm[f * 3 + 1] * sim.fNrm[g * 3 + 1] + sim.fNrm[f * 3 + 2] * sim.fNrm[g * 3 + 2];
+        if (d < 0.22 && dot > 0.3) found.push([g, d]);
+      }
+    }
+    found.sort((a, b) => a[1] - b[1]);
+    for (let k = 0; k < Math.min(4, found.length); k++) sim.fNb[f * 4 + k] = found[k][0];
   }
 
   // --- suspension preload: the model pose is the static ride height
@@ -1560,7 +1740,7 @@ function buildFNodeMatrix(sim, model) {
     front: [st[st.length - 1].BL, st[st.length - 1].BR, st[st.length - 1].ML, st[st.length - 1].MR],
     rear: [st[0].BL, st[0].BR, st[0].ML, st[0].MR],
     left: st.map(s => s.ML), right: st.map(s => s.MR),
-    cmz,
+    cmz, cowlZ,
   };
   sim.finalize();
   return sim.meta;
@@ -1581,17 +1761,24 @@ function sampleSurface(list, count, rng) {
   for (const t of list) for (let i = 0; i < t.I.length; i += 3) {
     const a = triArea(t.P, t.I[i], t.I[i + 1], t.I[i + 2]) * t.wgt;
     if (a <= 0) continue;
-    A += a; tris.push(t.P, t.I[i], t.I[i + 1], t.I[i + 2]); cum.push(A);
+    A += a; tris.push(t.P, t.I[i], t.I[i + 1], t.I[i + 2], t.N); cum.push(A);
   }
-  const M = count * 6, cand = new Float32Array(M * 3);
+  const M = count * 6, cand = new Float32Array(M * 3), candN = new Float32Array(M * 3);
   for (let s = 0; s < M; s++) {
     const r = rng() * A;
     let lo = 0, hi = cum.length - 1;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < r) lo = mid + 1; else hi = mid; }
-    const P = tris[lo * 4], a = tris[lo * 4 + 1] * 3, b = tris[lo * 4 + 2] * 3, c = tris[lo * 4 + 3] * 3;
+    const P = tris[lo * 5], a = tris[lo * 5 + 1] * 3, b = tris[lo * 5 + 2] * 3, c = tris[lo * 5 + 3] * 3, Nn = tris[lo * 5 + 4];
     let u = rng(), v = rng();
     if (u + v > 1) { u = 1 - u; v = 1 - v; }
-    for (let k = 0; k < 3; k++) cand[s * 3 + k] = P[a + k] + u * (P[b + k] - P[a + k]) + v * (P[c + k] - P[a + k]);
+    let nl = 0;
+    for (let k = 0; k < 3; k++) {
+      cand[s * 3 + k] = P[a + k] + u * (P[b + k] - P[a + k]) + v * (P[c + k] - P[a + k]);
+      candN[s * 3 + k] = Nn[a + k] + u * (Nn[b + k] - Nn[a + k]) + v * (Nn[c + k] - Nn[a + k]);
+      nl += candN[s * 3 + k] * candN[s * 3 + k];
+    }
+    nl = 1 / (Math.sqrt(nl) || 1);
+    for (let k = 0; k < 3; k++) candN[s * 3 + k] *= nl;
   }
   const thin = (h) => {
     const seen = new Set(), keep = [];
@@ -1610,9 +1797,9 @@ function sampleSurface(list, count, rng) {
   for (let i = best.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = best[i]; best[i] = best[j]; best[j] = t; }
   while (best.length < count) best.push(Math.floor(rng() * M));
   best.length = count;
-  const out = new Float32Array(count * 3);
-  best.forEach((s, i) => { out[i * 3] = cand[s * 3]; out[i * 3 + 1] = cand[s * 3 + 1]; out[i * 3 + 2] = cand[s * 3 + 2]; });
-  return out;
+  const out = new Float32Array(count * 3), outN = new Float32Array(count * 3);
+  best.forEach((s, i) => { for (let k = 0; k < 3; k++) { out[i * 3 + k] = cand[s * 3 + k]; outN[i * 3 + k] = candN[s * 3 + k]; } });
+  return { pos: out, nrm: outN };
 }
 
 // Scale beam stiffness/damping so every node satisfies a Gershgorin bound for the 1 ms explicit step.
@@ -1736,16 +1923,36 @@ function vehicleState(sim, meta, out) {
 /* =========================================================================================
    8. VISUAL BINDING: flexnode skinning, rigid sub-meshes, generated wheels, f-node debug view
    ========================================================================================= */
+// Dark radiator core: fine fin/tube micro-grid, mapped by planar UVs (see planarUV).
+function radiatorTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#26282a'; ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = '#121314';
+  for (let i = 0; i < 64; i += 4) { ctx.fillRect(0, i, 64, 1.5); ctx.fillRect(i, 0, 1, 64); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+
 function makeMaterials(envMap) {
   const std = (o) => new THREE.MeshStandardMaterial({ envMap, side: THREE.DoubleSide, ...o });
   return {
-    paint: std({ color: 0xe9e3d4, roughness: 0.34, metalness: 0.05, envMapIntensity: 0.7 }),
+    // glossy two-coat paint, the sand colour of the reference trucks
+    paint: new THREE.MeshPhysicalMaterial({ color: 0xbfa274, roughness: 0.34, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.05, envMap, envMapIntensity: 1.0, side: THREE.DoubleSide }),
+    trim: std({ color: 0xbdbab3, roughness: 0.24, metalness: 0.9, envMapIntensity: 1.25 }),          // grille surround between the headlights
+    radiator: std({ color: 0xffffff, map: radiatorTexture(), roughness: 0.9, metalness: 0.25, envMapIntensity: 0.2 }),
+    lens: std({ color: 0xf2f5f7, roughness: 0.03, metalness: 0.0, transparent: true, opacity: 0.34, emissive: 0xfff2d8, emissiveIntensity: 0.22, envMapIntensity: 1.8, depthWrite: false }),
     chrome: std({ color: 0xe6e2da, roughness: 0.16, metalness: 1.0, envMapIntensity: 1.2 }),
-    mech: std({ color: 0x2b2824, roughness: 0.72, metalness: 0.35, envMapIntensity: 0.4 }),
-    exhaust: std({ color: 0x5a5049, roughness: 0.55, metalness: 0.7, envMapIntensity: 0.5 }),
-    interior: std({ color: 0x3b342c, roughness: 0.85, metalness: 0.0, envMapIntensity: 0.25 }),
-    glass: std({ color: 0x1e2a2c, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.55, envMapIntensity: 1.6, depthWrite: false }),
-    headlight: std({ color: 0xfff6dc, emissive: 0xffe9b8, emissiveIntensity: 1.6, roughness: 0.2 }),
+    mech: std({ color: 0x2b2a28, roughness: 0.72, metalness: 0.35, envMapIntensity: 0.4 }),
+    exhaust: std({ color: 0x5a5550, roughness: 0.55, metalness: 0.7, envMapIntensity: 0.5 }),
+    interior: std({ color: 0x3a3632, roughness: 0.85, metalness: 0.0, envMapIntensity: 0.25 }),
+    glass: std({ color: 0x27323a, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.5, envMapIntensity: 1.6, depthWrite: false }),
+    headlight: std({ color: 0xfff8ec, emissive: 0xfff1d2, emissiveIntensity: 2.4, roughness: 0.12, metalness: 0.6 }),   // reflector + bulb
+    parking: std({ color: 0xffe9c4, emissive: 0xffcf86, emissiveIntensity: 0.8, roughness: 0.25 }),
     taillight: std({ color: 0x7a0c08, emissive: 0x5a0402, emissiveIntensity: 0.8, roughness: 0.25 }),
     reverse: std({ color: 0xe8e4dc, roughness: 0.25 }),
     signal: std({ color: 0xd88a1e, emissive: 0x5a3000, emissiveIntensity: 0.6, roughness: 0.3 }),
@@ -1760,8 +1967,11 @@ function makeMaterials(envMap) {
 
 function pickMaterial(m, mats) {
   const mn = ((m.srcMat && m.srcMat.name) || '').toLowerCase(), n = m.name;
+  if (/headlightglass|headlight[_\s.-]?lens/.test(n)) return mats.lens;
   if (/glass/.test(mn) || /glass|windshield|backlight/.test(n)) return mats.glass;
-  if (/headlight|parkinglight/.test(mn)) return mats.headlight;
+  if (/parkinglight/.test(mn)) return mats.parking;
+  if (/headlight/.test(mn)) return mats.headlight;
+  if (/radiator/.test(n) && !/radtube/.test(n)) return mats.radiator;
   if (/reverselight/.test(mn)) return mats.reverse;
   if (/taillight|chmsl/.test(mn)) return mats.taillight;
   if (/^pickup_signal|signal_[lr]$/.test(mn) && !/^signal_/.test(mn)) return mats.signal;
@@ -1810,8 +2020,10 @@ class VehicleVisual {
     const h = this.hashH;
     return ((Math.floor(x / h) + dx + 512) | 0) + 1024 * (((Math.floor(y / h) + dy + 512) | 0) + 1024 * ((Math.floor(z / h) + dz + 512) | 0));
   }
-  nearestFlex(p, x, y, z, K, out) {
-    const sim = this.sim, R = sim.rest, map = this.hash[p], fs = sim.fStart;
+  // K nearest flexnodes of part p, preferring ones on the same side of a thin panel (normal agrees),
+  // so an outer skin vertex never blends with the inner panel a few centimetres behind it.
+  nearestFlex(p, x, y, z, K, out, nx, ny, nz) {
+    const sim = this.sim, R = sim.rest, map = this.hash[p], fs = sim.fStart, FN = sim.fNrm;
     const cand = [];
     for (let r = 1; r <= 8; r++) {
       cand.length = 0;
@@ -1821,40 +2033,53 @@ class VehicleVisual {
       }
       if (cand.length >= K * 2 || (r >= 3 && cand.length >= K)) break;
     }
-    const d = cand.map(f => { const i = (fs + f) * 3; return [f, Math.hypot(R[i] - x, R[i + 1] - y, R[i + 2] - z)]; }).sort((a, b) => a[1] - b[1]);
-    for (let k = 0; k < K; k++) out[k] = d[Math.min(k, d.length - 1)] || [0, 1];
-    return d.length;
+    const d = cand.map(f => { const i = (fs + f) * 3; return [f, Math.hypot(R[i] - x, R[i + 1] - y, R[i + 2] - z), FN[f * 3] * nx + FN[f * 3 + 1] * ny + FN[f * 3 + 2] * nz]; }).sort((a, b) => a[1] - b[1]);
+    const same = d.filter(e => e[2] > 0.2), pick = same.length >= K ? same : same.concat(d.filter(e => e[2] <= 0.2));
+    for (let k = 0; k < K; k++) out[k] = pick[Math.min(k, pick.length - 1)] || [0, 1];
+    return pick.length;
   }
 
   bindMesh(m) {
     const sim = this.sim;
-    const mat = pickMaterial(m, this.mats);
+    let mat = pickMaterial(m, this.mats);
+    if (/fascia/.test(m.name) && mat === this.mats.paint) {
+      // the grille between the headlights is its own trim piece, not body paint
+      const bb = m.geom.boundingBox;
+      splitTriangles(m.geom, (x, y) => Math.abs(x) < 0.62 && y > bb.min.y + 0.12);
+      mat = [this.mats.paint, this.mats.trim];
+    }
+    if (mat === this.mats.radiator) planarUV(m.geom, 7);
     const mesh = new THREE.Mesh(m.geom, mat);
     mesh.castShadow = mat !== this.mats.glass; mesh.receiveShadow = true;
     mesh.frustumCulled = false;
     this.group.add(mesh);
     const P = m.geom.attributes.position.array, nv = P.length / 3;
     const hasFlex = sim.parts[m.part].n1 > sim.parts[m.part].n0 && this.hash[m.part].size > 0;
-    if ((m.cat === 'panel' || m.cat === 'nosample') && hasFlex) {
-      const fid = new Int32Array(nv * 3), phi = new Float32Array(nv * 3), off = new Float32Array(nv * 9);
-      const tmp = [[0, 0], [0, 0], [0, 0]], R = sim.rest, fs = sim.fStart;
+    // engine, radiator and front suspension sit in the crumple zone: skin them to the structure so a
+    // crushed bay pushes them back instead of leaving a rigid block poking through the sheet metal
+    const inBay = m.cat === 'rigid' && m.part === P_CHASSIS && !m.spinAxis && m.geom.boundingBox.getCenter(new THREE.Vector3()).z > this.meta.cowlZ - 0.05;
+    if (((m.cat === 'panel' || m.cat === 'nosample') || inBay) && hasFlex) {
+      // each vertex rides on its 4 nearest same-surface flexnodes, smoothly weighted
+      const K = 4, fid = new Int32Array(nv * K), phi = new Float32Array(nv * K), off = new Float32Array(nv * K * 3);
+      const tmp = [[0, 0], [0, 0], [0, 0], [0, 0]], R = sim.rest, fs = sim.fStart, Nr = m.geom.attributes.normal.array;
       const slot = this.skins.length;
       for (let v = 0; v < nv; v++) {
         const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
-        this.nearestFlex(m.part, x, y, z, 3, tmp);
+        if (inBay) this.nearestFlex(m.part, x, y, z, K, tmp, 0, 0, 0);
+        else this.nearestFlex(m.part, x, y, z, K, tmp, Nr[v * 3], Nr[v * 3 + 1], Nr[v * 3 + 2]);
         let ws = 0;
-        for (let k = 0; k < 3; k++) { const w = 1 / ((tmp[k][1] + 0.015) ** 2); phi[v * 3 + k] = w; ws += w; }
-        for (let k = 0; k < 3; k++) {
-          const f = tmp[k][0], i = (fs + f) * 3;
-          phi[v * 3 + k] /= ws; fid[v * 3 + k] = f;
-          off[v * 9 + k * 3] = x - R[i]; off[v * 9 + k * 3 + 1] = y - R[i + 1]; off[v * 9 + k * 3 + 2] = z - R[i + 2];
+        for (let k = 0; k < K; k++) { const w = 1 / (tmp[k][1] * tmp[k][1] + 0.045 * 0.045); phi[v * K + k] = w; ws += w; }
+        for (let k = 0; k < K; k++) {
+          const f = tmp[k][0], i = (fs + f) * 3, o = (v * K + k) * 3;
+          phi[v * K + k] /= ws; fid[v * K + k] = f;
+          off[o] = x - R[i]; off[o + 1] = y - R[i + 1]; off[o + 2] = z - R[i + 2];
           if (slot < 32) this.flexMeshMask[f] |= (1 << slot);
         }
       }
-      const restP = new Float32Array(P), restN = new Float32Array(m.geom.attributes.normal.array);
+      const restP = new Float32Array(P), restN = new Float32Array(Nr);
       m.geom.attributes.position.setUsage(THREE.DynamicDrawUsage);
       m.geom.attributes.normal.setUsage(THREE.DynamicDrawUsage);
-      this.skins.push({ mesh, geom: m.geom, fid, phi, off, restP, restN, index: m.geom.index.array, dented: false, nv, frame: 0 });
+      this.skins.push({ mesh, geom: m.geom, fid, phi, off, restP, restN, refN: new Float32Array(nv * 3), index: m.geom.index.array, dented: false, nv, frame: 0, folds: m.cat === 'panel' });
       return;
     }
     // rigid attachment to a structural tetra (or to the rear axle line)
@@ -1868,8 +2093,11 @@ class VehicleVisual {
     const cand = [];
     for (let i = sim.parts[part].n0; i < sim.parts[part].n1; i++) cand.push(i);
     const tet = chooseTet(sim.rest, cand, c.x, c.y, c.z, 9);
-    const tid = sim.addTet(tet.n);
-    this.rigids.push({ mesh, n: tet.n, w: tet.w, tid, c, spinAxis: m.spinAxis || null });
+    // rotation from a shape-matching frame over the tetra plus the closest few nodes of the part
+    const Rr = sim.rest;
+    const near = cand.map(i => [i, Math.hypot(Rr[i * 3] - c.x, Rr[i * 3 + 1] - c.y, Rr[i * 3 + 2] - c.z)]).sort((a, b) => a[1] - b[1]).slice(0, 6).map(a => a[0]);
+    const fid = sim.addFrame([...new Set([...tet.n, ...near])]);
+    this.rigids.push({ mesh, n: tet.n, w: tet.w, fid, c, spinAxis: m.spinAxis || null });
   }
 
   makeWheel(w) {
@@ -1938,42 +2166,54 @@ class VehicleVisual {
     this.partCol = PART_COLORS.map(c => new THREE.Color(c));
   }
 
-  setDebug(on) { this.debug = on; this.beamLines.visible = this.nodePoints.visible = on; for (const s of this.skins) s.mesh.material.wireframe = false; }
+  setDebug(on) { this.debug = on; this.beamLines.visible = this.nodePoints.visible = on; }
 
   update(steerInput) {
     const sim = this.sim;
     sim.syncVisualState();
-    const pos = sim.pos, Rt = sim.tetR, fs3 = sim.fStart * 3, ftet = sim.fTet;
+    const pos = sim.pos, Rt = sim.frameR, fs3 = sim.fStart * 3, ffr = sim.fFrame, AMP = sim.frameAmp, AX = sim.frameAxis, PH = sim.framePhase;
     for (const s of this.skins) {
       const out = s.geom.attributes.position.array, nrm = s.geom.attributes.normal.array;
-      const { fid, phi, off, restN, nv } = s;
-      const recompute = s.dented;
-      for (let v = 0, v3 = 0, v9 = 0; v < nv; v++, v3 += 3, v9 += 9) {
-        let px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0;
+      const { fid, phi, off, restP, restN, refN, nv } = s;
+      const recompute = s.dented, folds = s.folds;
+      let folded = false;
+      for (let v = 0, v3 = 0, v4 = 0, v12 = 0; v < nv; v++, v3 += 3, v4 += 4, v12 += 12) {
+        let px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0, amp = 0;
         const n0x = restN[v3], n0y = restN[v3 + 1], n0z = restN[v3 + 2];
-        for (let j = 0; j < 3; j++) {
-          const f = fid[v3 + j], w = phi[v3 + j], b = fs3 + f * 3, t = ftet[f] * 9, o = v9 + j * 3;
+        for (let j = 0; j < 4; j++) {
+          const f = fid[v4 + j], w = phi[v4 + j], b = fs3 + f * 3, fr = ffr[f], t = fr * 9, o = v12 + j * 3;
           const ox = off[o], oy = off[o + 1], oz = off[o + 2];
           const r0 = Rt[t], r1 = Rt[t + 1], r2 = Rt[t + 2], r3 = Rt[t + 3], r4 = Rt[t + 4], r5 = Rt[t + 5], r6 = Rt[t + 6], r7 = Rt[t + 7], r8 = Rt[t + 8];
           px += w * (pos[b] + r0 * ox + r1 * oy + r2 * oz);
           py += w * (pos[b + 1] + r3 * ox + r4 * oy + r5 * oz);
           pz += w * (pos[b + 2] + r6 * ox + r7 * oy + r8 * oz);
-          if (!recompute) {
-            nx += w * (r0 * n0x + r1 * n0y + r2 * n0z);
-            ny += w * (r3 * n0x + r4 * n0y + r5 * n0z);
-            nz += w * (r6 * n0x + r7 * n0y + r8 * n0z);
-          }
+          nx += w * (r0 * n0x + r1 * n0y + r2 * n0z);
+          ny += w * (r3 * n0x + r4 * n0y + r5 * n0z);
+          nz += w * (r6 * n0x + r7 * n0y + r8 * n0z);
+          amp += w * AMP[fr];
+        }
+        const l = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
+        nx *= l; ny *= l; nz *= l;
+        if (folds && amp > 0.0015) {
+          // accordion folds: ridges across the most squeezed rest axis of the surrounding structure,
+          // with an amplitude set by how far that structure has been permanently crushed
+          const fr0 = ffr[fid[v4]], ax = AX[fr0], ph = PH[fr0];
+          const wave = Math.sin(restP[v3 + ax] * FOLD_K + ph + 1.1 * Math.sin(restP[v3 + (ax === 1 ? 2 : 1)] * FOLD_K2 + ph * 1.7));
+          px += nx * amp * wave; py += ny * amp * wave; pz += nz * amp * wave;
+          folded = true;
         }
         out[v3] = px; out[v3 + 1] = py; out[v3 + 2] = pz;
-        if (!recompute) { const l = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1); nrm[v3] = nx * l; nrm[v3 + 1] = ny * l; nrm[v3 + 2] = nz * l; }
+        refN[v3] = nx; refN[v3 + 1] = ny; refN[v3 + 2] = nz;
+        if (!recompute) { nrm[v3] = nx; nrm[v3 + 1] = ny; nrm[v3 + 2] = nz; }
       }
-      if (recompute && (s.frame++ % (nv > 3000 ? 2 : 1) === 0)) computeNormalsFast(out, s.index, nrm);
+      if (folded) s.dented = true;                        // folds need real normals from now on
+      if (recompute && (s.frame++ % (nv > 3000 ? 2 : 1) === 0)) computeNormalsFast(out, s.index, nrm, refN);
       s.geom.attributes.position.needsUpdate = true;
       s.geom.attributes.normal.needsUpdate = true;
     }
     const tmpM = this._m4;
     for (const r of this.rigids) {
-      const t = r.tid * 9, n = r.n, w = r.w;
+      const t = r.fid * 9, n = r.n, w = r.w;
       let x = 0, y = 0, z = 0;
       for (let q = 0; q < 4; q++) { x += w[q] * pos[n[q] * 3]; y += w[q] * pos[n[q] * 3 + 1]; z += w[q] * pos[n[q] * 3 + 2]; }
       let m = this._r9;
@@ -2053,7 +2293,14 @@ class VehicleVisual {
     const col = new THREE.Color();
     for (let j = 0; j < sim.nBeams; j++) {
       const a = sim.ba[j] * 3, b = sim.bb[j] * 3, o = j * 6;
-      if (sim.broken[j]) { for (let k = 0; k < 6; k++) bp[o + k] = 0; continue; }
+      if (sim.broken[j]) {
+        // a beam that just snapped stays drawn in white-hot red for 0.4 s of sim time (frame-by-frame in slow-mo)
+        if (sim.broken[j] === 1 && sim.steps - sim.bBreak[j] < 400) {
+          bp[o] = pos[a]; bp[o + 1] = pos[a + 1]; bp[o + 2] = pos[a + 2]; bp[o + 3] = pos[b]; bp[o + 4] = pos[b + 1]; bp[o + 5] = pos[b + 2];
+          bc[o] = bc[o + 3] = 1; bc[o + 1] = bc[o + 4] = 0.25; bc[o + 2] = bc[o + 5] = 0.15;
+        } else for (let k = 0; k < 6; k++) bp[o + k] = 0;
+        continue;
+      }
       bp[o] = pos[a]; bp[o + 1] = pos[a + 1]; bp[o + 2] = pos[a + 2]; bp[o + 3] = pos[b]; bp[o + 4] = pos[b + 1]; bp[o + 5] = pos[b + 2];
       const L = Math.hypot(pos[b] - pos[a], pos[b + 1] - pos[a + 1], pos[b + 2] - pos[a + 2]);
       const stress = Math.min(1, Math.abs(L - sim.L0[j]) / (sim.bdef[j] * sim.L0o[j] + 1e-9));
@@ -2124,25 +2371,54 @@ function latheX(prof, S, radialOffset) {
   return g;
 }
 
-function computeNormalsFast(P, I, N) {
+// Reorder an indexed geometry's triangles into two material groups: pred(centroid) false -> 0, true -> 1.
+function splitTriangles(geom, pred) {
+  const I = geom.index.array, P = geom.attributes.position.array, a = [], b = [];
+  for (let t = 0; t < I.length; t += 3) {
+    const i0 = I[t] * 3, i1 = I[t + 1] * 3, i2 = I[t + 2] * 3;
+    const cx = (P[i0] + P[i1] + P[i2]) / 3, cy = (P[i0 + 1] + P[i1 + 1] + P[i2 + 1]) / 3, cz = (P[i0 + 2] + P[i1 + 2] + P[i2 + 2]) / 3;
+    (pred(cx, cy, cz) ? b : a).push(I[t], I[t + 1], I[t + 2]);
+  }
+  const idx = new Uint32Array(I.length);
+  idx.set(a, 0); idx.set(b, a.length);
+  geom.setIndex(new THREE.BufferAttribute(idx, 1));
+  geom.clearGroups();
+  geom.addGroup(0, a.length, 0);
+  geom.addGroup(a.length, b.length, 1);
+}
+
+// Front-facing planar UVs (x, y) at `scale` repeats per metre.
+function planarUV(geom, scale) {
+  const P = geom.attributes.position.array, n = P.length / 3, uv = new Float32Array(n * 2);
+  for (let v = 0; v < n; v++) { uv[v * 2] = P[v * 3] * scale; uv[v * 2 + 1] = P[v * 3 + 1] * scale; }
+  geom.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+
+// Area-weighted vertex normals of a deformed mesh. Each face normal is first turned to agree with the
+// vertex's reference normal (its skinned rest normal), so panels whose inner and outer faces share
+// vertices, or whose winding is inconsistent, can't cancel out to black.
+function computeNormalsFast(P, I, N, ref) {
   N.fill(0);
   for (let t = 0; t < I.length; t += 3) {
     const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
     const e1x = P[b] - P[a], e1y = P[b + 1] - P[a + 1], e1z = P[b + 2] - P[a + 2];
     const e2x = P[c] - P[a], e2y = P[c + 1] - P[a + 1], e2z = P[c + 2] - P[a + 2];
     const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
-    N[a] += nx; N[a + 1] += ny; N[a + 2] += nz; N[b] += nx; N[b + 1] += ny; N[b + 2] += nz; N[c] += nx; N[c + 1] += ny; N[c + 2] += nz;
+    for (const v of [a, b, c]) {
+      const sgn = nx * ref[v] + ny * ref[v + 1] + nz * ref[v + 2] < 0 ? -1 : 1;
+      N[v] += sgn * nx; N[v + 1] += sgn * ny; N[v + 2] += sgn * nz;
+    }
   }
   for (let i = 0; i < N.length; i += 3) {
     const l = Math.sqrt(N[i] * N[i] + N[i + 1] * N[i + 1] + N[i + 2] * N[i + 2]);
-    if (l > 0) { N[i] /= l; N[i + 1] /= l; N[i + 2] /= l; } else N[i + 1] = 1;
+    if (l > 1e-12) { N[i] /= l; N[i + 1] /= l; N[i + 2] /= l; } else { N[i] = ref[i]; N[i + 1] = ref[i + 1]; N[i + 2] = ref[i + 2]; }
   }
 }
 
 /* =========================================================================================
-   9. SCENE: test bench, sky, 2013-style lighting, bloom + amber grade
+   9. SCENE: test bench, sky, clean daylight, light bloom + subtle warm balance
    ========================================================================================= */
-const SUN_DIR = new THREE.Vector3(-0.62, 0.62, -0.48).normalize();
+const SUN_DIR = new THREE.Vector3(-0.55, 0.72, -0.42).normalize();
 
 function canvasTexture(w, h, draw) {
   const c = document.createElement('canvas');
@@ -2163,7 +2439,7 @@ function speckle(ctx, w, h, n, alpha, rng) {
 
 function buildEnvironment(scene, renderer, world) {
   const rng = mulberry32(7);
-  // sky dome (HDR values so the sun disc blooms)
+  // sky dome: pale blue zenith, near-white horizon, a modest sun glow
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: { uSun: { value: SUN_DIR.clone() } },
@@ -2171,12 +2447,12 @@ function buildEnvironment(scene, renderer, world) {
     fragmentShader: `uniform vec3 uSun; varying vec3 vDir;
       void main(){
         vec3 d = normalize(vDir); float h = d.y;
-        vec3 zen = vec3(0.30, 0.40, 0.52), hor = vec3(1.05, 0.86, 0.60), gnd = vec3(0.50, 0.40, 0.28);
-        vec3 col = mix(hor, zen, pow(clamp(h, 0.0, 1.0), 0.55));
-        col = mix(col, gnd, smoothstep(0.0, -0.06, h));
+        vec3 zen = vec3(0.36, 0.52, 0.80), hor = vec3(1.02, 1.02, 1.0), gnd = vec3(0.80, 0.80, 0.80);
+        vec3 col = mix(hor, zen, pow(clamp(h, 0.0, 1.0), 0.42));
+        col = mix(col, gnd, smoothstep(0.0, -0.05, h));
         float s = max(dot(d, uSun), 0.0);
-        col += vec3(1.0, 0.82, 0.5) * (pow(s, 6.0) * 0.55 + pow(s, 48.0) * 1.4);
-        col += vec3(1.0, 0.95, 0.82) * smoothstep(0.9994, 0.9997, s) * 40.0;
+        col += vec3(1.0, 0.96, 0.88) * (pow(s, 24.0) * 0.22 + pow(s, 400.0) * 1.2);
+        col += vec3(1.0, 0.97, 0.9) * smoothstep(0.9995, 0.9998, s) * 10.0;
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -2191,76 +2467,73 @@ function buildEnvironment(scene, renderer, world) {
   const env = pm.fromScene(envScene, 0.02).texture;
   pm.dispose();
 
-  scene.fog = new THREE.Fog(0xc9b088, 120, 900);
-  scene.add(new THREE.HemisphereLight(0xffe2b8, 0x5e4c34, 0.55));
-  const sun = new THREE.DirectionalLight(0xfff0d6, 3.4);
+  // neutral distance haze only; the sun is barely warm
+  scene.fog = new THREE.Fog(0xe7eaed, 240, 1500);
+  scene.add(new THREE.HemisphereLight(0xe3ecf6, 0x8d8b87, 0.8));
+  const sun = new THREE.DirectionalLight(0xfff5e8, 3.1);
   sun.castShadow = true;
   const isCoarse = matchMedia('(pointer: coarse)').matches;
   sun.shadow.mapSize.set(isCoarse ? 1024 : 2048, isCoarse ? 1024 : 2048);
   const sc = sun.shadow.camera;
   sc.left = -14; sc.right = 14; sc.top = 14; sc.bottom = -14; sc.near = 1; sc.far = 120;
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.025; sun.shadow.radius = 2.5;
   scene.add(sun, sun.target);
 
-  // ground: 1 m grid with 8 m amber majors (early grid-map look)
-  const gridTex = canvasTexture(512, 512, (ctx, w, h) => {
-    ctx.fillStyle = '#8b8473'; ctx.fillRect(0, 0, w, h);
-    speckle(ctx, w, h, 9000, 0.12, rng);
-    ctx.strokeStyle = 'rgba(40,34,26,0.35)'; ctx.lineWidth = 2;
-    for (let i = 0; i <= 8; i++) { const p = i * w / 8; ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, h); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(w, p); ctx.stroke(); }
-    ctx.strokeStyle = '#d7a647'; ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(1, h); ctx.moveTo(0, 1); ctx.lineTo(w, 1); ctx.stroke();
+  const line = (ctx, x0, y0, x1, y1) => { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+  // ground: gridmap of 2 m light / mid-grey checker tiles, each split by thin 0.5 m lines
+  const gridTex = canvasTexture(1024, 1024, (ctx, w, h) => {
+    const t = w / 2;
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#a9abac' : '#e3e4e4'; ctx.fillRect(i * t, j * t, t, t); }
+    speckle(ctx, w, h, 6000, 0.035, rng);
+    ctx.strokeStyle = 'rgba(70,72,74,0.32)'; ctx.lineWidth = 2;
+    for (let k = 1; k < 8; k++) { if (k === 4) continue; const q = k * w / 8; line(ctx, q, 0, q, h); line(ctx, 0, q, w, q); }
+    ctx.strokeStyle = 'rgba(46,48,50,0.62)'; ctx.lineWidth = 3;
+    for (const q of [1.5, t, w - 1.5]) { line(ctx, q, 0, q, h); line(ctx, 0, q, w, q); }
   });
-  gridTex.repeat.set(300, 300);
+  gridTex.repeat.set(600, 600);
   gridTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.92, metalness: 0, envMap: env, envMapIntensity: 0.3 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.82, metalness: 0, envMap: env, envMapIntensity: 0.35 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // concrete wall in the spawn path
-  const concrete = canvasTexture(512, 256, (ctx, w, h) => {
-    ctx.fillStyle = '#b9b2a2'; ctx.fillRect(0, 0, w, h);
-    speckle(ctx, w, h, 14000, 0.16, rng);
-    ctx.strokeStyle = 'rgba(60,52,40,0.45)'; ctx.lineWidth = 3;
-    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) ctx.strokeRect(c * w / 4 + (r % 2) * w / 8, r * h / 4, w / 4, h / 4);
-    for (let i = 0; i < 30; i++) { ctx.fillStyle = `rgba(80,66,50,${0.05 + rng() * 0.08})`; ctx.fillRect(rng() * w, rng() * h, 2, 18 + rng() * 40); }
+  // poured concrete: fine aggregate, faint board-form streaks, panel joints and tie holes
+  const concrete = canvasTexture(512, 512, (ctx, w, h) => {
+    ctx.fillStyle = '#b4ad9f'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, 22000, 0.1, rng);
+    for (let i = 0; i < 46; i++) { ctx.fillStyle = `rgba(92,84,72,${0.025 + rng() * 0.05})`; ctx.fillRect(0, rng() * h, w, 1 + rng() * 2); }
+    ctx.strokeStyle = 'rgba(70,64,56,0.35)'; ctx.lineWidth = 2;
+    line(ctx, 0, h / 2, w, h / 2); line(ctx, w / 2, 0, w / 2, h);
+    ctx.fillStyle = 'rgba(55,50,44,0.55)';
+    for (const x of [w / 4, 3 * w / 4]) for (const y of [h / 4, 3 * h / 4]) { ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); }
   });
   for (const c of world.cols) {
     if (c.type !== 0) continue;
     const wx = c.x1 - c.x0, wz = c.z1 - c.z0;
-    const tex = concrete.clone(); tex.needsUpdate = true; tex.repeat.set(wx / 4, c.h / 2);
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(wx, c.h, wz), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, envMap: env, envMapIntensity: 0.25 }));
+    const tex = concrete.clone(); tex.needsUpdate = true; tex.repeat.set(wx / 2.4, c.h / 2.4);
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(wx, c.h, wz), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.93, envMap: env, envMapIntensity: 0.3 }));
     wall.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
     wall.castShadow = wall.receiveShadow = true;
     scene.add(wall);
   }
 
-  // stunt ramps: yellow/black chevrons on the deck, concrete flanks
-  const chevron = canvasTexture(256, 256, (ctx, w, h) => {
-    ctx.fillStyle = '#2a241c'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#e9b23a';
-    for (let i = -2; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, i * 128 + 64); ctx.lineTo(w / 2, i * 128); ctx.lineTo(w, i * 128 + 64); ctx.lineTo(w, i * 128 + 128); ctx.lineTo(w / 2, i * 128 + 64); ctx.lineTo(0, i * 128 + 128); ctx.closePath(); ctx.fill(); }
-    speckle(ctx, w, h, 3000, 0.18, rng);
+  // stunt ramps: concrete deck and flanks, a hazard band on the vertical drop
+  const hazard = canvasTexture(256, 64, (ctx, w, h) => {
+    ctx.fillStyle = '#1d1d1d'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#e2b13c';
+    for (let x = -h; x < w + h; x += 48) { ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x + 24, h); ctx.lineTo(x + 24 + h, 0); ctx.lineTo(x + h, 0); ctx.closePath(); ctx.fill(); }
   });
   for (const c of world.cols) {
     if (c.type !== 1) continue;
-    const g = rampGeometry(c);
-    const deckTex = chevron.clone(); deckTex.needsUpdate = true; deckTex.repeat.set(c.width / 3, c.len / Math.cos(c.deg * Math.PI / 180) / 3);
-    const ramp = new THREE.Mesh(g, [new THREE.MeshStandardMaterial({ map: deckTex, roughness: 0.8, envMap: env, envMapIntensity: 0.3 }), new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.95, envMap: env, envMapIntensity: 0.25 })]);
+    const deck = concrete.clone(); deck.needsUpdate = true; deck.repeat.set(c.width / 2.4, c.len / Math.cos(c.deg * Math.PI / 180) / 2.4);
+    const side = concrete.clone(); side.needsUpdate = true;
+    const drop = hazard.clone(); drop.needsUpdate = true; drop.repeat.set(c.width / 3, 1);
+    const ramp = new THREE.Mesh(rampGeometry(c), [
+      new THREE.MeshStandardMaterial({ map: deck, roughness: 0.88, envMap: env, envMapIntensity: 0.3 }),
+      new THREE.MeshStandardMaterial({ map: drop, roughness: 0.7, envMap: env, envMapIntensity: 0.3 }),
+      new THREE.MeshStandardMaterial({ map: side, roughness: 0.93, envMap: env, envMapIntensity: 0.3 })]);
     ramp.castShadow = ramp.receiveShadow = true;
     scene.add(ramp);
-  }
-
-  // a ring of hazy mesas on the horizon
-  const mesaMat = new THREE.MeshStandardMaterial({ color: 0x9c7f58, roughness: 1, flatShading: true });
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * Math.PI * 2 + rng() * 0.3, r = 700 + rng() * 250;
-    const geo = new THREE.CylinderGeometry(40 + rng() * 60, 90 + rng() * 90, 30 + rng() * 70, 7, 1);
-    const mesa = new THREE.Mesh(geo, mesaMat);
-    mesa.position.set(Math.cos(a) * r, 10, Math.sin(a) * r);
-    mesa.rotation.y = rng() * 6;
-    scene.add(mesa);
   }
   return { sky, sun, env };
 }
@@ -2273,41 +2546,36 @@ function rampGeometry(c) {
   tri([x0, 0, z0], [x0, h, z1], [x1, h, z1], [0, 0], [0, 1], [1, 1]);
   tri([x0, 0, z0], [x1, h, z1], [x1, 0, z0], [0, 0], [1, 1], [1, 0]);
   // vertical drop at the far end (faces +z)
-  tri([x0, 0, z1], [x1, 0, z1], [x1, h, z1], [0, 0], [1, 0], [1, h / 3]);
-  tri([x0, 0, z1], [x1, h, z1], [x0, h, z1], [0, 0], [1, h / 3], [0, h / 3]);
+  tri([x0, 0, z1], [x1, 0, z1], [x1, h, z1], [0, 0], [1, 0], [1, 1]);
+  tri([x0, 0, z1], [x1, h, z1], [x0, h, z1], [0, 0], [1, 1], [0, 1]);
   // flanks
-  tri([x1, 0, z0], [x1, h, z1], [x1, 0, z1], [0, 0], [L / 4, h / 2], [L / 4, 0]);
-  tri([x0, 0, z0], [x0, 0, z1], [x0, h, z1], [0, 0], [L / 4, 0], [L / 4, h / 2]);
+  tri([x1, 0, z0], [x1, h, z1], [x1, 0, z1], [0, 0], [L / 2.4, h / 2.4], [L / 2.4, 0]);
+  tri([x0, 0, z0], [x0, 0, z1], [x0, h, z1], [0, 0], [L / 2.4, 0], [L / 2.4, h / 2.4]);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.addGroup(0, 6, 0);
-  g.addGroup(6, 12, 1);
+  g.addGroup(6, 6, 1);
+  g.addGroup(12, 6, 2);
   g.computeVertexNormals();
   return g;
 }
 
-// Amber/sepia, low-contrast, over-saturated grade with lens fall-off, faint fringing and grain.
-const VintageGradeShader = {
+// A few percent of warm sunlight balance and a soft lens fall-off; no tint, fog or lifted blacks.
+const WarmBalanceShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
-      vec2 c = vUv - 0.5; float r2 = dot(c, c);
-      vec2 ca = c * r2 * 0.018;
-      vec3 col = vec3(texture2D(tDiffuse, vUv + ca).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - ca).b);
+      vec3 col = texture2D(tDiffuse, vUv).rgb;
+      col *= vec3(1.02, 1.0, 0.975);
       float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
-      col = mix(vec3(lum), col, 1.3);                                    // over-saturate
-      vec3 sepia = vec3(dot(col, vec3(0.393, 0.769, 0.189)), dot(col, vec3(0.349, 0.686, 0.168)), dot(col, vec3(0.272, 0.534, 0.131)));
-      col = mix(col, sepia, 0.28);                                       // sepia blend
-      col *= vec3(1.06, 0.98, 0.8);                                      // amber cast
-      col = mix(vec3(0.06, 0.048, 0.022), vec3(0.98, 0.94, 0.82), col);   // lifted blacks, creamy whites: low contrast
-      col += vec3(0.09, 0.06, 0.0) * smoothstep(0.7, 1.0, lum);           // warm glow on highlights
-      float vig = smoothstep(0.92, 0.22, length(c * vec2(1.0, 0.9)));
-      col *= mix(0.6, 1.0, vig);
-      col += (hash(vUv * uRes + fract(uTime * 7.0) * 91.0) - 0.5) * 0.04;
+      col = mix(vec3(lum), col, 1.04);
+      vec2 c = vUv - 0.5;
+      col *= mix(0.88, 1.0, smoothstep(0.95, 0.3, length(c * vec2(1.0, 0.85))));
+      col += (hash(vUv * uRes + fract(uTime * 7.0) * 91.0) - 0.5) * 0.006;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }`,
 };
@@ -2367,9 +2635,9 @@ async function main() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 1.75));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.toneMapping = THREE.ReinhardToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.95;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 3000);
@@ -2400,10 +2668,10 @@ async function main() {
   const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: coarse ? 0 : 4 });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.66, 0.55, 0.86);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.22, 0.4, 0.94);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
-  const grade = new ShaderPass(VintageGradeShader);
+  const grade = new ShaderPass(WarmBalanceShader);
   composer.addPass(grade);
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
@@ -2452,6 +2720,7 @@ async function main() {
   canvas.addEventListener('wheel', (e) => { rig.dist = Math.min(18, Math.max(4.5, rig.dist * (1 + Math.sign(e.deltaY) * 0.08))); e.preventDefault(); }, { passive: false });
 
   let timeScale = 1;
+  const SLOWMO = 0.05;   // 20x slower; still whole 1 ms steps, just fewer of them per frame
   const feed = $('feed');
   const pushFeed = (text, warn) => {
     const li = document.createElement('li');
@@ -2470,7 +2739,7 @@ async function main() {
   }
   function cycleCam() { rig.mode = (rig.mode + 1) % 3; rig.userYaw = rig.userPitch = 0; $('camName').textContent = rig.names[rig.mode]; }
   function toggleNodes() { const on = !visual.debug; visual.setDebug(on); $('btnNodes').setAttribute('aria-pressed', String(on)); }
-  function toggleSlow() { timeScale = timeScale === 1 ? 0.25 : 1; $('btnSlow').setAttribute('aria-pressed', String(timeScale !== 1)); }
+  function toggleSlow() { timeScale = timeScale === 1 ? SLOWMO : 1; $('btnSlow').setAttribute('aria-pressed', String(timeScale !== 1)); }
   $('btnReset').addEventListener('click', () => doReset());
   $('btnCam').addEventListener('click', cycleCam);
   $('btnNodes').addEventListener('click', toggleNodes);
@@ -2537,7 +2806,7 @@ async function main() {
       $('gear').textContent = g < 0 ? 'R' : String(g);
       $('rpm').textContent = String(Math.round(ctrl.drive.rpm / 10) * 10);
       $('rpmBar').style.width = Math.min(100, ctrl.drive.rpm / 55) + '%';
-      $('sHz').textContent = Math.round(hz) + ' Hz' + (timeScale !== 1 ? ' ×0.25' : '');
+      $('sHz').textContent = Math.round(hz) + ' Hz' + (timeScale !== 1 ? ' · ×0.05' : '');
       $('sMs').textContent = physMs.toFixed(1) + ' ms/frame';
       $('sBroken').textContent = String(sim.nBroken);
       $('sBroken').classList.toggle('hot', sim.nBroken > 0);
