@@ -1,0 +1,11 @@
+Model Information:
+* title:	Gavril_D_ Beamng
+* source:	https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5
+* author:	akhikavi7 (https://sketchfab.com/akhikavi7)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Gavril_D_ Beamng" (https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5) by akhikavi7 (https://sketchfab.com/akhikavi7) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
