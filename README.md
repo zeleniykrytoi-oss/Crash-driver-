@@ -1,10 +1,10 @@
 # Crash Driver
 
-A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. The pickup truck is a 4500-node network solved with XPBD at a fixed 1 ms step (1000 Hz) in a dedicated Web Worker:
+A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
-- 726 constraint beams;
+- 738 beams: structural, shear (diagonal) and support;
 - 30 volume cells;
-- a sheet-metal skin of 5789 stretch edges and 3686 dihedral bending hinges.
+- a sheet-metal skin of 5789 stretch springs and 3686 dihedral bending springs.
 
 In a crash the crumple zone folds progressively and bulges sideways. The front piles up against a rigid engine block, and the hood folds into wide creases and arches up. A corner hit twists the frame. Bumpers, hood and doors hang from their hinges or tear off when their brackets fail.
 
@@ -37,7 +37,7 @@ python3 -m http.server 8000
 | Reset vehicle | R | RESET VEHICLE |
 | Cycle camera (chase, orbit, trackside) | C | CAM |
 | f-node debug view | N | F-NODES |
-| Slow motion: 20× slower (×0.05), still whole 1 ms steps | T | SLOW-MO |
+| Slow motion: 20× slower (×0.05), still whole 0.5 ms substeps | T | SLOW-MO |
 | Orbit camera | drag on the view | drag on the view |
 
 The test bench has a concrete wall 45 m straight ahead of the spawn, a 10° ramp on the left lane and a 22° ramp on the right lane.
@@ -51,27 +51,30 @@ The HUD shows:
 
 `index.html` has seven numbered sections. Section 1, `physicsLib()`, holds the whole simulation: solver, vehicle builder, drivetrain and skinning. It is one self-contained function with no DOM or three.js references.
 
-**Worker thread.** Section 2 turns `physicsLib`'s source text into a Blob and starts a Web Worker from it. The main thread sends the model geometry once. After that, each frame it sends only the number of 1 ms steps that are due and the driver input. The worker then:
+**Worker thread.** Section 2 turns `physicsLib`'s source text into a Blob and starts a Web Worker from it. The main thread sends the model geometry once. After that, each frame it splits the elapsed time into 0.5 ms substeps and sends only how many are due, plus the driver input. The worker then:
 
-1. runs the steps, at most 60 per frame (a slow device gets slow motion, never a larger step);
+1. runs the substeps, at most 120 per frame (a slow device gets slow motion, never a larger step);
 2. skins the vehicle;
 3. writes everything into one pooled `Float32Array` and transfers it back.
 
 That buffer holds stats, node positions, beam states, wheel matrices and probe depths, skinned vertex positions and normals, and rigid-part matrices. The page points the meshes' `BufferAttribute.array`s straight into it and returns the previous buffer to the pool. Vertex data is never copied or allocated per frame.
 
-**Spatial partitioning.** Static obstacles are indexed in a 4 m grid. Once per step, each simulated body gathers the obstacles its bounding box overlaps, usually none or one. Per-node collision queries test only that list, and never other nodes. Flexnode clusters only wake when their own bounding box nears the ground or an obstacle, or when the structure under them is crumpling.
+**Spatial partitioning.** Static obstacles are indexed in a 4 m grid. Once per substep, each simulated body gathers the obstacles its bounding box overlaps, usually none or one. Per-node collision queries test only that list, and never other nodes. Flexnode clusters only wake when their own bounding box nears the ground or an obstacle, or when the structure under them is crumpling.
 
 ## The solver
 
-**Step.** Each 1 ms step runs in five stages:
+**Substep.** Each 0.5 ms substep runs in four stages:
 
-1. Explicit external forces predict new positions: gravity, coil-over suspension, tyres, drag, and the air load on the hood and doors.
-2. Beams are projected in one Jacobi sweep.
-3. Gauss-Seidel passes project the volume cells, the rigid blocks, the skin sheet and the contacts.
-4. Velocities are the resulting position change.
-5. Velocities are damped per beam, with friction locking in crushed members.
+1. **Forces.** Every force on every node is summed: gravity, the coil-overs and tyres, drag, the air load on the hood and doors, the beam springs and dampers, the volume cells' pressure and the skin springs.
+2. **Integration.** Semi-implicit (symplectic) Euler: v += F/m·dt, then x += v·dt.
+3. **Contacts.** Contacts are resolved at the position level: crushed metal is pushed out of the engine and gearbox, then out of the ground and obstacles with Coulomb friction.
+4. **Velocities.** A node a contact moved takes its velocity from its corrected position. Crushed members then get their friction lock.
 
-XPBD is stable at any stiffness, so no beam is softened to fit the step: its compliance is exactly 1/k.
+**Stability.** Node positions and velocities live in flat `Float64Array`s. JavaScript does its arithmetic in doubles anyway, and stiff springs need that precision tens of metres from the origin; the buffers sent to the GPU are `Float32Array`s. An explicit spring is only stable while ω·dt < 2 at every node. `finalize()` therefore:
+
+- bounds each node's highest spring frequency (a Gershgorin bound over its beams). The stock truck peaks at ω·dt ≈ 1, and any node past 1.6 has its beams softened to fit, as a safety net for other models;
+- uses the remaining headroom as the most a beam may stiffen while it work-hardens;
+- sizes the engine and gearbox lattices and the skin springs from their node masses.
 
 **Nodes.**
 - **Structural nodes:** 11 chassis cross-section rings, closer together in the front crumple zone, plus two-layer lattices for each detachable part.
@@ -80,15 +83,21 @@ XPBD is stable at any stiffness, so no beam is softened to fit the step: its com
 - **Tread probes:** 256, a fixed 2 × 32 ring per wheel.
 - **Flexnodes:** 4066 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
 
-**Beams.** Each beam is a compliant distance constraint. The force it applies in a step is capped at its yield force, and whatever it can't carry flows into its rest length (see the mechanics below):
-- **Compression:** past 5 % compression the rest length shortens permanently, like an accordion.
-- **Packed metal:** below 32 % of its length a beam stops flowing.
-- **Tension:** past a smaller tension limit the rest length stretches.
-- **Snapping:** beams snap past a strain limit. Mounting brackets also tear once their plastic budget is used up.
+**Beams.** Each beam is a spring-damper along its axis: F = k·(L − L0) + c·v<sub>rel</sub>, with k = E/L0 and c set by the family's damping ratio. There are three kinds:
 
-**Volume cells.** Every bay between two chassis rings is a closed hexagonal prism, and every part lattice cube is a hexahedron. The volume of each is a constraint with the exact closed-surface gradient. The generalised force is a pressure. Past the cell's yield pressure, the rest volume flows plastically between a floor and a ceiling. Below the floor it densifies: its yield pressure climbs steeply, but it keeps flowing rather than storing the crush as a spring.
+- **Structural:** the ring edges, the rails between rings and the part lattice edges. They hold the shape.
+- **Shear:** the ring diagonals, the crossing diagonals of every bay face, the rail-to-rail twist bracing and the lattice face diagonals. They stop bays and panels shearing into parallelograms.
+- **Support:** hidden struts that only push. Twelve run corner to corner across and along the cab, and engage only once the cab is crushed past 12 % of their length, so it can't fold down to nothing. Others rest the hood on the fenders and the doors on the sills.
 
-**Engine and gearbox.** Each is an undeformable lattice of zero-compliance beams: 12 edges, 6 face diagonals and 4 body diagonals, swept four times per step. They carry 230 kg and 95 kg on plastic mounts, and the gearbox bolts rigidly to the back of the engine.
+Plasticity and fracture:
+
+- **Plastic set:** once a beam is stretched or compressed more than 5 % beyond its rest length (`msd.yield`), its rest length moves for good. It keeps its new length, like crumpled metal.
+- **Packed metal:** below 32 % of its factory length a beam stops flowing.
+- **Breaking:** a beam stretched more than 30 % past its factory length (`msd.break`) is deleted from its body's live beam list (swapped with the last live beam). Under compression, structural metal crumples instead of snapping. Mounting brackets also tear once their plastic budget is used up, and keep their own tuned limits.
+
+**Volume cells.** Every bay between two chassis rings is a closed hexagonal prism, and every part lattice cube is a hexahedron. Each is a pressure spring: p = K·(V0 − V)/V0 pushes its corners along the exact closed-surface volume gradient, with damping on the rate of volume change. Past the cell's yield pressure, the rest volume flows plastically between a floor and a ceiling. Below the floor it densifies: its yield pressure climbs steeply, but it keeps flowing rather than storing the crush as a spring.
+
+**Engine and gearbox.** Each is a lattice of 12 edges, 6 face diagonals and 4 body diagonals, as stiff as the substep allows for their node masses (ω·dt ≈ 0.9). They carry 230 kg and 95 kg on plastic mounts, and the gearbox bolts to the back of the engine.
 
 Crumple-zone beams that are driven into a block are pushed back out of it. The front therefore has to fold up ahead of the engine, and only a hard enough hit shoves the engine back toward the firewall.
 
@@ -98,25 +107,25 @@ Crumple-zone beams that are driven into a block are pushed back out of it. The f
 
 - **Node rotations:** each structural node carries its own rotation, shape-matched over itself and its beam neighbours.
 - **Smooth weights:** the weights fade to zero at the next node out, so neighbouring flexnodes always blend almost the same nodes.
-- **Awake flexnodes:** each is an XPBD constraint to its sheet target, and its reaction goes back to the structural nodes it blends. The tie is firm within the surface but only 12 % as stiff along the surface normal, so the sheet constraints can buckle a squeezed panel out of its plane.
-- **Sheet mesh:** the panel meshes are clustered into a coarse triangle mesh over the flexnodes. Each of its edges is a stretch constraint, which yields plastically and tears past 60 % stretch. Each edge shared by two triangles is a dihedral bending constraint (mechanic 1 below).
+- **Awake flexnodes:** each hangs on its sheet target with a spring-damper (520 rad/s, half critical damping), and the reaction goes back to the structural nodes it blends. The tie is firm within the surface but only 12 % as stiff along the surface normal, so the sheet springs can buckle a squeezed panel out of its plane.
+- **Sheet mesh:** the panel meshes are clustered into a coarse triangle mesh over the flexnodes. Each of its edges is a stretch spring, which yields plastically and tears past 60 % stretch. Each edge shared by two triangles is a dihedral bending spring (mechanic 1 below). A 27 g flexnode can't carry a very stiff sheet at the substep, so each spring is capped at its share of its nodes' stable frequency.
 - **Dents:** deviation past about 1 cm becomes a permanent rest-space offset. Sleeping surface neighbours within 24 cm take a smoothly falling share of it, so the patch sets together as one bowl or crease.
-- **Sleeping:** a flexnode that has settled, or has been awake for 200 steps, bakes its dent and goes back to sleep. Sleeping flexnodes are kinematic and cost nothing. At most 1000 flexnodes are woken by crumpling at once; contacts always wake them.
+- **Sleeping:** a flexnode that has settled, or has been awake for 0.2 s, bakes its dent and goes back to sleep. Sleeping flexnodes are kinematic and cost nothing. At most 1000 flexnodes are woken by crumpling at once; contacts always wake them.
 
 ## Metal deformation mechanics
 
-Ten mechanics run inside the XPBD/flexnode loop on top of the beams, cells and sheet above. The constants live in `VEHICLE` and can be changed with `?tune=`.
+Ten mechanics run inside the mass-spring loop on top of the beams, cells and sheet above. The constants live in `VEHICLE` and can be changed with `?tune=`.
 
-1. **Dihedral bending constraints.** Every pair of adjacent sheet triangles carries a bending constraint on the angle between their faces, using Bridson's exact dihedral gradient (`dihedral()`, `solveSheet()`). Its stiffness is `sheet.kBend`. A contact therefore spreads into one wide, continuous fold across the hood and fenders instead of a field of spikes. Past `sheet.bendYield` (0.3 rad) the fold angle sets plastically, which forms a permanent crease.
-2. **Logarithmic work hardening.** Each beam accumulates plastic strain ε<sub>p</sub>. Its yield force grows as F<sub>y</sub> = F<sub>y0</sub>·(1 + H·ln(1 + ε<sub>p</sub>/ε<sub>0</sub>)) (`plastic.H`, `plastic.eps0`), and its stiffness by the square of that factor. Crushed metal gets stronger and springs back less, so the crush moves on into the next undeformed bay rather than folding one bay flat.
-3. **Stress-induced volume expansion.** While a cell is flowing plastically in compression, its volume push loses the component along its most shortened axis (`squeezeAxis()`). It therefore pushes only sideways: fenders bulge and the hood arches up into its fold, instead of stiffening against the crush. Elastic cells keep the exact (energy-conserving) gradient, so the structure can't pump energy into itself as it rings after an impact.
-4. **Delayed impulse shockwave.** Beams are solved in one Jacobi sweep per step (`solveBeamsJacobi()`): every beam's correction is computed from the positions at the start of the sweep, and the corrections are summed per node. An impulse therefore crosses one beam per 1 ms step and runs from the bumper back to the cab as a wave, visible frame by frame in slow motion. Each beam's correction is scaled by the smaller of its two nodes' stable step sizes, recomputed every step from the hardened stiffnesses. That keeps the sweep stable and momentum-conserving.
-5. **Non-linear plastic flow (viscoplasticity).** The plastic flow rate follows Cowper-Symonds, rate = D·(F/F<sub>y</sub> − 1)<sup>q</sup> (`plastic.D`, `plastic.q`), solved per beam by bisection (`flow()`). In the peak milliseconds of a crash a member carries more than its static yield and flows like heavy, viscous metal rather than snapping instantly to the yield force.
+1. **Dihedral bending springs.** Every pair of adjacent sheet triangles carries a torsion spring on the angle between their faces, using Bridson's exact dihedral gradient (`dihedral()`, `sheetForces()`). Its stiffness is `sheet.kBend`, capped for the substep. A contact therefore spreads into one wide, continuous fold across the hood and fenders instead of a field of spikes. Past `sheet.bendYield` (0.3 rad) the fold angle sets plastically, which forms a permanent crease.
+2. **Logarithmic work hardening.** Each beam accumulates plastic strain ε<sub>p</sub>. Its yield force grows as F<sub>y</sub> = F<sub>y0</sub>·(1 + H·ln(1 + ε<sub>p</sub>/ε<sub>0</sub>)) (`plastic.H`, `plastic.eps0`). Its stiffness grows by that factor squared times (1 + ε<sub>p</sub>/`epsK`), as far as the substep allows: a buckled member unloads along a stiffer path. Crushed metal therefore gets stronger and springs back less, and the crush moves on into the next undeformed bay rather than folding one bay flat.
+3. **Stress-induced volume expansion.** A bay crushed lengthwise keeps its pressure, which pushes its side walls out against cross members that yield in tension at just 1.2 % (`cross.yieldT`). The crushed bay therefore bursts outward: fenders bulge and the hood arches up into its fold. The pressure always acts along the exact volume gradient. An earlier version pushed only sideways, but that force is non-conservative and pumped energy into the ringing structure after a crash.
+4. **Delayed impulse shockwave.** Explicit integration carries an impulse at most one beam further per 0.5 ms substep, so a hit runs from the bumper back to the cab as a wave at the structure's speed of sound, visible frame by frame in slow motion.
+5. **Non-linear plastic flow (viscoplasticity).** Fast deformation raises the yield, following Cowper-Symonds: y·(1 + (ε̇/D)<sup>1/q</sup>) (`plastic.D`, `plastic.q`). In the peak milliseconds of a crash a member carries more than its static yield and flows like heavy, viscous metal rather than giving at once.
 6. **Hinged hood flapping.** The hood's latch bracket lets go after its first beam fails, while its two rear hinge brackets keep holding. Each hood and door panel carries flat-plate aerodynamic pressure (`aeroParts()`, `air.Cn`). With the inertia of its lattice, that lifts an unlatched hood: it flaps, slams, and pivots on its rear hinges.
 7. **Edge-tearing propagation.** When an attachment beam snaps, every unbroken attachment beam next to it along the panel edge has its tensile stress doubled, capped at 4× (`concentrate()`). Its neighbours are the beams on the same panel node or one lattice beam away. A torn corner therefore unzips along the seam, and a bracket that has lost half its beams fails as a unit.
-8. **Frictional plastic damping.** A beam whose rest length has changed by more than 10 % of its factory length (`plastic.lockStrain`) gets Coulomb friction between its two nodes: up to `plastic.lockSpeed` (0.04 m/s) of their relative velocity is removed per step (`dampBeams()`). Crushed metal locks into shape instead of wobbling like jelly once the crash is over.
+8. **Frictional plastic damping.** A beam whose rest length has changed by more than 10 % of its factory length (`plastic.lockStrain`) gets Coulomb friction between its two nodes: up to `plastic.lockDecel` (40 m/s²) of their relative motion is taken off (`beamFriction()`). It acts at the velocity level, beam by beam, so it can stick without overshooting the way an explicit friction force would. Crushed metal locks into shape instead of wobbling like jelly once the crash is over.
 9. **Stretch-limit thinning.** Plastic stretch thins the metal: a beam's breaking strain shrinks to max(`thinMin`, 1 − `thin`·ε<sub>stretch</sub>) of its original value. Sheet edges tear the same way. Panel triangles stretched past 1.8× are cut out of the rendered mesh, so overstretched metal splits into strips.
-10. **Shear twist diagonals.** Stiff diagonal cross-beams (`frameX`) brace the left and right rails, each spanning two chassis bays. A corner impact therefore twists the whole frame, cab and bed instead of folding one rail on its own.
+10. **Shear twist diagonals.** Stiff diagonal shear beams (`frameX`) brace the left and right rails, each spanning two chassis bays. A corner impact therefore twists the whole frame, cab and bed instead of folding one rail on its own.
 
 ## Detaching parts
 
