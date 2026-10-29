@@ -71,6 +71,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 .tog { font-weight: 700; font-size: 13px; letter-spacing: 0.08em; padding: 7px 10px; color: var(--ink); background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px; }
 .tog i { font-style: normal; color: var(--accent); margin-left: 4px; }
 .tog[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tog[aria-pressed="true"] i { color: var(--accent-ink); }
 
 /* --- bottom-centre: speedo --- */
 .gauge { position: absolute; left: 50%; bottom: calc(10px + var(--safe-b)); transform: translateX(-50%); text-align: center; }
@@ -215,6 +216,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CSM } from 'three/addons/csm/CSM.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 
 const MODEL_URL = new URLSearchParams(location.search).get('model') || 'models/gavril_d/scene.glb';
 
@@ -254,7 +256,10 @@ function physicsLib() {
       arbF: 26000, arbR: 12000, bump: 0.11, droop: 0.16, kB: 6e5, kS: 6e5, cS: 5000,
       yieldS: 0.05, maxBend: 0.22, couple: 1.0,
     },
-    flex: { omega: 520, zeta: 0.5 },
+    // Skin sheet: flex constraint frequency / damping; bend = share of an awake flexnode's deviation from
+    // its neighbours removed per step (bending stiffness of the sheet); a dent spreads over `brush` metres
+    // with `share` of its depth at the centre, falling smoothly to zero at the edge.
+    flex: { omega: 520, zeta: 0.5, bend: 0.35, brush: 0.24, share: 0.6 },
     // Beam families. E is an axial rigidity (k = E / L0, the XPBD compliance is 1 / k). def / defC are the
     // tension / compression strains at which the member yields: past 5 % compression the rest length
     // shortens permanently. The yield is applied to the constraint force, so a beam never carries more
@@ -305,8 +310,10 @@ function physicsLib() {
     rr: 0.013,                     // rolling resistance coefficient
   };
 
-  const FLEX_REACH = 0.15;          // max distance of a flexnode target from its shape-matched estimate
-  const FOLD_LAMBDA = 0.26, FOLD_K = 2 * Math.PI / FOLD_LAMBDA, FOLD_K2 = 2 * Math.PI / 0.47;
+  const ED_K = 6;                   // structural nodes blended by each flexnode (embedded deformation)
+  const BRUSH = 10;                 // surface neighbours a flexnode bends with and shares its dents with
+  // skin buckles: wavelength of the folds a squeezed panel throws, and their largest height
+  const FOLD_LAMBDA = 0.5, FOLD_K = 2 * Math.PI / FOLD_LAMBDA, FOLD_K2 = 2 * Math.PI / 1.3, FOLD_MAX = 0.055;
   const STATS = 48;                 // floats in the per-frame stats block
 
   /* ----------------------------------- math helpers ----------------------------------- */
@@ -576,25 +583,29 @@ function physicsLib() {
       this.bbrT = new Float64Array(NB); this.bbrC = new Float64Array(NB); this.bbrP = new Float64Array(NB);
       this.btype = new Uint8Array(NB); this.bpart = new Uint8Array(NB); this.bBreak = new Int32Array(NB);
       this.broken = new Uint8Array(NB);   // 0 intact, 1 snapped, 2 disabled (support beam of a detached part)
-      this.bgroup = new Int16Array(NB).fill(-1); this.groups = []; this.groupNeed = []; this.groupHits = [];
+      this.bgroup = new Int16Array(NB).fill(-1); this.groups = []; this.groupNeed = []; this.groupHits = []; this.groupPart = [];
       this.rigid = new Int32Array(0);
       this.cells = []; this.blocks = []; this.blockRange = [0, 0];
       this.fStart = 0; this.nFlex = 0;
-      this.fAnc = new Int32Array(NN * 4); this.fW = new Float64Array(NN * 4); this.fW0 = new Float64Array(NN * 4);
-      this.fFrame = new Int32Array(NN); this.fActive = new Uint8Array(NN); this.fCalm = new Uint16Array(NN);
+      // Embedded deformation: each flexnode follows a smooth blend of ED_K structural nodes of its part, each
+      // node carrying its own rotation (shape-matched over its beam neighbours), plus a rest-space dent offset.
+      this.edN = new Int32Array(NN * ED_K); this.edW = new Float64Array(NN * ED_K); this.edO = new Float64Array(NN * ED_K * 3);
+      this.fDent = new Float64Array(NN * 3);
+      this.fT = new Float64Array(NN * 3);               // this step's sheet target of each awake flexnode
+      this.fBrN = new Int32Array(NN * BRUSH).fill(-1); this.fBrW = new Float32Array(NN * BRUSH);   // surface neighbours
+      this.nodeFrame = new Int32Array(NN).fill(-1);     // rotation frame of each structural node
+      this.fActive = new Uint8Array(NN); this.fCalm = new Uint16Array(NN);
       this.fC2 = new Float32Array(NN); this.fList = new Int32Array(NN); this.nActive = 0;
       this.fBent = new Uint8Array(NN);
-      this.fRestD = new Float64Array(NN * 3);           // rest-space position of each flexnode including its dents
       this.fNrm = new Float32Array(NN * 3);             // rest surface normal at each flexnode
-      this.fNb = new Int32Array(NN * 4).fill(-1);       // up to four neighbours on the same surface
       this.fp = [];
-      this.frames = []; this.frameR = null; this.frameAmp = null; this.frameAxis = null; this.framePhase = null;
+      this.frames = []; this.frameR = null; this.fRot = null; this.fFold = null;
       this.clusters = []; this.parts = []; this.contexts = []; this.wheels = [];
       this.vehicle = null; this.meta = null;
       this.steps = 0; this.nBroken = 0; this.dentEvents = 0;
       this.events = [];
       this.onDent = null;
-      this._F = new Float64Array(9); this._w = new Float64Array(4); this._t = new Float64Array(3); this._t2 = new Float64Array(3);
+      this._F = new Float64Array(9); this._w = new Float64Array(4); this._t = new Float64Array(3); this._M = new Float64Array(9);
     }
 
     addNode(x, y, z, m, kind, part) {
@@ -702,7 +713,7 @@ function physicsLib() {
       const det = m00 * c00 + m01 * c01 + m02 * c02;
       const Minv = Float64Array.from([c00, c01, c02, c01, c11, c12, c02, c12, c22], v => v / det);
       this.frames.push({ nodes: Int32Array.from(nodes), off, C: Float64Array.from([cx, cy, cz]), c: Float64Array.from([cx, cy, cz]),
-        q: Float64Array.from([1, 0, 0, 0]), R: Float64Array.from([1, 0, 0, 0, 1, 0, 0, 0, 1]), Minv, step: -1, amp: 0, axis: 2 });
+        q: Float64Array.from([1, 0, 0, 0]), R: Float64Array.from([1, 0, 0, 0, 1, 0, 0, 0, 1]), Minv, step: -1, fold: new Float64Array(3) });
       return this.frames.length - 1;
     }
 
@@ -751,43 +762,56 @@ function physicsLib() {
       R[0] = r00; R[1] = r01; R[2] = r02; R[3] = r10; R[4] = r11; R[5] = r12; R[6] = r20; R[7] = r21; R[8] = r22;
       fr.c[0] = cx; fr.c[1] = cy; fr.c[2] = cz;
       if (wantShape) {
-        // deformation gradient F = A * Minv: how far each rest axis has been squeezed. A sheet squeezed to
-        // ratio r folds with amplitude ~ (lambda / 4) * sqrt(1 - r^2). The first 5 % is elastic: no folds.
-        const M = fr.Minv;
-        let best = 9, axis = 2;
+        // deformation gradient F = A * Minv: how far each rest axis has been squeezed. Sheet metal can't
+        // shorten, so a panel squeezed to ratio r takes up the slack in buckles of height
+        // (lambda / pi) * sqrt(1 / r - 1) (equal arc length). The first 5 % is elastic: no buckles.
+        const M = fr.Minv, fold = fr.fold;
         for (let k = 0; k < 3; k++) {
           const fx = a00 * M[k] + a01 * M[3 + k] + a02 * M[6 + k];
           const fy = a10 * M[k] + a11 * M[3 + k] + a12 * M[6 + k];
           const fz = a20 * M[k] + a21 * M[3 + k] + a22 * M[6 + k];
-          const st = Math.sqrt(fx * fx + fy * fy + fz * fz);
-          if (st < best) { best = st; axis = k; }
+          const r = Math.sqrt(fx * fx + fy * fy + fz * fz) / 0.95;
+          fold[k] = r < 1 ? Math.min(FOLD_MAX, (FOLD_LAMBDA / Math.PI) * Math.sqrt(1 / Math.max(r, 0.05) - 1)) : 0;
         }
-        const r = Math.min(1, best / 0.95);
-        fr.amp = r < 0.995 ? 1.15 * (FOLD_LAMBDA / 4) * Math.sqrt(1 - r * r) : 0;
-        fr.axis = axis;
       }
       fr.step = this.steps;
     }
 
-    // Affine target of flexnode f, kept within FLEX_REACH of the shape-matched estimate of its dented
-    // rest position, so an inverted or collapsed anchor tetrahedron can't fling the skin around.
-    flexTarget(f, T) {
-      const pos = this.pos, A = this.fAnc, W = this.fW, f4 = f * 4;
-      const a0 = A[f4] * 3, a1 = A[f4 + 1] * 3, a2 = A[f4 + 2] * 3, a3 = A[f4 + 3] * 3;
-      const w0 = W[f4], w1 = W[f4 + 1], w2 = W[f4 + 2], w3 = W[f4 + 3];
-      let tx = w0 * pos[a0] + w1 * pos[a1] + w2 * pos[a2] + w3 * pos[a3];
-      let ty = w0 * pos[a0 + 1] + w1 * pos[a1 + 1] + w2 * pos[a2 + 1] + w3 * pos[a3 + 1];
-      let tz = w0 * pos[a0 + 2] + w1 * pos[a1 + 2] + w2 * pos[a2 + 2] + w3 * pos[a3 + 2];
-      const fr = this.frames[this.fFrame[f]];
+    nodeRot(n) {
+      const fr = this.frames[this.nodeFrame[n]];
       if (fr.step !== this.steps) this.updateFrame(fr, false);
-      const R = fr.R, c = fr.c, C = fr.C, D = this.fRestD, r = f * 3;
-      const ox = D[r] - C[0], oy = D[r + 1] - C[1], oz = D[r + 2] - C[2];
-      const ex = c[0] + R[0] * ox + R[1] * oy + R[2] * oz;
-      const ey = c[1] + R[3] * ox + R[4] * oy + R[5] * oz;
-      const ez = c[2] + R[6] * ox + R[7] * oy + R[8] * oz;
-      const qx = tx - ex, qy = ty - ey, qz = tz - ez, q2 = qx * qx + qy * qy + qz * qz;
-      if (q2 > FLEX_REACH * FLEX_REACH) { const s = FLEX_REACH / Math.sqrt(q2); tx = ex + qx * s; ty = ey + qy * s; tz = ez + qz * s; }
+      return fr.R;
+    }
+
+    // Sheet target of flexnode f: sum_k w_k (p_k + R_k (r_f + dent_f - g_k)) over its structural nodes k.
+    // Neighbouring flexnodes blend the same nodes with weights that fade to zero at the edge of their reach,
+    // so the skin moves as one smooth, continuous sheet however hard the structure underneath is crushed.
+    flexTarget(f, T) {
+      const pos = this.pos, N = this.edN, W = this.edW, O = this.edO, D = this.fDent, b = f * ED_K, f3 = f * 3;
+      const dx = D[f3], dy = D[f3 + 1], dz = D[f3 + 2];
+      let tx = 0, ty = 0, tz = 0;
+      for (let k = 0; k < ED_K; k++) {
+        const w = W[b + k];
+        if (w === 0) continue;
+        const n = N[b + k], R = this.nodeRot(n), o = (b + k) * 3, p = n * 3;
+        const ox = O[o] + dx, oy = O[o + 1] + dy, oz = O[o + 2] + dz;
+        tx += w * (pos[p] + R[0] * ox + R[1] * oy + R[2] * oz);
+        ty += w * (pos[p + 1] + R[3] * ox + R[4] * oy + R[5] * oz);
+        tz += w * (pos[p + 2] + R[6] * ox + R[7] * oy + R[8] * oz);
+      }
       T[0] = tx; T[1] = ty; T[2] = tz;
+    }
+
+    // Blended rotation of flexnode f, M = sum_k w_k R_k (close to a rotation; not re-orthonormalised).
+    flexRot(f, M) {
+      M.fill(0);
+      const b = f * ED_K, N = this.edN, W = this.edW;
+      for (let k = 0; k < ED_K; k++) {
+        const w = W[b + k];
+        if (w === 0) continue;
+        const R = this.nodeRot(N[b + k]);
+        for (let q = 0; q < 9; q++) M[q] += w * R[q];
+      }
     }
 
     makeContext(name, parts, id) {
@@ -827,7 +851,7 @@ function physicsLib() {
       this.flexG = Math.min(0.9, 2 * fl.zeta * fl.omega * DT);
       this.snapshot = {
         L0: this.L0o.slice(0, this.nBeams),
-        fW: this.fW0.slice(0, this.nFlex * 4),
+        brT: this.bbrT.slice(0, this.nBeams), brC: this.bbrC.slice(0, this.nBeams), brP: this.bbrP.slice(0, this.nBeams),
         wheels: this.wheels.map(w => Float64Array.from(w.w0)),
       };
       this.reset();
@@ -838,10 +862,10 @@ function physicsLib() {
       this.pos.set(this.rest.subarray(0, n3)); this.prev.set(this.rest.subarray(0, n3));
       this.vel.fill(0, 0, n3); this.frc.fill(0, 0, n3);
       this.L0.set(this.snapshot.L0); this.broken.fill(0); this.nBroken = 0; this.bBreak.fill(0);
+      this.bbrT.set(this.snapshot.brT); this.bbrC.set(this.snapshot.brC); this.bbrP.set(this.snapshot.brP);
       for (const c of this.cells) c.V0 = c.V0o;
-      this.fW.set(this.snapshot.fW); this.fActive.fill(0); this.fCalm.fill(0); this.fBent.fill(0); this.nActive = 0;
-      for (const fr of this.frames) { fr.q.set([1, 0, 0, 0]); fr.R.set([1, 0, 0, 0, 1, 0, 0, 0, 1]); fr.c.set(fr.C); fr.step = -1; fr.amp = 0; fr.axis = 2; }
-      this.fRestD.set(this.rest.subarray(this.fStart * 3, (this.fStart + this.nFlex) * 3));
+      this.fDent.fill(0); this.fActive.fill(0); this.fCalm.fill(0); this.fBent.fill(0); this.nActive = 0;
+      for (const fr of this.frames) { fr.q.set([1, 0, 0, 0]); fr.R.set([1, 0, 0, 0, 1, 0, 0, 0, 1]); fr.c.set(fr.C); fr.step = -1; fr.fold.fill(0); }
       this.wheels.forEach((w, i) => {
         w.w.set(this.snapshot.wheels[i]); w.omega = 0; w.theta = 0; w.steer = 0; w.depth.fill(0); w.bent = 0;
         w.R.set([1, 0, 0, 0, 1, 0, 0, 0, 1]); w.load = 0; w.ux = 0; w.uy = 0; w.slip = 0; w.sliding = 0; w.farb = 0; w.absOn = 0;
@@ -930,9 +954,17 @@ function physicsLib() {
       if (this.bgroup[j] >= 0) this.breakGroup(this.bgroup[j]);
     }
 
+    // A bracket that has lost enough beams lets go as a unit, and the part's remaining brackets now carry
+    // its load: their break limits drop, so a part that hangs on one hinge after a moderate hit is torn
+    // free as one panel by a severe one.
     breakGroup(g) {
-      if (++this.groupHits[g] < this.groupNeed[g]) return;
+      if (++this.groupHits[g] !== this.groupNeed[g]) return;
       for (const j of this.groups[g]) if (!this.broken[j]) { this.broken[j] = 1; this.bBreak[j] = this.steps; this.nBroken++; }
+      const p = this.groupPart[g];
+      for (let h = 0; h < this.groups.length; h++) {
+        if (h === g || this.groupPart[h] !== p) continue;
+        for (const j of this.groups[h]) { this.bbrT[j] *= 0.7; this.bbrC[j] *= 0.7; this.bbrP[j] *= 0.7; }
+      }
     }
 
     // Compliant distance constraints. The constraint force of this step, f = C / ((wa + wb) dt^2 + 1/k),
@@ -1087,9 +1119,9 @@ function physicsLib() {
     ctxOf(part) { return this.contexts[this.parts[part].ctx]; }
 
     activate(f, tx, ty, tz) {
-      const i3 = (this.fStart + f) * 3, f4 = f * 4, pos = this.pos, prev = this.prev, vel = this.vel, A = this.fAnc, W = this.fW;
+      const i3 = (this.fStart + f) * 3, b = f * ED_K, pos = this.pos, prev = this.prev, vel = this.vel, N = this.edN, W = this.edW;
       let vx = 0, vy = 0, vz = 0;
-      for (let k = 0; k < 4; k++) { const a = A[f4 + k] * 3, w = W[f4 + k]; vx += w * vel[a]; vy += w * vel[a + 1]; vz += w * vel[a + 2]; }
+      for (let k = 0; k < ED_K; k++) { const a = N[b + k] * 3, w = W[b + k]; vx += w * vel[a]; vy += w * vel[a + 1]; vz += w * vel[a + 2]; }
       pos[i3] = tx; pos[i3 + 1] = ty; pos[i3 + 2] = tz;
       vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
       prev[i3] = tx - vx * DT; prev[i3 + 1] = ty - vy * DT; prev[i3 + 2] = tz - vz * DT;
@@ -1109,10 +1141,13 @@ function physicsLib() {
       }
     }
 
-    // Flex constraints: each awake flexnode is a zero-length XPBD constraint to its affine target. The
-    // correction goes back to the four anchors with the same weights, so momentum is conserved.
+    // Flex constraints: each awake flexnode is a zero-length XPBD constraint to its sheet target, and the
+    // correction goes back to the structural nodes it blends with the same weights (momentum is kept).
+    // A bending pass then pulls each awake flexnode's deviation from the sheet toward its neighbours'
+    // (zero for those still on the sheet): a contact or a dent spreads over the panel instead of raising a
+    // single spike, the discrete form of the sheet's bending stiffness.
     solveFlex() {
-      const pos = this.pos, inv = this.inv, A = this.fAnc, W = this.fW, fs = this.fStart, active = this.fActive, world = this.world;
+      const pos = this.pos, inv = this.inv, N = this.edN, W = this.edW, fs = this.fStart, active = this.fActive, world = this.world, fT = this.fT;
       // broadphase: a cluster wakes its flexnodes only when its bounding box nears the ground or an obstacle
       const cls = this.clusters, T = this._t;
       for (let ci = 0; ci < cls.length; ci++) {
@@ -1138,70 +1173,80 @@ function physicsLib() {
       }
       const list = this.fList, al = this.flexAl;
       for (let q = 0; q < this.nActive; q++) {
-        const f = list[q], i = fs + f, i3 = i * 3, f4 = f * 4, part = this.part[i];
+        const f = list[q], i = fs + f, i3 = i * 3, part = this.part[i];
         if (this.ctxSleeping(part)) continue;
         const fp = this.fp[part];
         this.flexTarget(f, T);
         let dx = T[0] - pos[i3], dy = T[1] - pos[i3 + 1], dz = T[2] - pos[i3 + 2];
         let d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 > fp.y2 && this.flexYield(f, i3, dx, dy, dz, Math.sqrt(d2), fp)) {
+        if (d2 > fp.y2) {
+          this.flexYield(f, dx, dy, dz, Math.sqrt(d2), fp);
           this.flexTarget(f, T);
           dx = T[0] - pos[i3]; dy = T[1] - pos[i3 + 1]; dz = T[2] - pos[i3 + 2];
           d2 = dx * dx + dy * dy + dz * dz;
         }
+        fT[f * 3] = T[0]; fT[f * 3 + 1] = T[1]; fT[f * 3 + 2] = T[2];
         this.fC2[f] = d2;
         if (d2 < 1e-14) continue;
-        const a0 = A[f4], a1 = A[f4 + 1], a2 = A[f4 + 2], a3 = A[f4 + 3];
-        const w0 = W[f4], w1 = W[f4 + 1], w2 = W[f4 + 2], w3 = W[f4 + 3];
-        const wi = inv[i];
-        const den = wi + w0 * w0 * inv[a0] + w1 * w1 * inv[a1] + w2 * w2 * inv[a2] + w3 * w3 * inv[a3] + al;
+        const b = f * ED_K, wi = inv[i];
+        let den = wi + al;
+        for (let k = 0; k < ED_K; k++) { const w = W[b + k]; den += w * w * inv[N[b + k]]; }
         const s = 1 / den;                                  // Δλ / C, applied along d (unnormalised)
         pos[i3] += wi * s * dx; pos[i3 + 1] += wi * s * dy; pos[i3 + 2] += wi * s * dz;
-        let k = inv[a0] * w0 * s, j = a0 * 3; pos[j] -= k * dx; pos[j + 1] -= k * dy; pos[j + 2] -= k * dz;
-        k = inv[a1] * w1 * s; j = a1 * 3; pos[j] -= k * dx; pos[j + 1] -= k * dy; pos[j + 2] -= k * dz;
-        k = inv[a2] * w2 * s; j = a2 * 3; pos[j] -= k * dx; pos[j + 1] -= k * dy; pos[j + 2] -= k * dz;
-        k = inv[a3] * w3 * s; j = a3 * 3; pos[j] -= k * dx; pos[j + 1] -= k * dy; pos[j + 2] -= k * dz;
+        for (let k = 0; k < ED_K; k++) {
+          const w = W[b + k];
+          if (w === 0) continue;
+          const n = N[b + k], c = inv[n] * w * s, j = n * 3;
+          pos[j] -= c * dx; pos[j + 1] -= c * dy; pos[j + 2] -= c * dz;
+        }
+      }
+      const kb = VEHICLE.flex.bend, BN = this.fBrN, BW = this.fBrW;
+      for (let q = 0; q < this.nActive; q++) {
+        const f = list[q], i3 = (fs + f) * 3;
+        if (this.ctxSleeping(this.part[fs + f])) continue;
+        let mx = 0, my = 0, mz = 0, ws = 0;
+        for (let r = f * BRUSH, e = r + BRUSH; r < e; r++) {
+          const n = BN[r];
+          if (n < 0) break;
+          const w = BW[r];
+          ws += w;
+          if (active[n]) { const j3 = (fs + n) * 3, t3 = n * 3; mx += w * (pos[j3] - fT[t3]); my += w * (pos[j3 + 1] - fT[t3 + 1]); mz += w * (pos[j3 + 2] - fT[t3 + 2]); }
+        }
+        if (ws === 0) continue;
+        const t3 = f * 3;
+        pos[i3] -= kb * (pos[i3] - fT[t3] - mx / ws);
+        pos[i3 + 1] -= kb * (pos[i3 + 1] - fT[t3 + 1] - my / ws);
+        pos[i3 + 2] -= kb * (pos[i3 + 2] - fT[t3 + 2] - mz / ws);
       }
     }
 
-    // Plastic dent: re-anchor the flexnode's rest target inside its (deformed) tetrahedron so the
-    // elastic deviation stays at the yield distance. Its surface neighbours take 40 % of the push, which
-    // turns a dent into a smooth bowl in the sheet instead of a single spike.
-    flexYield(f, i3, dx, dy, dz, d, fp) {
-      const pos = this.pos, A = this.fAnc, f4 = f * 4, s = fp.yield / d;
-      const tx = pos[i3] + dx, ty = pos[i3 + 1] + dy, tz = pos[i3 + 2] + dz;
-      let px = pos[i3] + dx * s, py = pos[i3 + 1] + dy * s, pz = pos[i3 + 2] + dz * s;
-      let ox = 0, oy = 0, oz = 0;
-      for (let k = 0; k < 4; k++) { const a = A[f4 + k] * 3, w = this.fW0[f4 + k]; ox += w * pos[a]; oy += w * pos[a + 1]; oz += w * pos[a + 2]; }
-      const ex = px - ox, ey = py - oy, ez = pz - oz, e2 = ex * ex + ey * ey + ez * ez;
-      if (e2 > fp.maxP * fp.maxP) { const r = fp.maxP / Math.sqrt(e2); px = ox + ex * r; py = oy + ey * r; pz = oz + ez * r; }
-      if (!this.reanchor(f, px, py, pz)) return false;
-      const mx = (px - tx) * 0.4, my = (py - ty) * 0.4, mz = (pz - tz) * 0.4, T = this._t2;
-      for (let k = 0; k < 4; k++) {
-        const n = this.fNb[f4 + k];
-        if (n < 0) continue;
-        this.flexTarget(n, T);
-        this.reanchor(n, T[0] + mx, T[1] + my, T[2] + mz);
+    // Plastic dent: whatever deviation exceeds the yield distance becomes a permanent rest-space offset of
+    // the flexnode. Its surface neighbours take a smoothly falling share of it, so the patch sets together
+    // as one smooth bowl or crease instead of single nodes sinking into spikes.
+    flexYield(f, dx, dy, dz, d, fp) {
+      const k = 1 - fp.yield / d, M = this._M;
+      const wx = -dx * k, wy = -dy * k, wz = -dz * k;     // world-space move of the target toward the node
+      this.flexRot(f, M);
+      const rx = M[0] * wx + M[3] * wy + M[6] * wz, ry = M[1] * wx + M[4] * wy + M[7] * wz, rz = M[2] * wx + M[5] * wy + M[8] * wz;
+      this.addDent(f, rx, ry, rz, fp.maxP);
+      const share = VEHICLE.flex.share, fs = this.fStart;
+      for (let r = f * BRUSH, e = r + BRUSH; r < e; r++) {
+        const n = this.fBrN[r];
+        if (n < 0) break;
+        const w = this.fBrW[r] * share;
+        this.addDent(n, rx * w, ry * w, rz * w, this.fp[this.part[fs + n]].maxP);
       }
-      this.parts[this.part[this.fStart + f]].dent++;
+      this.parts[this.part[fs + f]].dent++;
       this.dentEvents++;
-      return true;
     }
 
-    reanchor(f, px, py, pz) {
-      const A = this.fAnc, f4 = f * 4, w = this._w;
-      if (!bary4(this.pos, A[f4], A[f4 + 1], A[f4 + 2], A[f4 + 3], px, py, pz, w, 0)) return false;
-      if (Math.abs(w[0]) > 3 || Math.abs(w[1]) > 3 || Math.abs(w[2]) > 3 || Math.abs(w[3]) > 3) return false;
-      this.fW[f4] = w[0]; this.fW[f4 + 1] = w[1]; this.fW[f4 + 2] = w[2]; this.fW[f4 + 3] = w[3];
-      const fr = this.frames[this.fFrame[f]];
-      if (fr.step !== this.steps) this.updateFrame(fr, false);
-      const R = fr.R, c = fr.c, C = fr.C, D = this.fRestD, r = f * 3;
-      const qx = px - c[0], qy = py - c[1], qz = pz - c[2];
-      D[r] = C[0] + R[0] * qx + R[3] * qy + R[6] * qz;
-      D[r + 1] = C[1] + R[1] * qx + R[4] * qy + R[7] * qz;
-      D[r + 2] = C[2] + R[2] * qx + R[5] * qy + R[8] * qz;
+    addDent(f, x, y, z, maxP) {
+      const D = this.fDent, f3 = f * 3;
+      let a = D[f3] + x, b = D[f3 + 1] + y, c = D[f3 + 2] + z;
+      const l2 = a * a + b * b + c * c;
+      if (l2 > maxP * maxP) { const s = maxP / Math.sqrt(l2); a *= s; b *= s; c *= s; }
+      D[f3] = a; D[f3 + 1] = b; D[f3 + 2] = c;
       if (!this.fBent[f]) { this.fBent[f] = 1; if (this.onDent) this.onDent(f); }
-      return true;
     }
 
     // Position-based contact: project the node out along the contact normal, then apply Coulomb friction
@@ -1284,13 +1329,13 @@ function physicsLib() {
     }
 
     finishFlex() {
-      const pos = this.pos, prev = this.prev, vel = this.vel, list = this.fList, fs = this.fStart, A = this.fAnc, W = this.fW, g = this.flexG, iDT = 1 / DT;
+      const pos = this.pos, prev = this.prev, vel = this.vel, list = this.fList, fs = this.fStart, N = this.edN, W = this.edW, g = this.flexG, iDT = 1 / DT;
       for (let q = 0; q < this.nActive;) {
-        const f = list[q], i = fs + f, i3 = i * 3, f4 = f * 4;
+        const f = list[q], i = fs + f, i3 = i * 3, b = f * ED_K;
         if (this.ctxSleeping(this.part[i])) { q++; continue; }
         let vx = (pos[i3] - prev[i3]) * iDT, vy = (pos[i3 + 1] - prev[i3 + 1]) * iDT, vz = (pos[i3 + 2] - prev[i3 + 2]) * iDT;
         let tx = 0, ty = 0, tz = 0;
-        for (let k = 0; k < 4; k++) { const a = A[f4 + k] * 3, w = W[f4 + k]; tx += w * vel[a]; ty += w * vel[a + 1]; tz += w * vel[a + 2]; }
+        for (let k = 0; k < ED_K; k++) { const a = N[b + k] * 3, w = W[b + k]; tx += w * vel[a]; ty += w * vel[a + 1]; tz += w * vel[a + 2]; }
         const rx = tx - vx, ry = ty - vy, rz = tz - vz;
         vx += g * rx; vy += g * ry; vz += g * rz;
         vel[i3] = vx; vel[i3 + 1] = vy; vel[i3 + 2] = vz;
@@ -1524,17 +1569,7 @@ function physicsLib() {
       const ctx = this.makeContext(PART_LABELS[p], [p], this.contexts.length);
       this.contexts.push(ctx);
       P.ctx = ctx.id;
-      const pos = this.pos, vel = this.vel, prev = this.prev, mass = this.mass, ch = this.parts[P_CHASSIS];
-      let cx = 0, cy = 0, cz = 0, m = 0, vx = 0, vy = 0, vz = 0, M = 0;
-      for (let i = P.n0; i < P.n1; i++) { cx += pos[i * 3]; cy += pos[i * 3 + 1]; cz += pos[i * 3 + 2]; m++; }
-      for (let i = ch.n0; i < ch.n1; i++) { vx += pos[i * 3] * mass[i]; vy += pos[i * 3 + 1] * mass[i]; vz += pos[i * 3 + 2] * mass[i]; M += mass[i]; }
-      let dx = cx / m - vx / M, dy = cy / m - vy / M + 0.3, dz = cz / m - vz / M;
-      const dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-      dx /= dl; dy /= dl; dz /= dl;
-      for (let i = P.n0; i < P.n1; i++) {
-        vel[i * 3] += dx * 1.2; vel[i * 3 + 1] += dy * 1.2; vel[i * 3 + 2] += dz * 1.2;
-        prev[i * 3] = pos[i * 3] - vel[i * 3] * DT; prev[i * 3 + 1] = pos[i * 3 + 1] - vel[i * 3 + 1] * DT; prev[i * 3 + 2] = pos[i * 3 + 2] - vel[i * 3 + 2] * DT;
-      }
+      // no push: the part leaves with exactly the momentum it had when its last bracket let go
       this.events.push({ kind: 'detach', part: p, text: PART_LABELS[p] + ' DETACHED' });
     }
 
@@ -1557,27 +1592,34 @@ function physicsLib() {
       }
     }
 
-    // Per render frame: refresh every shape-matching frame (rotation + fold amplitude) and place the
-    // kinematic flexnodes on their targets.
+    // Per render frame: refresh every rotation frame (with its buckle heights), then give each flexnode its
+    // blended rotation and buckle heights for the skin and put the kinematic ones on their sheet targets.
     syncVisualState() {
       const nF = this.frames.length;
-      if (!this.frameR || this.frameR.length !== nF * 9) {
-        this.frameR = new Float64Array(nF * 9); this.frameAmp = new Float32Array(nF);
-        this.frameAxis = new Uint8Array(nF); this.framePhase = new Float32Array(nF);
-        for (let k = 0; k < nF; k++) this.framePhase[k] = (k * 2.399963) % 6.283185;
-      }
-      for (let k = 0; k < nF; k++) {
-        const fr = this.frames[k];
-        this.updateFrame(fr, true);
-        this.frameR.set(fr.R, k * 9); this.frameAmp[k] = fr.amp; this.frameAxis[k] = fr.axis;
-      }
+      if (!this.frameR || this.frameR.length !== nF * 9) this.frameR = new Float64Array(nF * 9);
+      for (let k = 0; k < nF; k++) { const fr = this.frames[k]; this.updateFrame(fr, true); this.frameR.set(fr.R, k * 9); }
       for (const b of this.blocks) this.blockFrame(b);
-      const pos = this.pos, fs = this.fStart, act = this.fActive, T = this._t;
-      for (let f = 0; f < this.nFlex; f++) {
-        if (act[f]) continue;
-        this.flexTarget(f, T);
-        const i3 = (fs + f) * 3;
-        pos[i3] = T[0]; pos[i3 + 1] = T[1]; pos[i3 + 2] = T[2];
+      const nf = this.nFlex;
+      if (!this.fRot) { this.fRot = new Float32Array(nf * 9); this.fFold = new Float32Array(nf * 3); }
+      const pos = this.pos, fs = this.fStart, act = this.fActive, N = this.edN, W = this.edW, O = this.edO, D = this.fDent;
+      const frames = this.frames, nodeFrame = this.nodeFrame, FR = this.fRot, FF = this.fFold;
+      for (let f = 0; f < nf; f++) {
+        const b = f * ED_K, f3 = f * 3, f9 = f * 9, dx = D[f3], dy = D[f3 + 1], dz = D[f3 + 2];
+        let m0 = 0, m1 = 0, m2 = 0, m3 = 0, m4 = 0, m5 = 0, m6 = 0, m7 = 0, m8 = 0, a0 = 0, a1 = 0, a2 = 0, tx = 0, ty = 0, tz = 0;
+        for (let k = 0; k < ED_K; k++) {
+          const w = W[b + k];
+          if (w === 0) continue;
+          const n = N[b + k], fr = frames[nodeFrame[n]], R = fr.R, fo = fr.fold, o = (b + k) * 3, p = n * 3;
+          m0 += w * R[0]; m1 += w * R[1]; m2 += w * R[2]; m3 += w * R[3]; m4 += w * R[4]; m5 += w * R[5]; m6 += w * R[6]; m7 += w * R[7]; m8 += w * R[8];
+          a0 += w * fo[0]; a1 += w * fo[1]; a2 += w * fo[2];
+          const ox = O[o] + dx, oy = O[o + 1] + dy, oz = O[o + 2] + dz;
+          tx += w * (pos[p] + R[0] * ox + R[1] * oy + R[2] * oz);
+          ty += w * (pos[p + 1] + R[3] * ox + R[4] * oy + R[5] * oz);
+          tz += w * (pos[p + 2] + R[6] * ox + R[7] * oy + R[8] * oz);
+        }
+        FR[f9] = m0; FR[f9 + 1] = m1; FR[f9 + 2] = m2; FR[f9 + 3] = m3; FR[f9 + 4] = m4; FR[f9 + 5] = m5; FR[f9 + 6] = m6; FR[f9 + 7] = m7; FR[f9 + 8] = m8;
+        FF[f3] = a0; FF[f3 + 1] = a1; FF[f3 + 2] = a2;
+        if (!act[f]) { const i3 = (fs + f) * 3; pos[i3] = tx; pos[i3 + 1] = ty; pos[i3 + 2] = tz; }
       }
     }
 
@@ -1761,8 +1803,12 @@ function physicsLib() {
       }
       return out;
     };
-    const attach = (p, n, count, fam, filter) => {
-      for (const c of nearestChassis(n, count, filter)) { const j = sim.addBeam(n, c, fam, BEAM_ATTACH, p); if (j >= 0) sim.parts[p].attach.push(j); }
+    // Every attachment beam belongs to a named bracket (a hinge, a latch, a bolt). A bracket lets go as a
+    // unit once it has lost half its beams, so damage stays local: a door can hang from its lower hinge
+    // after the upper one tears, and only flies off when its last bracket fails.
+    const bracketOf = new Map();
+    const attach = (p, n, count, fam, bracket) => {
+      for (const c of nearestChassis(n, count)) { const j = sim.addBeam(n, c, fam, BEAM_ATTACH, p); if (j >= 0) { sim.parts[p].attach.push(j); bracketOf.set(j, bracket); } }
     };
     const support = (p, n, filter) => {
       for (const c of nearestChassis(n, 1, filter)) { const j = sim.addBeam(n, c, BF.support, BEAM_SUPPORT, p); if (j >= 0) sim.parts[p].support.push(j); }
@@ -1779,8 +1825,8 @@ function physicsLib() {
         const top = surfaceExtreme(V, 0, 2, 1, x, z, 1, hb.max[1]) - 0.012;
         return [x, top - 0.09 * k, z];
       }, BF.hood, (k, dir) => (k === 1 && (dir === 'b' || dir === 'ab') ? BF.hoodFold : null), VF.hood);
-      for (const i of [0, 2]) for (const k of [0, 1]) attach(P_HOOD, H.id(i, 0, k), 3, BF.attachHood);
-      attach(P_HOOD, H.id(1, 3, 1), 3, BF.attachHood);
+      for (const i of [0, 2]) for (const k of [0, 1]) attach(P_HOOD, H.id(i, 0, k), 3, BF.attachHood, i === 0 ? 'hingeL' : 'hingeR');
+      attach(P_HOOD, H.id(1, 3, 1), 3, BF.attachHood, 'latch');
       for (const i of [0, 2]) for (const j of [2, 3]) support(P_HOOD, H.id(i, j, 1), c => R[c * 3 + 1] < R[H.id(i, j, 1) * 3 + 1]);
       for (const j of [0, 1, 2, 3]) support(P_HOOD, H.id(1, j, 1), c => R[c * 3 + 1] < R[H.id(1, j, 1) * 3 + 1] - 0.05);
     }
@@ -1793,8 +1839,8 @@ function physicsLib() {
         const outer = surfaceExtreme(V, 2, 1, 0, z, y, side, side > 0 ? db.max[0] : db.min[0]) - side * 0.012;
         return [outer - side * 0.085 * k, y, z];
       }, BF.door, null, VF.door);
-      for (const j of [0, 1]) for (const k of [0, 1]) attach(p, D.id(0, j, k), 3, BF.attachDoor);
-      for (const k of [0, 1]) attach(p, D.id(2, 1, k), 3, BF.attachDoor);
+      for (const j of [0, 1]) for (const k of [0, 1]) attach(p, D.id(0, j, k), 3, BF.attachDoor, j === 0 ? 'hingeLower' : 'hingeUpper');
+      for (const k of [0, 1]) attach(p, D.id(2, 1, k), 3, BF.attachDoor, 'latch');
       for (const j of [0, 1]) support(p, D.id(1, j, 1));
     }
     for (const p of [P_BUMPER_F, P_BUMPER_R]) {
@@ -1806,32 +1852,21 @@ function physicsLib() {
         const face = surfaceExtreme(V, 0, 1, 2, x, y, fwd, fwd > 0 ? bb.max[2] : bb.min[2]) - fwd * 0.015;
         return [x, y, face - fwd * 0.11 * k];
       }, BF.bumper, null, VF.bumper);
-      for (const i of [1, 2]) for (const j of [0, 1]) attach(p, Bm.id(i, j, 1), 3, BF.attach);
-      attach(p, Bm.id(0, 1, 1), 2, BF.attach);
-      attach(p, Bm.id(3, 1, 1), 2, BF.attach);
+      for (const i of [1, 2]) for (const j of [0, 1]) attach(p, Bm.id(i, j, 1), 3, BF.attach, 'bolt' + i + j);
+      attach(p, Bm.id(0, 1, 1), 2, BF.attach, 'end0');
+      attach(p, Bm.id(3, 1, 1), 2, BF.attach, 'end3');
     }
     for (let p = 1; p <= 5; p++) if (!sim.parts[p]) sim.parts[p] = { id: p, n0: sim.nNodes, n1: sim.nNodes, attach: [], support: [], detached: false, ctx: 0, dent: 0 };
-    // break groups (brackets): left/right for bumpers, left hinge / right hinge / latch for the hood,
-    // hinge / latch for the doors
+    // brackets become break groups: a bracket fails after half its beams (a hood latch after its first)
     for (let p = 1; p <= 5; p++) {
-      const P = sim.parts[p];
-      if (!P.attach.length) continue;
-      let zc = 0;
-      for (let i = P.n0; i < P.n1; i++) zc += R[i * 3 + 2] / (P.n1 - P.n0);
-      const keyOf = (n) => {
-        const x = R[n * 3], z = R[n * 3 + 2];
-        if (p === P_DOOR_L || p === P_DOOR_R) return z > zc ? 'hinge' : 'latch';
-        if (p === P_HOOD) return Math.abs(x) < 0.2 ? 'latch' : (x > 0 ? 'hingeL' : 'hingeR');
-        return x > 0 ? 'L' : 'R';
-      };
       const map = new Map();
-      for (const j of P.attach) {
-        const n = sim.part[sim.ba[j]] === p ? sim.ba[j] : sim.bb[j];
-        const k = keyOf(n);
-        if (!map.has(k)) { map.set(k, sim.groups.length); sim.groups.push([]); sim.groupNeed.push(p === P_HOOD ? (k === 'latch' ? 1 : 2) : (p === P_DOOR_L || p === P_DOOR_R ? 3 : 2)); }
+      for (const j of sim.parts[p].attach) {
+        const k = bracketOf.get(j);
+        if (!map.has(k)) { map.set(k, sim.groups.length); sim.groups.push([]); sim.groupNeed.push(1); sim.groupPart.push(p); }
         const g = map.get(k);
         sim.groups[g].push(j); sim.bgroup[j] = g;
       }
+      for (const [k, g] of map) sim.groupNeed[g] = p === P_HOOD && k === 'latch' ? 1 : Math.ceil(sim.groups[g].length / 2);
     }
 
     // --- wheels: hub node + suspension anchor tetra + mount frame + tread probe ring
@@ -1946,6 +1981,29 @@ function physicsLib() {
     const Atot = areas.reduce((a, b) => a + b, 0);
     const counts = areas.map((A, p) => (A > 0 ? Math.max(p === 0 ? 0 : 60, Math.round(flexBudget * A / Atot)) : 0));
     counts[0] += flexBudget - counts.reduce((a, b) => a + b, 0);
+    // every structural node gets a rotation frame, shape-matched over itself and its beam neighbours
+    const adj = new Map();
+    for (let j = 0; j < sim.nBeams; j++) {
+      const a = sim.ba[j], b = sim.bb[j];
+      if (sim.btype[j] !== BEAM_STRUCT || sim.part[a] !== sim.part[b]) continue;
+      for (const [x, y] of [[a, b], [b, a]]) { if (!adj.has(x)) adj.set(x, [x]); adj.get(x).push(y); }
+    }
+    for (const [n, list] of adj) sim.nodeFrame[n] = sim.addFrame(list);
+    // embedded-deformation weights: the ED_K nearest structural nodes of the part, fading to zero at the
+    // next one out, so neighbouring points never jump between node sets
+    const edBind = (cand, x, y, z, f) => {
+      const d = cand.map(c => [c, Math.hypot(R[c * 3] - x, R[c * 3 + 1] - y, R[c * 3 + 2] - z)]).sort((a, b) => a[1] - b[1]);
+      const K = Math.min(ED_K, d.length), dmax = (d.length > K ? d[K][1] : d[K - 1][1] * 1.25) + 1e-6;
+      const w = [];
+      let ws = 0;
+      for (let k = 0; k < K; k++) { w.push((1 - d[k][1] / dmax) ** 2 + 1e-9); ws += w[k]; }
+      const b = f * ED_K;
+      for (let k = 0; k < ED_K; k++) {
+        const c = d[Math.min(k, K - 1)][0], o = (b + k) * 3;
+        sim.edN[b + k] = c; sim.edW[b + k] = k < K ? w[k] / ws : 0;
+        sim.edO[o] = x - R[c * 3]; sim.edO[o + 1] = y - R[c * 3 + 1]; sim.edO[o + 2] = z - R[c * 3 + 2];
+      }
+    };
     sim.fStart = sim.nNodes;
     for (let p = 0; p < 6; p++) {
       sim.fp[p] = { yield: p === P_BUMPER_F || p === P_BUMPER_R ? 0.015 : (p === 0 ? 0.012 : 0.01), maxP: 0.3 };
@@ -1954,16 +2012,13 @@ function physicsLib() {
       const smp = sampleSurface(partTris[p], counts[p], rng), pts = smp.pos;
       const P = sim.parts[p];
       const cand = [];
-      for (let i = P.n0; i < P.n1; i++) cand.push(i);
+      for (let i = P.n0; i < P.n1; i++) if (sim.nodeFrame[i] >= 0) cand.push(i);
       for (let s = 0; s < pts.length; s += 3) {
         const n = sim.addNode(pts[s], pts[s + 1], pts[s + 2], mFlex, NODE_FLEX, p);
         const f = n - sim.fStart;
-        const tet = chooseTet(R, cand, pts[s], pts[s + 1], pts[s + 2], 9);
-        sim.fAnc.set(tet.n, f * 4); sim.fW.set(tet.w, f * 4); sim.fW0.set(tet.w, f * 4);
+        edBind(cand, pts[s], pts[s + 1], pts[s + 2], f);
         sim.fNrm[f * 3] = smp.nrm[s]; sim.fNrm[f * 3 + 1] = smp.nrm[s + 1]; sim.fNrm[f * 3 + 2] = smp.nrm[s + 2];
-        let ws = 0;
-        for (const ww of tet.w) ws += Math.abs(ww);
-        for (let q = 0; q < 4; q++) sim.mass[tet.n[q]] += mFlex * Math.abs(tet.w[q]) / ws;   // lumped while kinematic
+        for (let k = 0; k < ED_K; k++) sim.mass[sim.edN[f * ED_K + k]] += mFlex * sim.edW[f * ED_K + k];   // lumped while kinematic
       }
     }
     sim.nFlex = sim.nNodes - sim.fStart;
@@ -1977,7 +2032,7 @@ function physicsLib() {
       if (!cmap.has(key)) cmap.set(key, { part: p, flex: [], anchors: new Set() });
       const cl = cmap.get(key);
       cl.flex.push(f);
-      for (let q = 0; q < 4; q++) cl.anchors.add(sim.fAnc[f * 4 + q]);
+      for (let q = 0; q < ED_K; q++) if (sim.edW[f * ED_K + q] > 0) cl.anchors.add(sim.edN[f * ED_K + q]);
     }
     for (const cl of cmap.values()) {
       const an = [...cl.anchors];
@@ -1990,13 +2045,12 @@ function physicsLib() {
         for (let k = 0; k < 3; k++) { const v = R[i * 3 + k], e = Math.max(mn[k] - v, 0, v - mx[k]); d2 += e * e; }
         pad = Math.max(pad, Math.sqrt(d2));
       }
-      const frame = sim.addFrame(an);
-      for (const f of cl.flex) sim.fFrame[f] = frame;
-      sim.clusters.push({ part: cl.part, flex: Int32Array.from(cl.flex), anchors: Int32Array.from(an), pad: pad * 1.25 + 0.08, frame });
+      sim.clusters.push({ part: cl.part, flex: Int32Array.from(cl.flex), anchors: Int32Array.from(an), pad: pad * 1.25 + 0.08 });
     }
 
-    // --- flexnode neighbours on the same surface (same part, similar normal) for dent diffusion
-    const nbMap = new Map(), NH = 0.2;
+    // --- flexnode neighbours on the same surface (same part, similar normal): the sheet's bending stencil
+    // and the reach of a dent, weighted (1 - (d / r)^2)^2 so influence fades smoothly to zero at r
+    const nbMap = new Map(), NH = VEHICLE.flex.brush;
     const nbKey = (x, y, z) => (Math.floor(x / NH) + 256) + 512 * ((Math.floor(y / NH) + 256) + 512 * (Math.floor(z / NH) + 256));
     for (let f = 0; f < sim.nFlex; f++) {
       const i = (sim.fStart + f) * 3, key = nbKey(R[i], R[i + 1], R[i + 2]);
@@ -2013,11 +2067,14 @@ function physicsLib() {
           if (g === f || sim.part[sim.fStart + g] !== p) continue;
           const j = (sim.fStart + g) * 3, d = Math.hypot(R[j] - x, R[j + 1] - y, R[j + 2] - z);
           const dot = sim.fNrm[f * 3] * sim.fNrm[g * 3] + sim.fNrm[f * 3 + 1] * sim.fNrm[g * 3 + 1] + sim.fNrm[f * 3 + 2] * sim.fNrm[g * 3 + 2];
-          if (d < 0.22 && dot > 0.3) found.push([g, d]);
+          if (d < NH && dot > 0.3) found.push([g, d]);
         }
       }
       found.sort((a, b) => a[1] - b[1]);
-      for (let k = 0; k < Math.min(4, found.length); k++) sim.fNb[f * 4 + k] = found[k][0];
+      for (let k = 0; k < Math.min(BRUSH, found.length); k++) {
+        const q = found[k][1] / NH;
+        sim.fBrN[f * BRUSH + k] = found[k][0]; sim.fBrW[f * BRUSH + k] = (1 - q * q) * (1 - q * q);
+      }
     }
 
     // --- suspension: preload so the model pose is the static ride height; dampers sized to the corner mass
@@ -2253,14 +2310,16 @@ function physicsLib() {
       const inBay = m.cat === 'rigid' && m.part === P_CHASSIS && !m.spinAxis && c[2] > this.meta.cowlZ - 0.05;
       if ((m.cat === 'panel' || m.cat === 'nosample' || inBay) && hasFlex) {
         const K = 4, fid = new Int32Array(nv * K), phi = new Float32Array(nv * K), off = new Float32Array(nv * K * 3);
-        const tmp = [[0, 0], [0, 0], [0, 0], [0, 0]], R = sim.rest, fs = sim.fStart, Nr = m.N;
+        const tmp = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]], R = sim.rest, fs = sim.fStart, Nr = m.N;
         const uses = new Uint8Array(sim.nFlex);
         for (let v = 0; v < nv; v++) {
           const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
-          if (inBay) this.nearestFlex(m.part, x, y, z, K, tmp, 0, 0, 0);
-          else this.nearestFlex(m.part, x, y, z, K, tmp, Nr[v * 3], Nr[v * 3 + 1], Nr[v * 3 + 2]);
+          if (inBay) this.nearestFlex(m.part, x, y, z, K + 1, tmp, 0, 0, 0);
+          else this.nearestFlex(m.part, x, y, z, K + 1, tmp, Nr[v * 3], Nr[v * 3 + 1], Nr[v * 3 + 2]);
+          // weights fade to zero at the fifth-nearest flexnode, so neighbouring vertices never jump between sets
+          const dmax = tmp[K][1] + 1e-6;
           let ws = 0;
-          for (let k = 0; k < K; k++) { const w = 1 / (tmp[k][1] * tmp[k][1] + 0.045 * 0.045); phi[v * K + k] = w; ws += w; }
+          for (let k = 0; k < K; k++) { const w = (1 - Math.min(1, tmp[k][1] / dmax)) ** 2 + 1e-6; phi[v * K + k] = w; ws += w; }
           for (let k = 0; k < K; k++) {
             const f = tmp[k][0], i = (fs + f) * 3, o = (v * K + k) * 3;
             phi[v * K + k] /= ws; fid[v * K + k] = f; uses[f] = 1;
@@ -2269,7 +2328,7 @@ function physicsLib() {
         }
         item.mode = 'skin';
         this.skins.push({ fid, phi, off, restP: P, restN: Nr, refN: new Float32Array(nv * 3), nrm: new Float32Array(nv * 3), index: m.I,
-          dented: false, nv, frame: 0, folds: m.cat === 'panel', uses, item });
+          dented: false, nv, frame: 0, folds: m.cat === 'panel', ph: 0.4 + 1.7 * m.part, uses, item });
         return item;
       }
       if (m.cat === 'axle' && sim.wheels.length === 4) {
@@ -2294,34 +2353,38 @@ function physicsLib() {
     pack(out, steer) {
       const sim = this.sim;
       sim.syncVisualState();
-      const pos = sim.pos, Rt = sim.frameR, fs3 = sim.fStart * 3, ffr = sim.fFrame, AMP = sim.frameAmp, AX = sim.frameAxis, PH = sim.framePhase;
+      const pos = sim.pos, Rt = sim.frameR, FR = sim.fRot, FF = sim.fFold, fs3 = sim.fStart * 3;
       for (const s of this.skins) {
         const po = s.item.offset, no = po + s.nv * 3;
         const { fid, phi, off, restP, restN, refN, nv } = s;
         const recompute = s.dented, folds = s.folds;
         let folded = false;
         for (let v = 0, v3 = 0, v4 = 0, v12 = 0; v < nv; v++, v3 += 3, v4 += 4, v12 += 12) {
-          let px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0, amp = 0;
+          let px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0, a0 = 0, a1 = 0, a2 = 0;
           const n0x = restN[v3], n0y = restN[v3 + 1], n0z = restN[v3 + 2];
           for (let j = 0; j < 4; j++) {
-            const f = fid[v4 + j], w = phi[v4 + j], b = fs3 + f * 3, fr = ffr[f], t = fr * 9, o = v12 + j * 3;
+            const f = fid[v4 + j], w = phi[v4 + j], b = fs3 + f * 3, t = f * 9, f3 = f * 3, o = v12 + j * 3;
             const ox = off[o], oy = off[o + 1], oz = off[o + 2];
-            const r0 = Rt[t], r1 = Rt[t + 1], r2 = Rt[t + 2], r3 = Rt[t + 3], r4 = Rt[t + 4], r5 = Rt[t + 5], r6 = Rt[t + 6], r7 = Rt[t + 7], r8 = Rt[t + 8];
+            const r0 = FR[t], r1 = FR[t + 1], r2 = FR[t + 2], r3 = FR[t + 3], r4 = FR[t + 4], r5 = FR[t + 5], r6 = FR[t + 6], r7 = FR[t + 7], r8 = FR[t + 8];
             px += w * (pos[b] + r0 * ox + r1 * oy + r2 * oz);
             py += w * (pos[b + 1] + r3 * ox + r4 * oy + r5 * oz);
             pz += w * (pos[b + 2] + r6 * ox + r7 * oy + r8 * oz);
             nx += w * (r0 * n0x + r1 * n0y + r2 * n0z);
             ny += w * (r3 * n0x + r4 * n0y + r5 * n0z);
             nz += w * (r6 * n0x + r7 * n0y + r8 * n0z);
-            amp += w * AMP[fr];
+            a0 += w * FF[f3]; a1 += w * FF[f3 + 1]; a2 += w * FF[f3 + 2];
           }
           const l = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
           nx *= l; ny *= l; nz *= l;
-          if (folds && amp > 0.0015) {
-            // accordion folds: ridges across the most squeezed rest axis of the surrounding structure
-            const fr0 = ffr[fid[v4]], ax = AX[fr0], ph = PH[fr0];
-            const wave = Math.sin(restP[v3 + ax] * FOLD_K + ph + 1.1 * Math.sin(restP[v3 + (ax === 1 ? 2 : 1)] * FOLD_K2 + ph * 1.7));
-            px += nx * amp * wave; py += ny * amp * wave; pz += nz * amp * wave;
+          if (folds && a0 + a1 + a2 > 0.0015) {
+            // buckles: long, smooth folds across each squeezed rest axis. The ridges stand proud of the panel
+            // and the troughs sit on it, so a crushed panel pillows outward instead of rippling into spikes.
+            const rx = restP[v3], ry = restP[v3 + 1], rz = restP[v3 + 2], ph = s.ph;
+            let h = 0;
+            if (a0 > 0.0005) h += a0 * (0.5 + 0.5 * Math.sin(rx * FOLD_K + ph + 0.9 * Math.sin(rz * FOLD_K2 + ph)));
+            if (a1 > 0.0005) h += a1 * (0.5 + 0.5 * Math.sin(ry * FOLD_K + 1.3 * ph + 0.9 * Math.sin(rx * FOLD_K2)));
+            if (a2 > 0.0005) h += a2 * (0.5 + 0.5 * Math.sin(rz * FOLD_K + 0.7 * ph + 0.9 * Math.sin(ry * FOLD_K2 + ph)));
+            px += nx * h; py += ny * h; pz += nz * h;
             folded = true;
           }
           out[po + v3] = px; out[po + v3 + 1] = py; out[po + v3 + 2] = pz;
@@ -2329,8 +2392,8 @@ function physicsLib() {
           if (!recompute) { out[no + v3] = nx; out[no + v3 + 1] = ny; out[no + v3 + 2] = nz; }
         }
         if (recompute) {
-          // a dented or folded panel needs real normals (big meshes refresh them every other frame)
-          if (s.frame++ % (nv > 3000 ? 2 : 1) === 0) computeNormalsFast(out.subarray(po, po + nv * 3), s.index, s.nrm, refN);
+          // a dented or folded panel needs real normals (bigger meshes refresh them every second or third frame)
+          if (s.frame++ % (nv > 2500 ? 3 : (nv > 800 ? 2 : 1)) === 0) computeNormalsFast(out.subarray(po, po + nv * 3), s.index, s.nrm, refN);
           out.set(s.nrm, no);
         }
         if (folded) s.dented = true;
@@ -2512,14 +2575,17 @@ function physicsLib() {
     command(op, a) {
       a = a || {};
       if (op === 'reset') { this.reset(); return this.probe(); }
-      if (op === 'place') { this.place(+a.x || 0, +a.z || 0, +a.yaw || 0, +a.speed || 0, +a.y || 0); return this.probe(); }
+      if (op === 'place') { this.place(+a.x || 0, +a.z || 0, +a.yaw || 0, +a.speed || 0, +a.y || 0, a.vel); return this.probe(); }
       if (op === 'run') return this.run(a);
       if (op === 'probe') return this.probe();
+      if (op === 'bench') return this.bench(a.frames || 30);
       throw new Error('unknown command ' + op);
     }
 
-    place(x, z, yaw, speed, dy) {
-      const sim = this.sim, c = Math.cos(yaw), s = Math.sin(yaw), vx = speed * s, vz = speed * c;
+    place(x, z, yaw, speed, dy, vel) {
+      const sim = this.sim, c = Math.cos(yaw), s = Math.sin(yaw);
+      let vx = speed * s, vz = speed * c;
+      if (vel) { vx = +vel[0] || 0; vz = +vel[1] || 0; speed = Math.hypot(vx, vz); }
       for (const arr of [sim.pos, sim.prev]) {
         for (let i = 0; i < sim.nNodes; i++) { const px = arr[i * 3], pz = arr[i * 3 + 2]; arr[i * 3] = x + c * px + s * pz; arr[i * 3 + 1] += dy; arr[i * 3 + 2] = z - s * px + c * pz; }
       }
@@ -2528,7 +2594,7 @@ function physicsLib() {
         if (speed) { sim.vel[i * 3] = vx; sim.vel[i * 3 + 1] = 0; sim.vel[i * 3 + 2] = vz; }
         sim.prev[i * 3] = sim.pos[i * 3] - sim.vel[i * 3] * DT; sim.prev[i * 3 + 1] = sim.pos[i * 3 + 1] - sim.vel[i * 3 + 1] * DT; sim.prev[i * 3 + 2] = sim.pos[i * 3 + 2] - sim.vel[i * 3 + 2] * DT;
       }
-      if (speed) for (const w of sim.wheels) w.omega = speed / w.radius;
+      if (speed) for (const w of sim.wheels) w.omega = (vx * s + vz * c) / w.radius;   // rolling with the heading component
       vehicleState(sim, this.meta, this.state); this.ctrl.fwdSpeed = this.state.speed; this.pv.set(this.state.vel);
     }
 
@@ -2554,6 +2620,22 @@ function physicsLib() {
       const ms = (performance.now() - t0) / Math.max(1, n);
       vehicleState(sim, this.meta, st); this.ctrl.fwdSpeed = st.speed;
       return Object.assign(this.probe(), { msPerStep: +ms.toFixed(4), peakDecelG: +peakDecel.toFixed(2), peakRoll: +peakRoll.toFixed(2), peakPitch: +peakPitch.toFixed(2), trace });
+    }
+
+    // timing of one frame's work: 16 steps and one pack, averaged
+    bench(frames) {
+      const out = new Float32Array(this.layout.floats);
+      let tStep = 0, tPack = 0;
+      for (let k = 0; k < frames; k++) {
+        const t0 = performance.now();
+        this.step(16, null);
+        const t1 = performance.now();
+        this.pack(out, false, 0, 16);
+        tStep += t1 - t0; tPack += performance.now() - t1;
+      }
+      const t2 = performance.now();
+      for (let k = 0; k < frames; k++) this.sim.syncVisualState();
+      return { stepMsPerFrame: +(tStep / frames).toFixed(2), packMs: +(tPack / frames).toFixed(2), syncMs: +((performance.now() - t2) / frames).toFixed(2) };
     }
 
     brief(t) {
@@ -2604,6 +2686,7 @@ function physicsLib() {
         gear: this.ctrl.drive.gear, rpm: Math.round(this.ctrl.drive.rpm),
         detached: sim.parts.filter(p => p.detached).map(p => p.id), ctxs: sim.contexts.length,
         attachBroken: sim.parts.map(P => P.attach.filter(j => sim.broken[j]).length + '/' + P.attach.length).join(' '),
+        brackets: sim.parts.slice(1).map(P => [...new Set(P.attach.map(j => sim.bgroup[j]))].map(g => (sim.groups[g].every(j => sim.broken[j]) ? 'X' : (sim.groups[g].some(j => sim.broken[j]) ? '~' : 'o'))).join('')).join(' '),
         bays, crush: +crush.toFixed(3), bulge: +bulge.toFixed(3), cells, engine: +engine.toFixed(3),
       };
     }
@@ -3498,7 +3581,7 @@ async function main() {
   const canvas = $('view');
   const coarse = matchMedia('(pointer: coarse)').matches;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 1.75));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -3560,12 +3643,16 @@ async function main() {
   composer.addPass(new OutputPass());
   const grade = new ShaderPass(WarmBalanceShader);
   composer.addPass(grade);
+  // touch devices render without MSAA: smooth the edges with FXAA instead
+  const fxaa = coarse ? new ShaderPass(FXAAShader) : null;
+  if (fxaa) composer.addPass(fxaa);
   const resize = () => {
-    const w = window.innerWidth, h = window.innerHeight;
+    const w = window.innerWidth, h = window.innerHeight, pr = renderer.getPixelRatio();
     renderer.setSize(w, h, false);
-    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setPixelRatio(pr);
     composer.setSize(w, h);
-    grade.uniforms.uRes.value.set(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+    grade.uniforms.uRes.value.set(w * pr, h * pr);
+    if (fxaa) fxaa.material.uniforms.resolution.value.set(1 / (w * pr), 1 / (h * pr));
     camera.aspect = w / h; camera.updateProjectionMatrix();
     csm.updateFrustums();
   };

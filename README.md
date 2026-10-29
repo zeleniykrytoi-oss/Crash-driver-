@@ -88,11 +88,26 @@ Crumple-zone beams that are driven into a block are pushed back out of it. The f
 
 **Contacts.** Contacts are position-based. A node is projected out along the contact normal, then Coulomb friction acts on that step's tangential displacement: static while it is within μ times the normal correction, kinetic sliding beyond that. Only the penetration created by this step's own approach may turn into velocity. Anything deeper is eased out without launching the body.
 
-**Flexnodes.** Each awake flexnode is a zero-length XPBD constraint to an affine target in a tetrahedron of its part's structural nodes. Its reaction goes back to those anchors. Shape-matching frames keep the targets sane under crushing.
-- **Dents:** past about 1 cm the flexnode re-anchors, which leaves a permanent dent, and its neighbours take 40 % of the push.
+**Flexnodes (the skin sheet).** Every flexnode follows a smooth blend of the 6 nearest structural nodes of its part (embedded deformation):
+
+- **Node rotations:** each structural node carries its own rotation, shape-matched over itself and its beam neighbours.
+- **Smooth weights:** the weights fade to zero at the next node out, so neighbouring flexnodes always blend almost the same nodes. However hard the structure is crushed, the skin moves as one continuous sheet and can't tear into shards.
+- **Awake flexnodes:** each is a zero-length XPBD constraint to its sheet target, and its reaction goes back to the structural nodes it blends.
+- **Bending:** each step, an awake flexnode's deviation from the sheet is pulled toward its neighbours' deviations. This is the discrete form of the sheet's bending stiffness, so a contact spreads over the panel instead of raising a spike.
+- **Dents:** deviation past about 1 cm becomes a permanent rest-space offset. Surface neighbours within 24 cm take a smoothly falling share of it, so the patch sets together as one bowl or crease.
 - **Sleeping:** flexnodes are kinematic and cost nothing until something touches them.
 
-**Detaching parts.** Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door and Hood. Each hangs on brackets of attachment beams. Once every attachment beam of a part has failed, the part moves into its own simulation context, keeps deforming, and goes to sleep once it comes to rest.
+**Detaching parts.** Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door and Hood. Each hangs on named brackets of attachment beams:
+
+| Part | Brackets |
+| --- | --- |
+| Doors | upper hinge, lower hinge, latch |
+| Hood | left hinge, right hinge, latch |
+| Bumpers | one per bolt |
+
+- **Bracket failure:** a bracket lets go as a unit after losing half its beams (a hood latch after its first). Failures stay local, so a door whose upper hinge and latch tear off swings and hangs on its lower hinge.
+- **Load sharing:** each failed bracket leaves the part's remaining brackets carrying its load, and their break limits drop. A moderate hit leaves a part hanging; a severe one tears it free as one panel.
+- **Free parts:** a part with no brackets left moves into its own simulation context with exactly the momentum it had, keeps deforming, and goes to sleep once it comes to rest.
 
 ## Vehicle dynamics
 
@@ -118,9 +133,10 @@ Laterally and fore-aft the hub is held by a stiff link that bends plastically in
 - **Lighting:**
   - **Sun:** a directional light with cascaded shadow maps. The nearest cascade covers only about 11 m around the car, which gives sharp contact shadows under the chassis.
   - **Fill:** a hemisphere sky-bounce light, with image-based reflections from the sky. There is no flat ambient light.
-  - **Post:** an HDR render goes through a light bloom and ACES tone mapping.
+  - **Post:** an HDR render goes through a light bloom and ACES tone mapping. Desktop renders with 4× MSAA; touch devices use FXAA.
 - **Materials:** physically based. Clearcoat sand paint, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, a dark radiator with a micro-grid texture, and chrome bumpers. The ground is a clean grey checker gridmap.
-- **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated by the shape-matching frames. Accordion pleats appear where a frame has been permanently squeezed. Normals are recomputed once a panel is dented.
+- **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams.
+- **Buckles:** sheet metal can't shorten, so where the structure is squeezed along an axis, the skin takes up the slack in long (0.5 m), outward-standing buckles of height (λ/π)·√(1/r − 1). Normals are recomputed once a panel is dented or buckled.
 - **Rigid parts:** the engine and gearbox meshes ride on their blocks. Radiator and suspension parts in the engine bay are skinned to the structure.
 - **Wheels:** the stock GLTF wheels are measured and removed. The generated wheels (tyre, rim, instanced lug nuts, disc and caliper) spin, steer, and squash where the probes report compression.
 
