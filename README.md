@@ -11,7 +11,7 @@ python3 -m http.server 8000
 # open http://localhost:8000/
 ```
 
-`index.html` is self-contained. When it can fetch `models/gavril_d/scene.gltf` it uses that truck. When it can't (for example when opened from `file://`), it builds a procedural placeholder pickup with the same part names and runs the same pipeline. Load another model with `?model=path/to/vehicle.gltf`.
+`index.html` is self-contained. When it can fetch `models/gavril_d/scene.glb` it uses that truck. When it can't (for example when opened from `file://`), it builds a procedural placeholder pickup with the same part names and runs the same pipeline. Load another model with `?model=path/to/vehicle.glb` (`.gltf` works too).
 
 ## Controls
 
@@ -63,4 +63,4 @@ The generated wheel mesh (tyre, steel rim, disc and caliper) rotates by the inte
 
 ## Vehicle model and licence
 
-`models/gavril_d/` contains "Gavril_D_ Beamng" by [akhikavi7](https://sketchfab.com/akhikavi7), from [Sketchfab](https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5), licensed CC-BY-4.0 (see `models/gavril_d/license.txt`). The in-game HUD shows the same credit.
+`models/gavril_d/scene.glb` is "Gavril_D_ Beamng" by [akhikavi7](https://sketchfab.com/akhikavi7), from [Sketchfab](https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5), licensed CC-BY-4.0 (see `models/gavril_d/license.txt`), repacked losslessly from the original `.gltf` + `.bin` into a single GLB. The in-game HUD shows the same credit.
