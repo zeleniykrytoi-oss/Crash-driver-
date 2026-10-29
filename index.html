@@ -74,6 +74,8 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 .tog i { font-style: normal; color: var(--accent); margin-left: 4px; }
 .tog[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .tog[aria-pressed="true"] i { color: var(--accent-ink); }
+.zoom { display: flex; gap: 6px; }
+.zbtn { width: 40px; height: 36px; padding: 0; font-size: 22px; line-height: 1; }
 
 /* --- settings panel (flows under the toggles in the tools column) --- */
 .settings { width: 300px; max-width: calc(100vw - 2 * var(--edge) - var(--safe-l) - var(--safe-r)); box-sizing: border-box; padding: 10px 12px 12px; background: rgba(22, 16, 8, 0.82); border: 1px solid var(--panel-edge); border-radius: 3px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); pointer-events: auto; z-index: 2; }
@@ -194,7 +196,12 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
       <button id="btnCam" class="tog" type="button">CAM<i id="camName">CHASE</i></button>
       <button id="btnNodes" class="tog" type="button" aria-pressed="false">F-NODES</button>
       <button id="btnSlow" class="tog" type="button" aria-pressed="false">SLOW-MO<i>×20</i></button>
+      <button id="btnLights" class="tog" type="button" aria-pressed="false">LIGHTS</button>
       <button id="btnSettings" class="tog" type="button" aria-expanded="false" aria-controls="settings">SETTINGS</button>
+    </div>
+    <div class="zoom">
+      <button id="btnZoomIn" class="tog zbtn" type="button" aria-label="Zoom in">+</button>
+      <button id="btnZoomOut" class="tog zbtn" type="button" aria-label="Zoom out">−</button>
     </div>
     <section id="settings" class="settings" hidden aria-label="Settings">
       <div class="set-head"><span>SETTINGS</span><button id="btnSetClose" class="set-x" type="button" aria-label="Close settings">×</button></div>
@@ -225,7 +232,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
     <div class="credit" id="credit">Vehicle model: “Gavril_D_ Beamng” by <a href="https://sketchfab.com/akhikavi7" target="_blank" rel="noopener">akhikavi7</a>, <a href="https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5" target="_blank" rel="noopener">Sketchfab</a>, CC-BY-4.0</div>
   </div>
 
-  <p class="keys">W/S or ↑/↓ throttle · brake (hold at a stop to reverse) · A/D or ←/→ steer · R reset · C camera · N f-node view · T slow-mo · G settings</p>
+  <p class="keys">W/S or ↑/↓ throttle · brake (hold at a stop to reverse) · A/D or ←/→ steer · R reset · C camera · +/− or wheel zoom · L lights · N f-node view · T slow-mo · G settings</p>
 
   <div class="pad pad-steer">
     <button class="ctl steer" type="button" data-ctl="left" aria-label="Steer left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></button>
@@ -356,8 +363,8 @@ function physicsLib() {
       crumple: { K: 1.5e7, Py: 2.4e5, floor: 0.45, ceil: 1.4 },
       cab:     { K: 1.5e7, Py: 6.0e5, floor: 0.6, ceil: 1.2 },
       rear:    { K: 1.5e7, Py: 2.4e5, floor: 0.45, ceil: 1.4 },
-      hood:    { K: 3.0e6, Py: 8.0e4, floor: 0.35, ceil: 1.8 },
-      door:    { K: 4.0e6, Py: 6.0e4, floor: 0.4, ceil: 1.5 },
+      hood:    { K: 1.0e6, Py: 8.0e4, floor: 0.35, ceil: 1.8 },   // flat panel cells on light nodes: soft enough for the substep
+      door:    { K: 1.2e6, Py: 6.0e4, floor: 0.4, ceil: 1.5 },
       bumper:  { K: 4.0e6, Py: 6.0e4, floor: 0.4, ceil: 1.5 },
     },
     densify: 0.32,   // crushed below 32 % of its length a beam is packed metal: no further plastic flow
@@ -379,11 +386,12 @@ function physicsLib() {
   const ED_K = 6;                   // structural nodes blended by each flexnode (embedded deformation)
   const BRUSH = 10;                 // surface neighbours a flexnode shares its dents with
   const TEAR = 1.8;                 // a skin triangle edge stretched past this factor tears open
-  const SHEET_BUDGET = 800;         // most flexnodes woken by crumpling at once (contacts always wake)
+  const SHEET_BUDGET = 500;         // most flexnodes woken by crumpling at once (contacts always wake)
   const STATS = 48;                 // floats in the per-frame stats block
   const CRUMPLE = stepsIn(0.04);    // skin over structure that flowed plastically this recently counts as crumpling
   const SETTLE = stepsIn(0.2);      // an awake flexnode untouched this long settles and sleeps
   const CALM = stepsIn(0.04);       // ... or one calm for this long
+  const NORMAL_BUDGET = 20000;      // triangles of dented panels whose normals are recomputed per frame
   const PLEAT = 0.24;               // rest wavelength of the accordion pleats in a crushed bay (m)
   const PLEAT_GAIN = 1.4;           // pleat depth over the inextensible-sheet value, so the folds read clearly
 
@@ -676,6 +684,7 @@ function physicsLib() {
       this.fAge = new Uint16Array(NN);                  // steps since the flexnode was last touched or crumpled
       this.fBent = new Uint8Array(NN);
       this.fNrm = new Float32Array(NN * 3);             // rest surface normal at each flexnode
+      this.fReach = new Float32Array(NN);               // furthest a flexnode's target can sit from its dominant node (plus its dent)
       this.fp = [];
       this.frames = []; this.frameR = null; this.fRot = null;
       this.clusters = []; this.parts = []; this.contexts = []; this.wheels = [];
@@ -909,20 +918,34 @@ function physicsLib() {
         const a = ba[j], b = bb[j];
         bk[j] = 0.4 / DT2 * Math.min(mass[a] / deg[a], mass[b] / deg[b]);
       }
-      // stability guard: a Gershgorin bound on each node's highest spring frequency. A node past
-      // omega * dt = 1.6 has its beams softened to fit (the stock truck stays below 1; this is the safety
-      // net for other models).
-      const lam = new Float64Array(this.nNodes), lim = (1.6 / DT) ** 2;
+      // stability guard: a Gershgorin bound on each node's highest spring frequency, from its beams and the
+      // pressure stiffness of its volume cells. A node past omega * dt = 1.6 has its beams softened to fit
+      // (a safety net for other models: the stock truck stays at or below it). Work hardening may stiffen a
+      // beam only into the headroom below 1.3, well under the undamped limit of 2, which leaves room for the
+      // dampers (at a damping ratio of 0.35 symplectic Euler is stable only up to about 1.42).
+      const lam = new Float64Array(this.nNodes), lim = (1.6 / DT) ** 2, limHard = (1.3 / DT) ** 2;
       for (let j = 0; j < nb; j++) {
         const a = ba[j], b = bb[j];
         if (!(mass[a] > 0 && mass[b] > 0)) continue;
         const x = 1 / Math.sqrt(mass[a] * mass[b]);
         lam[a] += bk[j] * (1 / mass[a] + x); lam[b] += bk[j] * (1 / mass[b] + x);
       }
+      for (const c of this.cells) {
+        // a cell is a rank-one stiffness kv g g^T over its corners (g = the volume gradient): its own
+        // frequency is exactly kv sum(|g_j|^2 / m_j), which every corner carries on top of its beams
+        this.cellGrad(c, this.rest);
+        const N = c.nodes, g = c.g;
+        let w2 = 0;
+        for (let k = 0; k < N.length; k++) if (mass[N[k]] > 0) w2 += (g[k * 3] ** 2 + g[k * 3 + 1] ** 2 + g[k * 3 + 2] ** 2) / 36 / mass[N[k]];
+        for (let k = 0; k < N.length; k++) lam[N[k]] += c.kv * w2;
+      }
       this.wdtMax = 0;
       for (let i = 0; i < this.nNodes; i++) this.wdtMax = Math.max(this.wdtMax, Math.sqrt(lam[i]) * DT);
-      // ... and the headroom left is how far a beam may stiffen as it work-hardens
-      for (let j = 0; j < nb; j++) { const r = Math.max(lam[ba[j]], lam[bb[j]]) / lim; if (r > 1) bk[j] /= r; this.bKcap[j] = r > 1 ? 1 : (r > 0 ? 1 / r : 1); }
+      for (let j = 0; j < nb; j++) {
+        const l = Math.max(lam[ba[j]], lam[bb[j]]);
+        if (l > lim) bk[j] *= lim / l;
+        this.bKcap[j] = l > 0 ? Math.max(1, limHard / l) : 1;
+      }
       for (let j = 0; j < nb; j++) {
         const w = inv[ba[j]] + inv[bb[j]];
         this.bc[j] = w > 0 ? 2 * this.bz[j] * Math.sqrt(bk[j] / w) : 0;
@@ -1293,6 +1316,13 @@ function physicsLib() {
             wake = wy > 0.35 && this.nActive < SHEET_BUDGET;
           }
           if (!wake && !nearObstacle) continue;
+          if (!wake) {
+            // cheap test first: the target lies within reach of its dominant structural node, so one clearly
+            // away from the ground and every obstacle needs no sheet target
+            const b = f * ED_K, n0 = N[b] * 3, D = this.fDent, f3 = f * 3;
+            const reach = this.fReach[f] + Math.sqrt(D[f3] * D[f3] + D[f3 + 1] * D[f3 + 1] + D[f3 + 2] * D[f3 + 2]);
+            if (pos[n0 + 1] - reach > 0.025 && !world.insideMargin(pos[n0], pos[n0 + 1], pos[n0 + 2], 0.025 + reach, C.cols, C.nCols)) continue;
+          }
           this.flexTarget(f, T);
           if (wake || T[1] < 0.025 || world.insideMargin(T[0], T[1], T[2], 0.025, C.cols, C.nCols)) this.activate(f, T[0], T[1], T[2]);
         }
@@ -2388,6 +2418,16 @@ function physicsLib() {
         const n = sim.addNode(pts[s], pts[s + 1], pts[s + 2], mFlex, NODE_FLEX, p);
         const f = n - sim.fStart;
         edBind(cand, pts[s], pts[s + 1], pts[s + 2], f);
+        // reach: the target is a blend of node positions plus rotated offsets, so it never sits further from the
+        // dominant node than the furthest blended node plus the longest offset (with 30 % for stretch)
+        let spread = 0, off = 0;
+        const b = f * ED_K, n0 = sim.edN[b];
+        for (let k = 0; k < ED_K; k++) {
+          const c = sim.edN[b + k], o = (b + k) * 3;
+          spread = Math.max(spread, Math.hypot(R[c * 3] - R[n0 * 3], R[c * 3 + 1] - R[n0 * 3 + 1], R[c * 3 + 2] - R[n0 * 3 + 2]));
+          off = Math.max(off, Math.hypot(sim.edO[o], sim.edO[o + 1], sim.edO[o + 2]));
+        }
+        sim.fReach[f] = 1.3 * spread + off + 0.02;
         sim.fNrm[f * 3] = smp.nrm[s]; sim.fNrm[f * 3 + 1] = smp.nrm[s + 1]; sim.fNrm[f * 3 + 2] = smp.nrm[s + 2];
         for (let k = 0; k < ED_K; k++) sim.mass[sim.edN[f * ED_K + k]] += mFlex * sim.edW[f * ED_K + k];   // lumped while kinematic
       }
@@ -2707,7 +2747,7 @@ function physicsLib() {
           rest2[t * 3 + e] = (P[b] - P[a]) ** 2 + (P[b + 1] - P[a + 1]) ** 2 + (P[b + 2] - P[a + 2]) ** 2;
         }
         this.skins.push({ fid, phi, off, restP: P, restN: Nr, refN: new Float32Array(nv * 3), nrm: new Float32Array(nv * 3), index, index0: index.slice(),
-          rest2, torn: new Uint8Array(nt), dented: false, nv, frame: 0, panel: m.cat === 'panel', part: m.part, meshIndex, uses, item, pw: null, pb: null, pt: null, pz: null });
+          rest2, torn: new Uint8Array(nt), dented: false, nv, frame: 0, nrmFrame: -1, nrmValid: false, panel: m.cat === 'panel', part: m.part, name: m.name, meshIndex, uses, item, pw: null, pb: null, pt: null, pz: null });
         return item;
       }
       if (m.cat === 'axle' && sim.wheels.length === 4) {
@@ -2726,7 +2766,7 @@ function physicsLib() {
       return item;
     }
 
-    reset() { for (const s of this.skins) { s.dented = false; s.frame = 0; s.index.set(s.index0); s.torn.fill(0); } this.tears.length = 0; this.frontCrush = 0; }
+    reset() { for (const s of this.skins) { s.dented = false; s.frame = 0; s.nrmValid = false; s.index.set(s.index0); s.torn.fill(0); } this.tears.length = 0; this.frontCrush = 0; }
 
     // Accordion pleats. A crushed bay can't shorten its sheet metal, so the fenders, the wheel tubs and the
     // body's sides ahead of the cowl fold into sharp pleats across the bay: flat facets between creases, a
@@ -2746,7 +2786,7 @@ function physicsLib() {
         zc[i] = (st[i].z + st[i + 1].z) / 2; this.pFront[i] = zc[i] > cowl ? 1 : 0;
       }
       for (const s of this.skins) {
-        if (!s.panel || s.part !== P_CHASSIS) continue;
+        if (!s.panel || s.part !== P_CHASSIS || /frame/.test(s.name)) continue;   // the chassis frame sits under the truck
         const nv = s.nv, P = s.restP, N = s.restN, pw = new Float32Array(nv), pb = new Uint8Array(nv), pt = new Float32Array(nv), pz = new Float32Array(nv);
         let any = false;
         for (let v = 0; v < nv; v++) {
@@ -2830,7 +2870,12 @@ function physicsLib() {
       sim.syncVisualState();
       const pos = sim.pos, Rt = sim.frameR, FR = sim.fRot, fs3 = sim.fStart * 3;
       const pleating = this.bayCompression(), Rb = this.pRb, PA = PLEAT_GAIN * PLEAT / 4;
-      for (const s of this.skins) {
+      let nrmBudget = NORMAL_BUDGET;
+      this.frames = (this.frames || 0) + 1;
+      // start the normals budget at a different panel each frame, so every dented panel gets its turn
+      const S = this.skins, start = this.frames % S.length;
+      for (let k = 0; k < S.length; k++) {
+        const s = S[(start + k) % S.length];
         const po = s.item.offset, no = po + s.nv * 3;
         const { fid, phi, off, restP, restN, refN, nv } = s;
         const plW = pleating ? s.pw : null, plB = s.pb, plT = s.pt, plS = s.pz;
@@ -2861,9 +2906,15 @@ function physicsLib() {
           if (!recompute) { out[no + v3] = nx; out[no + v3 + 1] = ny; out[no + v3 + 2] = nz; }
         }
         if (recompute) {
-          // a dented or folded panel needs real normals (bigger meshes refresh them every second or third frame)
-          if (s.frame++ % (nv > 2500 ? 3 : (nv > 800 ? 2 : 1)) === 0) computeNormalsFast(out.subarray(po, po + nv * 3), s.index, s.nrm, refN);
-          out.set(s.nrm, no);
+          // A dented or folded panel needs real normals. They are recomputed under a per-frame triangle
+          // budget, the panels taking turns (a crash dents many panels at once), and a panel that hasn't had
+          // its turn yet shows its rotated rest normals.
+          s.frame++;
+          if (nrmBudget > 0 && s.nrmFrame !== this.frames) {
+            computeNormalsFast(out.subarray(po, po + nv * 3), s.index, s.nrm, refN);
+            s.nrmFrame = this.frames; s.nrmValid = true; nrmBudget -= s.index.length / 3;
+          } else if (!s.nrmValid) out.set(refN, no);
+          if (s.nrmValid) out.set(s.nrm, no);
           if (s.panel && !plW && (s.frame & 3) === 1) this.tearCheck(s, out, po);   // pleats lengthen triangles on purpose
         }
       }
@@ -2940,7 +2991,23 @@ function physicsLib() {
       L.wheels = o; L.wheelStride = 16 + 1 + 2 * VEHICLE.wheel.rays + 4; o += sim.wheels.length * L.wheelStride;
       for (const it of this.binder.items) { it.offset = o; o += it.mode === 'skin' ? it.nv * 6 : 16; }
       L.floats = o;
+      this.warmUp();
       return this.summary();
+    }
+
+    // JIT warm-up: one short crash into the first wall, skinned for a few frames, then a full reset. Every
+    // crash code path (plastic flow, fracture, waking skin, dents, pleats, normals) is compiled before the
+    // first real impact, whose first frames would otherwise run unoptimised and stall the picture.
+    warmUp() {
+      const sim = this.sim, wall = this.world.cols.find(c => c.type === 0);
+      if (!wall) return;
+      let front = -1e9;
+      for (let i = 0; i < sim.fStart; i++) front = Math.max(front, sim.rest[i * 3 + 2]);
+      this.place((wall.x0 + wall.x1) / 2, wall.z0 - front - 0.3, 0, 13, 0);
+      const out = new Float32Array(this.layout.floats);
+      for (let k = 0; k < 12; k++) { this.step(40, null); this.pack(out, false, 0, 40); }
+      this.reset();
+      this.events = [];
     }
 
     summary() {
@@ -2961,17 +3028,20 @@ function physicsLib() {
 
     setInput(inp) { const i = this.ctrl.input; i.throttle = +inp.throttle || 0; i.brake = +inp.brake || 0; i.steer = +inp.steer || 0; }
 
-    step(n, inp) {
-      const sim = this.sim, st = this.state;
+    // Run up to n substeps; with a budget (ms) the batch stops early once it has used that much time, so
+    // one heavy batch can't hold a frame back. Returns the number of substeps run.
+    step(n, inp, budget) {
+      const sim = this.sim, st = this.state, t0 = budget ? performance.now() : 0;
       if (inp) this.setInput(inp);
       n = Math.max(0, Math.min(n | 0, MAX_STEPS));
       for (let i = 0; i < n; i++) {
         sim.step();
         if ((sim.steps & 15) === 0) { vehicleState(sim, this.meta, st); this.ctrl.fwdSpeed = st.speed; }
+        if (budget && (i & 3) === 3 && performance.now() - t0 > budget) { n = i + 1; break; }
       }
       vehicleState(sim, this.meta, st);
       this.ctrl.fwdSpeed = st.speed;
-      if (!Number.isFinite(st.cm[0] + st.cm[1] + st.cm[2]) || st.cm[1] < -25) { this.reset(); this.events.push({ kind: 'reset', text: 'SIMULATION RESET' }); return; }
+      if (!Number.isFinite(st.cm[0] + st.cm[1] + st.cm[2]) || st.cm[1] < -25) { this.reset(); this.events.push({ kind: 'reset', text: 'SIMULATION RESET' }); return n; }
       for (const e of sim.events) this.events.push(e);
       sim.events.length = 0;
       if (sim.nBroken - this.lastBroken >= 8) { this.events.push({ kind: 'break', text: 'STRUCTURAL FAILURE · ' + (sim.nBroken - this.lastBroken) + ' BEAMS' }); this.lastBroken = sim.nBroken; }
@@ -2984,6 +3054,7 @@ function physicsLib() {
         this.gLat += ((ax * st.left[0] + ay * st.left[1] + az * st.left[2]) - this.gLat) * a;
         pv.set(v);
       }
+      return n;
     }
 
     drainEvents() {
@@ -3246,12 +3317,12 @@ function workerMain(LIB) {
         self.postMessage({ type: 'ready', summary: core.init(m.data) });
       } else if (m.cmd === 'step') {
         const t0 = performance.now();
-        core.step(m.steps, m.input);
+        const done = core.step(m.steps, m.input, m.budget);
         const t1 = performance.now();
         let buf = m.buf;
         if (!buf || buf.byteLength !== core.layout.floats * 4) buf = new ArrayBuffer(core.layout.floats * 4);
         const f = new Float32Array(buf);
-        core.pack(f, m.debug, t1 - t0, m.steps);
+        core.pack(f, m.debug, t1 - t0, done);
         f[40] = performance.now() - t1;
         self.postMessage({ type: 'frame', buf, events: core.drainEvents() }, [buf]);
       } else if (m.cmd === 'call') {
@@ -3267,13 +3338,14 @@ const PHYS = physicsLib();   // this thread's copy: constants, the World for the
 const { DT, MAX_STEPS, NODE_FLEX, NODE_TREAD, NODE_HUB, NODE_BLOCK, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR,
   P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, mulberry32 } = PHYS;
 const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a];
+const BATCH_MS = 24;   // a batch of substeps stops early past this much time, so a heavy moment can't hold a frame back
 
 class PhysicsLink {
   constructor() {
     this.worker = null; this.core = null; this.mode = 'main'; this.summary = null;
     this.pool = []; this.busy = false; this.latest = null; this.current = null; this.events = [];
     this.calls = new Map(); this.seq = 0;
-    this.msg = { cmd: 'step', steps: 0, input: null, debug: false, buf: null };
+    this.msg = { cmd: 'step', steps: 0, budget: BATCH_MS, input: null, debug: false, buf: null };
   }
 
   async start(data, allowWorker) {
@@ -3323,9 +3395,9 @@ class PhysicsLink {
       m.buf = null;
     } else {
       const t0 = performance.now();
-      this.core.step(steps, input);
+      const done = this.core.step(steps, input, BATCH_MS);
       const t1 = performance.now(), f = new Float32Array(buf);
-      this.core.pack(f, debug, t1 - t0, steps);
+      this.core.pack(f, debug, t1 - t0, done);
       f[40] = performance.now() - t1;
       this.receive(buf, this.core.drainEvents());
     }
@@ -4124,8 +4196,13 @@ class CameraRig {
   constructor(camera) {
     this.camera = camera; this.mode = 0; this.yaw = 0; this.pitch = 0.18; this.dist = 7.5; this.userYaw = 0; this.userPitch = 0; this.idle = 0;
     this.pos = new THREE.Vector3(0, 3, -8); this.look = new THREE.Vector3(); this.names = ['CHASE', 'ORBIT', 'TRACKSIDE'];
-    this.heading = 0;
+    this.heading = 0; this.fovZoom = 1;
     this.target = new THREE.Vector3(); this.desired = new THREE.Vector3();
+  }
+  // Zoom: the chase and orbit cameras move closer / further (2.8-24 m), the trackside camera narrows its lens.
+  zoom(f) {
+    if (this.mode === 2) this.fovZoom = Math.min(1.6, Math.max(0.3, this.fovZoom * f));
+    else this.dist = Math.min(24, Math.max(2.8, this.dist * f));
   }
   snap(state) { this.heading = Math.atan2(state.fwd.x, state.fwd.z); this.update(state, 1, true); }
   update(state, dt, snap = false) {
@@ -4152,7 +4229,7 @@ class CameraRig {
     this.look.lerp(target, snap ? 1 : 1 - Math.exp(-dt * 12));
     cam.position.copy(this.pos);
     cam.lookAt(this.look);
-    if (this.mode === 2) cam.fov += ((this.pos.distanceTo(target) > 40 ? 22 : 45) - cam.fov) * Math.min(1, dt * 2);
+    if (this.mode === 2) cam.fov += ((this.pos.distanceTo(target) > 40 ? 22 : 45) * this.fovZoom - cam.fov) * Math.min(1, dt * 2);
     else cam.fov += (58 - cam.fov) * Math.min(1, dt * 3);
     cam.updateProjectionMatrix();
   }
@@ -4304,7 +4381,7 @@ async function main() {
   if (GFX[params.get('gfx')]) settings.gfx = params.get('gfx');
   if (!TIMES[settings.time]) settings.time = 'day';
   if (!GFX[settings.gfx]) settings.gfx = 'high';
-  let lampLevel = 0, beamLevel = 0;
+  let lampLevel = 0, beamLevel = 0, lightsOn = false;
 
   function applyTime(name) {
     const T = TIMES[name], u = envr.skyMat.uniforms, sun = new THREE.Vector3(...T.sun).normalize();
@@ -4319,14 +4396,23 @@ async function main() {
     // reflections follow the sky
     if (!envCache[name]) envCache[name] = envr.makeEnv();
     for (const mt of litMaterials()) if (mt.envMap) mt.envMap = envCache[name];
-    // lamps: floodlights, headlights (and their glass), tail and parking lights
-    lampLevel = T.lamps; beamLevel = T.beams;
+    // floodlights; the truck's lights switch on by themselves in the evening and at night (L toggles them)
+    lampLevel = T.lamps;
     envr.glowMat.emissiveIntensity = 3.5 * lampLevel;
     document.body.dataset.time = name;
-    mats.headlight.emissiveIntensity = 2.4 + 5 * beamLevel;
-    mats.lens.emissiveIntensity = 0.22 + 1.6 * beamLevel;
-    mats.parking.emissiveIntensity = 0.8 + 1.6 * beamLevel;
-    mats.taillight.emissiveIntensity = 0.8 + 2.4 * beamLevel;
+    setLights(T.beams > 0);
+    needFrame = true;
+  }
+  // Headlights (beams, reflectors and glass), parking and tail lights; in daylight a switched-on beam is
+  // half strength.
+  function setLights(on) {
+    lightsOn = on;
+    beamLevel = on ? (TIMES[settings.time].beams || 0.5) : 0;
+    mats.headlight.emissiveIntensity = on ? 2.4 + 5 * beamLevel : 0.35;
+    mats.lens.emissiveIntensity = on ? 0.22 + 1.6 * beamLevel : 0.04;
+    mats.parking.emissiveIntensity = on ? 0.8 + 1.6 * beamLevel : 0.2;
+    mats.taillight.emissiveIntensity = on ? 0.8 + 2.4 * beamLevel : 0.3;
+    $('btnLights').setAttribute('aria-pressed', String(on));
     updateLights();
     needFrame = true;
   }
@@ -4366,6 +4452,9 @@ async function main() {
     if (e.code === 'KeyN') toggleNodes();
     if (e.code === 'KeyT') toggleSlow();
     if (e.code === 'KeyG') showSettings(panel.hidden);
+    if (e.code === 'KeyL') toggleLights();
+    if (e.code === 'Equal' || e.code === 'NumpadAdd') rig.zoom(0.88);
+    if (e.code === 'Minus' || e.code === 'NumpadSubtract') rig.zoom(1.14);
     if (e.code === 'Escape') showSettings(false);
   });
   window.addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
@@ -4381,16 +4470,27 @@ async function main() {
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   });
   const rig = new CameraRig(camera);
+  // one finger (or the mouse) orbits the camera, two fingers pinch to zoom
   let drag = null;
-  canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* optional */ } });
+  const touchesOnView = new Map();
+  let pinch = 0;
+  const pinchSpan = () => { const [a, b] = [...touchesOnView.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  canvas.addEventListener('pointerdown', (e) => {
+    touchesOnView.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* optional */ }
+    if (touchesOnView.size === 2) { drag = null; pinch = pinchSpan(); } else if (touchesOnView.size === 1) drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  });
   canvas.addEventListener('pointermove', (e) => {
+    const t = touchesOnView.get(e.pointerId);
+    if (t) { t.x = e.clientX; t.y = e.clientY; }
+    if (touchesOnView.size === 2 && pinch > 0) { const d = pinchSpan(); if (d > 10) { rig.zoom(pinch / d); pinch = d; rig.idle = 0; } return; }
     if (!drag || drag.id !== e.pointerId) return;
     rig.userYaw -= (e.clientX - drag.x) * 0.006; rig.userPitch += (e.clientY - drag.y) * 0.004; rig.idle = 0;
     drag.x = e.clientX; drag.y = e.clientY;
   });
-  const endDrag = (e) => { if (drag && drag.id === e.pointerId) drag = null; };
+  const endDrag = (e) => { touchesOnView.delete(e.pointerId); if (touchesOnView.size < 2) pinch = 0; if (drag && drag.id === e.pointerId) drag = null; };
   canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('wheel', (e) => { rig.dist = Math.min(18, Math.max(4.5, rig.dist * (1 + Math.sign(e.deltaY) * 0.08))); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { rig.zoom(1 + Math.sign(e.deltaY) * 0.08); e.preventDefault(); }, { passive: false });
 
   let timeScale = 1;
   const SLOWMO = 0.05;   // 20x slower; still whole 0.5 ms substeps, just fewer of them per frame
@@ -4406,9 +4506,10 @@ async function main() {
 
   // vehicle state and telemetry, read from the stats block of each frame buffer
   const state = { cm: new THREE.Vector3(), vel: new THREE.Vector3(), fwd: new THREE.Vector3(0, 0, 1), left: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0), speed: 0 };
-  const stats = { steps: 0, broken: 0, deformed: 0, active: 0, rpm: 800, gear: 1, solveMs: 0, packMs: 0, gLat: 0, gLon: 0, volLoss: 0, loads: [0, 0, 0, 0], slips: [0, 0, 0, 0] };
+  const stats = { steps: 0, broken: 0, deformed: 0, active: 0, stepRate: 5, rpm: 800, gear: 1, solveMs: 0, packMs: 0, gLat: 0, gLon: 0, volLoss: 0, loads: [0, 0, 0, 0], slips: [0, 0, 0, 0] };
   const readFrame = (f) => {
     stats.steps = f[0]; stats.broken = f[1]; stats.deformed = f[2]; stats.active = f[3];
+    if (f[8] >= 2) stats.stepRate += (f[8] / Math.max(0.05, f[7]) - stats.stepRate) * 0.35;   // substeps per ms of the physics thread
     state.speed = f[4]; stats.rpm = f[5]; stats.gear = f[6];
     stats.solveMs += (f[7] - stats.solveMs) * 0.1; stats.packMs += (f[40] - stats.packMs) * 0.1;
     state.cm.set(f[9], f[10], f[11]); state.vel.set(f[12], f[13], f[14]);
@@ -4427,10 +4528,14 @@ async function main() {
   function cycleCam() { rig.mode = (rig.mode + 1) % 3; rig.userYaw = rig.userPitch = 0; $('camName').textContent = rig.names[rig.mode]; }
   function toggleNodes() { const on = !view.debug; view.setDebug(on); needFrame = true; $('btnNodes').setAttribute('aria-pressed', String(on)); }
   function toggleSlow() { timeScale = timeScale === 1 ? SLOWMO : 1; $('btnSlow').setAttribute('aria-pressed', String(timeScale !== 1)); }
+  function toggleLights() { setLights(!lightsOn); pushFeed(lightsOn ? 'HEADLIGHTS ON' : 'HEADLIGHTS OFF', false); }
   $('btnReset').addEventListener('click', () => doReset());
   $('btnCam').addEventListener('click', cycleCam);
   $('btnNodes').addEventListener('click', toggleNodes);
   $('btnSlow').addEventListener('click', toggleSlow);
+  $('btnLights').addEventListener('click', toggleLights);
+  $('btnZoomIn').addEventListener('click', () => rig.zoom(0.82));
+  $('btnZoomOut').addEventListener('click', () => rig.zoom(1.22));
 
   // settings panel: time of day and graphics, remembered in this browser
   const panel = $('settings');
@@ -4489,14 +4594,18 @@ async function main() {
     steerState.v += Math.max(-dtF * rate, Math.min(dtF * rate, stT - steerState.v));
     input.steer = steerState.v;
 
-    // fixed 0.5 ms substeps: the frame time is split into as many as are due, and the physics thread runs
-    // them while this thread renders the last frame
+    // Fixed 0.5 ms substeps: the frame time is split into as many as are due, and the physics thread runs
+    // them while this thread renders the last frame. A batch never holds more substeps than the physics
+    // thread can run, with its skinning, in about 22 ms (its substep rate is measured from the last
+    // batches), and a backlog beyond that is dropped: a heavy moment such as an impact plays as smooth slow
+    // motion, never as a slideshow of catch-up batches.
     if (hook.paused) acc = 0; else acc += dtF * timeScale;
+    const cap = Math.max(6, Math.min(MAX_STEPS, Math.floor(stats.stepRate * Math.max(8, 22 - stats.packMs))));
     if (!link.busy) {
       let n = Math.floor(acc / DT + 1e-9);
-      if (n > MAX_STEPS) { n = MAX_STEPS; acc = 0; } else acc -= n * DT;
+      if (n > cap) { n = cap; acc = 0; } else acc -= n * DT;
       if (n > 0 || needFrame) { link.step(n, input, view.debug); needFrame = false; stepsWindow += n; }
-    } else if (acc > MAX_STEPS * DT * 2) acc = MAX_STEPS * DT * 2;   // the solver is behind: slow down instead of spiralling
+    } else if (acc > cap * DT) acc = cap * DT;
     stepsT += dtF;
     if (stepsT >= 0.5) { hz = stepsWindow / stepsT; stepsWindow = 0; stepsT = 0; }
 

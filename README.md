@@ -37,6 +37,8 @@ python3 -m http.server 8000
 | Steer | A D / ← → | ◀ ▶ buttons |
 | Reset vehicle | R | RESET VEHICLE |
 | Cycle camera (chase, orbit, trackside) | C | CAM |
+| Zoom in / out | + / − or the mouse wheel | + / − buttons, or pinch on the view |
+| Headlights on / off | L | LIGHTS |
 | f-node debug view | N | F-NODES |
 | Slow motion: 20× slower (×0.05), still whole 0.5 ms substeps | T | SLOW-MO |
 | Settings: time of day and graphics | G (Esc closes) | SETTINGS |
@@ -55,9 +57,13 @@ The HUD shows:
 
 **Worker thread.** Section 2 turns `physicsLib`'s source text into a Blob and starts a Web Worker from it. The main thread sends the model geometry once. After that, each frame it splits the elapsed time into 0.5 ms substeps and sends only how many are due, plus the driver input. The worker then:
 
-1. runs the substeps, at most 120 per frame (a slow device gets slow motion, never a larger step);
+1. runs the substeps;
 2. skins the vehicle;
 3. writes everything into one pooled `Float32Array` and transfers it back.
+
+**Smooth under load.** A batch never holds more substeps than the worker can run, with its skinning, in about 22 ms. The page measures the worker's substep rate from its last batches, and the worker also stops a batch early once it has used 24 ms. A backlog beyond that is dropped. A heavy moment such as an impact (a substep then costs several times more) therefore plays as smooth slow motion for a few hundred milliseconds, never as a slideshow of large catch-up batches. A slow device likewise gets slow motion, never a larger step.
+
+**Warm-up.** At load, behind the loading screen, the worker simulates one short crash into the wall, skins a few frames and resets the truck completely. Every crash code path is compiled before the first real impact; otherwise the first impact's opening frames run unoptimised and stall the picture.
 
 That buffer holds stats, node positions, beam states, wheel matrices and probe depths, skinned vertex positions and normals, and rigid-part matrices. The page points the meshes' `BufferAttribute.array`s straight into it and returns the previous buffer to the pool. Vertex data is never copied or allocated per frame.
 
@@ -74,8 +80,8 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 
 **Stability.** Node positions and velocities live in flat `Float64Array`s. JavaScript does its arithmetic in doubles anyway, and stiff springs need that precision tens of metres from the origin; the buffers sent to the GPU are `Float32Array`s. An explicit spring is only stable while ω·dt < 2 at every node. `finalize()` therefore:
 
-- bounds each node's highest spring frequency (a Gershgorin bound over its beams). The stock truck peaks at ω·dt ≈ 1, and any node past 1.6 has its beams softened to fit, as a safety net for other models;
-- uses the remaining headroom as the most a beam may stiffen while it work-hardens;
+- bounds each node's highest spring frequency: a Gershgorin bound over its beams, plus the exact frequency of each volume cell it belongs to (a cell's pressure stiffness has rank one). Any node past 1.6 has its beams softened to fit, as a safety net for other models;
+- lets a beam stiffen while it work-hardens only into the headroom below ω·dt = 1.3. That keeps room for the dampers: at a damping ratio of 0.35, symplectic Euler is stable only up to about 1.42. Nodes already near the limit, such as the light hood and door lattices, therefore don't stiffen further, which is what used to make a door hanging from one hinge vibrate;
 - sizes the engine and gearbox lattices and the skin springs from their node masses.
 
 **Nodes.**
@@ -112,7 +118,7 @@ Crumple-zone beams that are driven into a block are pushed back out of it. The f
 - **Awake flexnodes:** each hangs on its sheet target with a spring-damper (520 rad/s, half critical damping), and the reaction goes back to the structural nodes it blends. The tie is firm within the surface but only 12 % as stiff along the surface normal, so the sheet springs can buckle a squeezed panel out of its plane.
 - **Sheet mesh:** the panel meshes are clustered into a coarse triangle mesh over the flexnodes. Each of its edges is a stretch spring, which yields plastically and tears past 60 % stretch. Each edge shared by two triangles is a dihedral bending spring (mechanic 1 below). A 27 g flexnode can't carry a very stiff sheet at the substep, so each spring is capped at its share of its nodes' stable frequency.
 - **Dents:** deviation past about 1 cm becomes a permanent rest-space offset. Sleeping surface neighbours within 24 cm take a smoothly falling share of it, so the patch sets together as one bowl or crease.
-- **Sleeping:** a flexnode that has settled, or has been awake for 0.2 s, bakes its dent and goes back to sleep. Sleeping flexnodes are kinematic and cost nothing. At most 800 flexnodes are woken by crumpling at once; contacts always wake them. The wake test runs every second substep (1 kHz), which is enough because its 2.5 cm margin covers 1 ms of travel at crash speed.
+- **Sleeping:** a flexnode that has settled, or has been awake for 0.2 s, bakes its dent and goes back to sleep. Sleeping flexnodes are kinematic and cost nothing. At most 500 flexnodes are woken by crumpling at once; contacts always wake them. The wake test runs every second substep (1 kHz), which is enough because its 2.5 cm margin covers 1 ms of travel at crash speed. A flexnode clearly out of reach of the ground and every obstacle (its distance from its dominant structural node is bounded) is skipped without computing its target.
 
 ## Metal deformation mechanics
 
@@ -184,6 +190,8 @@ The SETTINGS button (or G) opens a panel with two choices. They are remembered i
 
 Each time sets the sky colours, the sun or moon direction, colour and strength, the hemisphere fill, the reflections (re-rendered from that sky), exposure, haze and bloom. At night the HUD text turns light on a dark halo.
 
+The truck's lights switch on by themselves in the evening and at night. LIGHTS (or L) turns them on or off at any time; in daylight a switched-on beam runs at half strength.
+
 **Graphics:**
 
 | Preset | Resolution | Sun shadows | Anti-aliasing | Extras |
@@ -202,7 +210,7 @@ The default is HIGH on desktop and MEDIUM on touch devices.
   - **Fill:** a hemisphere sky-bounce light, with image-based reflections from the sky. There is no flat ambient light.
   - **Post:** an HDR render goes through a light bloom and ACES tone mapping, then MSAA or FXAA depending on the graphics preset.
 - **Materials:** physically based. Clearcoat sand paint, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, a dark radiator with a micro-grid texture, and chrome bumpers. The ground is a clean grey checker gridmap.
-- **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Normals are recomputed once a panel is dented.
+- **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Normals are recomputed once a panel is dented. The panels take turns under a budget of 20,000 triangles per frame, since a crash dents many at once; a panel waiting for its turn shows its rotated rest normals.
 - **Accordion pleats:** a crushed bay can't shorten its sheet metal, so the fenders, wheel tubs and body sides ahead of the cowl fold into sharp pleats across it. The pleats are a triangle wave of 24 cm rest wavelength, standing (λ/4)·√(1 − r²) high (deepened 1.4× so they read clearly) for a bay squeezed to a fraction r of its length. Normals are recomputed, so the folds catch the light.
 - **Torn metal:** triangles of a dented panel that stretch past 1.8× along an edge are removed from the mesh on both the worker and the page, so the panel opens up into strips.
 - **Rigid parts:** the engine and gearbox meshes ride on their blocks. Radiator and suspension parts in the engine bay are skinned to the structure. All the dark mechanical parts ahead of the cowl (engine, manifold, battery and airbox, radiator, front suspension and steering) are hidden once the crumple zone shortens by 3 cm, so a crash never shows them as black shards through the panels.
