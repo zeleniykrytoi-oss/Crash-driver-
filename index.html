@@ -1053,6 +1053,18 @@ async function loadVehicleSource(url, onProgress) {
     const gltf = await loader.loadAsync(url, (e) => { if (e.total) onProgress(e.loaded / e.total); });
     return { root: gltf.scene, source: 'gltf' };
   } catch (err) {
+    // Hosts that only serve text files can carry the same GLB base64-encoded next to it (scene.glb.txt).
+    if (/\.glb$/i.test(url)) {
+      try {
+        const res = await fetch(url + '.txt');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const bin = atob((await res.text()).replace(/\s+/g, ''));
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const gltf = await loader.parseAsync(bytes.buffer, url.slice(0, url.lastIndexOf('/') + 1));
+        return { root: gltf.scene, source: 'gltf' };
+      } catch (err2) { /* fall through to the placeholder */ }
+    }
     console.warn('[crash-driver] GLTF not available (' + url + '), using the procedural placeholder truck.', err);
     return { root: buildPlaceholderTruck(), source: 'placeholder' };
   }
