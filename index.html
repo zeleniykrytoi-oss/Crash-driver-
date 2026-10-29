@@ -341,7 +341,7 @@ function physicsLib() {
   const ED_K = 6;                   // structural nodes blended by each flexnode (embedded deformation)
   const BRUSH = 10;                 // surface neighbours a flexnode shares its dents with
   const TEAR = 1.8;                 // a skin triangle edge stretched past this factor tears open
-  const SHEET_BUDGET = 1000;        // most flexnodes woken by crumpling at once (contacts always wake)
+  const SHEET_BUDGET = 800;         // most flexnodes woken by crumpling at once (contacts always wake)
   const STATS = 48;                 // floats in the per-frame stats block
   const CRUMPLE = stepsIn(0.04);    // skin over structure that flowed plastically this recently counts as crumpling
   const SETTLE = stepsIn(0.2);      // an awake flexnode untouched this long settles and sleeps
@@ -942,7 +942,7 @@ function physicsLib() {
       this.aero();
       this.aeroParts();
       for (let c = 0; c < nc; c++) { const C = ctxs[c]; if (!C.sleeping) { this.beamForces(C); this.cellForces(C.cells); } }
-      this.wakeFlex();
+      if ((this.steps & 1) === 0) this.wakeFlex();   // 1 kHz is enough: the 2.5 cm wake margin covers 1 ms of travel at crash speed
       this.flexForces();
       // 2. integrate (semi-implicit Euler), and gather the obstacles each body's bounding box overlaps
       for (let c = 0; c < nc; c++) {
@@ -1476,7 +1476,7 @@ function physicsLib() {
     // the flexnode. Its surface neighbours take a smoothly falling share of it, so the patch sets together
     // as one smooth bowl or crease instead of single nodes sinking into spikes.
     flexYield(f, dx, dy, dz, d, fp) {
-      const k = 1 - fp.yield / d, M = this._M;
+      const k = 1 - 0.7 * fp.yield / d, M = this._M;   // set back to 70 % of the yield distance, so a lagging node doesn't re-yield every substep
       const wx = -dx * k, wy = -dy * k, wz = -dz * k;     // world-space move of the target toward the node
       this.flexRot(f, M);
       const rx = M[0] * wx + M[3] * wy + M[6] * wz, ry = M[1] * wx + M[4] * wy + M[7] * wz, rz = M[2] * wx + M[5] * wy + M[8] * wz;
