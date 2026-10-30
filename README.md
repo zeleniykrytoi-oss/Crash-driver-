@@ -2,9 +2,9 @@
 
 A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
-- 1060 beams: structural, shear (diagonal) and support;
-- 46 volume cells;
-- a sheet-metal skin of 5592 stretch springs and 3524 dihedral bending springs.
+- 1034 beams: structural, shear (diagonal) and support;
+- 45 volume cells;
+- a sheet-metal skin of 5574 stretch springs and 3458 dihedral bending springs.
 
 In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate, headlights, grille and taillights hang from their hinges, bolts and clips or tear off when their brackets fail; an offset hit leaves the front bumper dangling from one end.
 
@@ -147,7 +147,7 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 - **Rigid blocks:** 8 corner nodes each for the engine and the gearbox.
 - **Hubs:** 4, one per wheel centre.
 - **Tread probes:** 256, a fixed 2 × 32 ring per wheel.
-- **Flexnodes:** 3968 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
+- **Flexnodes:** 3976 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
 
 **Beams.** Each beam is a spring-damper along its axis: F = k·(L − L0) + c·v<sub>rel</sub>, with k = E/L0 and c set by the family's damping ratio. There are three kinds:
 
