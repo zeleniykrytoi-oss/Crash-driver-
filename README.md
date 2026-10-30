@@ -46,6 +46,8 @@ python3 -m http.server 8000
 | Settings: time of day and graphics | G (Esc closes) | SETTINGS |
 | Orbit camera | drag on the view | drag on the view |
 
+The chase camera holds the truck's heading closely, so a hard turn doesn't show the truck from the side as if it slid. Its lens widens a little with speed.
+
 The test bench has a concrete wall 45 m straight ahead of the spawn, a 10° ramp on the left lane and a 22° ramp on the right lane.
 
 The HUD shows:
@@ -63,7 +65,13 @@ The HUD shows:
 2. skins the vehicle;
 3. writes everything into one pooled `Float32Array` and transfers it back.
 
-**Smooth under load.** A batch never holds more substeps than the worker can run in about 40 ms, less its skinning time. The page measures the worker's substep rate from its last batches, and the worker also stops a batch early once it has used 45 ms. A backlog beyond that is dropped. A heavy moment such as an impact (a substep then costs several times more) therefore plays as smooth slow motion for a few hundred milliseconds, never as a slideshow of large catch-up batches. A slow device likewise gets slow motion, never a larger step, and the HUD says by how much. The budget is generous so that a merely busy device still plays in real time.
+**Smooth under load.** A batch never holds more substeps than the worker can run in about 40 ms, less its skinning time. The page measures the worker's substep rate from its last batches, and the worker also stops a batch early once it has used 45 ms. A backlog beyond that is dropped. A heavy moment such as an impact (a substep then costs several times more) therefore plays as smooth slow motion for a few hundred milliseconds, never as a slideshow of large catch-up batches. A slow device likewise gets slow motion, never a larger step, and the HUD says by how much: it counts the substeps the worker actually ran, so a batch cut short shows too. The budget is generous so that a merely busy device still plays in real time.
+
+**Cost.** On a desktop CPU a 60 Hz frame of driving costs the worker about 4 ms: about 2.6 ms for its 33 substeps and about 1.2 ms to skin and pack. That leaves room for devices several times slower to keep real time. Three things keep the substep cheap while nothing is crashing:
+
+- the engine-block contact rejects a beam with one AND of its two ends' slab codes;
+- a skin flexnode clear of the ground isn't tested again until it could have come down to the wake margin;
+- work-hardening factors are cached per beam and recomputed only when the beam flows.
 
 **Warm-up.** At load, behind the loading screen, the worker simulates one short crash into the wall, skins a few frames and resets the truck completely. Every crash code path is compiled before the first real impact; otherwise the first impact's opening frames run unoptimised and stall the picture.
 
@@ -109,7 +117,7 @@ Plasticity and fracture:
 
 **Engine and gearbox.** Each is a lattice of 12 edges, 6 face diagonals and 4 body diagonals, as stiff as the substep allows for their node masses (ω·dt ≈ 0.9). They carry 230 kg and 95 kg on plastic mounts, and the gearbox bolts to the back of the engine.
 
-Crumple-zone beams that are driven into a block are pushed back out of it. The front therefore has to fold up ahead of the engine, and only a hard enough hit shoves the engine back toward the firewall.
+Crumple-zone beams that are driven into a block are pushed back out of it. The front therefore has to fold up ahead of the engine, and only a hard enough hit shoves the engine back toward the firewall. Every substep, each candidate node gets a 6-bit code for which of the box's faces it lies beyond. A beam whose two ends share a bit lies wholly outside the box, which is convex, so only the few left over are sampled.
 
 This contact is inelastic, so it can only take energy out:
 
@@ -127,7 +135,7 @@ An earlier version pushed the whole depth out every step and moved the block as 
 - **Awake flexnodes:** each hangs on its sheet target with a spring-damper (520 rad/s, half critical damping), and the reaction goes back to the structural nodes it blends. The tie is firm within the surface but only 12 % as stiff along the surface normal, so the sheet springs can buckle a squeezed panel out of its plane.
 - **Sheet mesh:** the panel meshes are clustered into a coarse triangle mesh over the flexnodes. Each of its edges is a stretch spring, which yields plastically and tears past 60 % stretch. Each edge shared by two triangles is a dihedral bending spring (mechanic 1 below). A 27 g flexnode can't carry a very stiff sheet at the substep, so each spring is capped at its share of its nodes' stable frequency. A crushed triangle folding nearly flat makes a hinge's stiffness grow like 1/height², so each hinge is held at four times its rest stiffness; without that cap, skin flexnodes were fired off at impact as giant stretched sheets.
 - **Dents:** deviation past about 1 cm becomes a permanent rest-space offset. Sleeping surface neighbours within 24 cm take a smoothly falling share of it, so the patch sets together as one bowl or crease.
-- **Sleeping:** a flexnode that has settled, or has been awake for 0.2 s, bakes its dent and goes back to sleep. Sleeping flexnodes are kinematic and cost nothing. At most 500 flexnodes are woken by crumpling at once; contacts always wake them. The wake test runs every second substep (1 kHz), which is enough because its 2.5 cm margin covers 1 ms of travel at crash speed. A flexnode clearly out of reach of the ground and every obstacle (its distance from its dominant structural node is bounded) is skipped without computing its target.
+- **Sleeping:** a flexnode that has settled, or has been awake for 0.2 s, bakes its dent and goes back to sleep. While only the ground is near, a sleeping flexnode found clear of it is next tested once it could have come down to the 2.5 cm margin, at its structure's sink rate plus 3 m/s. Sleeping flexnodes are kinematic and cost nothing. At most 500 flexnodes are woken by crumpling at once; contacts always wake them. The wake test runs every second substep (1 kHz), which is enough because its 2.5 cm margin covers 1 ms of travel at crash speed. A flexnode clearly out of reach of the ground and every obstacle (its distance from its dominant structural node is bounded) is skipped without computing its target.
 
 ## Metal deformation mechanics
 
@@ -179,7 +187,7 @@ Laterally and fore-aft the hub is held by a stiff link that bends plastically in
 **Tyres.**
 - **Normal force:** the probe ring measures how far the tyre is compressed against the world, which gives the radial force.
 - **Friction:** friction acts at a single contact patch per wheel. The patch deflects with the slip velocity and relaxes over a relaxation length while rolling. That gives slip-ratio and slip-angle forces at speed, and true static friction at a standstill: the truck holds still on the 10° ramp with the brake on.
-- **Friction limit:** the force is capped by a Coulomb limit that falls from the static (peak) value to the kinetic one as slip grows, with load sensitivity. The peak, μ = 0.92 falling to 0.70 sliding, is an all-season light-truck tyre on dry concrete.
+- **Friction limit:** the force is capped by a Coulomb limit that falls from the static (peak) value to the kinetic one as slip grows, with load sensitivity. The peak, μ = 0.92 falling to 0.70 sliding, is an all-season light-truck tyre on dry concrete. Past the peak the grip eases off gently: about 94 % at 11° of slip angle and 88 % at 17°. Only a locked or spinning tyre falls to the sliding value, so a tyre pushed just past its limit recovers instead of letting go like ice.
 - **Spin coupling:** wheel spin is coupled implicitly through the patch damping.
 - **Moments:** the patch moment goes to the body with its full lever arm from the ground, so weight transfer under braking, acceleration and cornering comes out of the geometry.
 
@@ -189,14 +197,14 @@ Laterally and fore-aft the hub is held by a stiff link that bends plastically in
 | --- | --- |
 | Engine | 5.0 L V8, about 245 hp at 4500 rpm, 425 N·m at 3500 rpm, from a torque curve table; rev limiter at 5600 rpm |
 | Gearbox | 4-speed automatic (2.71, 1.54, 1.00, 0.71; reverse 2.18), 3.55 axle |
-| Torque converter | multiplies torque up to its stall speed, which rises with throttle; locks up in 3rd and 4th |
+| Torque converter | multiplies torque (up to 1.6×) below its stall speed, which rises with throttle; locks up in 3rd and 4th |
 | Shift schedule | later upshifts and earlier kickdowns the harder the throttle is pressed |
-| 4WD | 40/60 front/rear torque split, viscous limited-slip axles |
+| 4WD | 40/60 front/rear torque split, a viscous centre coupling and viscous limited-slip axles: a full-throttle launch puts its torque down on all four tyres instead of spinning the rears |
 | Brakes | four-channel ABS |
 | Drag and rolling resistance | CdA 1.45 m², light-truck tyres at 0.015 |
 | Speed limiter | 178 km/h, like a road truck's |
 
-Measured on the bench: 0–100 km/h in 8.0 s (0–60 mph in 7.6 s), 178 km/h on the limiter, and 100–0 km/h braking in about 46 m. Steering uses Ackermann geometry, with about 29° of lock at rest (a 12 m turning circle) and less at speed.
+Measured on the bench: 0–100 km/h in 8.0 s (0–60 mph in 7.6 s), 178 km/h on the limiter, and 100–0 km/h braking in about 44 m. Steady cornering holds about 0.8 g with the body sideslip under 2°. Steering uses Ackermann geometry, with about 29° of lock at rest (a 12 m turning circle) and less at speed.
 
 ## Settings
 
@@ -234,7 +242,8 @@ The default is HIGH on desktop and MEDIUM on touch devices.
   - **Fill:** a hemisphere sky-bounce light, with image-based reflections from the sky. There is no flat ambient light.
   - **Post:** an HDR render goes through a light bloom and ACES tone mapping, then MSAA or FXAA depending on the graphics preset.
 - **Materials:** physically based. Clearcoat sand paint, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, a dark radiator with a micro-grid texture, and chrome bumpers. The ground is a clean grey checker gridmap.
-- **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Normals are recomputed once a panel is dented. The panels take turns under a budget of 20,000 triangles per frame, since a crash dents many at once; a panel waiting for its turn shows its rotated rest normals.
+- **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Each flexnode's map is affine (x → R·x + T), so a vertex needs one blended matrix: (Σ w·R)·v + Σ w·T.
+- **Intact panels:** a panel moving as a rigid body skips skinning altogether. The worker fits one matrix to its flexnodes (their mean rotation and the shift of their centroid), and the page draws the panel's rest geometry under it, uploading no vertices. A panel stays skinned while it is pleated, while any of its flexnodes is awake or dented, or while a flexnode sits more than 7 mm off the fit (16 mm to leave). That covers bent structure, and the frame and doors flexing under hard braking and cornering. An intact truck is drawn almost entirely from matrices. Normals are recomputed once a panel is dented. The panels take turns under a budget of 20,000 triangles per frame, since a crash dents many at once; a panel waiting for its turn shows its rotated rest normals.
 - **Accordion pleats:** a crushed bay can't shorten its sheet metal, so the fenders, wheel tubs and body sides ahead of the cowl fold into sharp pleats across it. The pleats are a triangle wave of 24 cm rest wavelength, standing (λ/4)·√(1 − r²) high (deepened 1.4× so they read clearly) for a bay squeezed to a fraction r of its length. Normals are recomputed, so the folds catch the light.
 - **Torn metal:** triangles of a dented panel that stretch past 1.8× along an edge are removed from the mesh on both the worker and the page, so the panel opens up into strips.
 - **Rigid parts:** the engine and gearbox meshes ride on their blocks. Radiator and suspension parts in the engine bay are skinned to the structure. All the dark mechanical parts ahead of the cowl (engine, manifold, battery and airbox, radiator, front suspension and steering) are hidden once the crumple zone shortens by 3 cm, so a crash never shows them as black shards through the panels.

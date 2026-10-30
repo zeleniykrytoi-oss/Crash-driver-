@@ -375,7 +375,10 @@ function physicsLib() {
   // gives slip-ratio / slip-angle forces at speed and true static friction at a standstill. The force is
   // capped by a Coulomb limit that falls from the static (peak) value to the kinetic one as slip grows.
   const TYRE = {
-    mu: 0.92, kinetic: 0.76, s0: 0.2, vRef: 2.5,   // all-season truck tyres on dry concrete: ~0.85 g braking
+    // all-season truck tyres on dry concrete: ~0.85 g braking. Past the peak the grip eases off gently (about
+    // 94 % of it at 11 degrees of slip angle, 88 % at 17) and only a locked or spinning tyre falls to the
+    // sliding value; a steeper fall-off made a tyre just past its peak let go for good, like ice.
+    mu: 0.92, kinetic: 0.76, s0: 0.35, vRef: 2.5,
     Cx: 14, Cy: 9,                 // longitudinal / cornering stiffness per unit load (per unit slip)
     sigmaX: 0.25, sigmaY: 0.5,     // relaxation lengths, m
     damp: 3.0,                     // low-speed patch damping per unit load, s/m
@@ -663,6 +666,7 @@ function physicsLib() {
       this.bdef = new Float64Array(NB); this.bdefC = new Float64Array(NB);   // yield strain in tension / compression
       this.bSlack = new Float64Array(NB);                                 // support struts: free play before they push
       this.bEp = new Float32Array(NB);                  // accumulated plastic strain (work hardening)
+      this.bHard = new Float32Array(NB).fill(1); this.bH2 = new Float32Array(NB).fill(1);   // its yield and stiffness factors, kept in step with bEp
       this.bScf = new Float32Array(NB).fill(1);         // stress concentration on panel attachments (tearing)
       this.attNb = [];                                  // neighbouring attachment beams of each attachment beam
       this.bbrT = new Float64Array(NB); this.bbrC = new Float64Array(NB); this.bbrP = new Float64Array(NB);
@@ -687,6 +691,7 @@ function physicsLib() {
       this.fBent = new Uint8Array(NN);
       this.fNrm = new Float32Array(NN * 3);             // rest surface normal at each flexnode
       this.fReach = new Float32Array(NN);               // furthest a flexnode's target can sit from its dominant node (plus its dent)
+      this.fNext = new Int32Array(NN);                  // first step at which a flexnode clear of the ground needs its ground test again
       this.fp = [];
       this.frames = []; this.frameR = null; this.fRot = null;
       this.clusters = []; this.parts = []; this.contexts = []; this.wheels = [];
@@ -983,11 +988,11 @@ function physicsLib() {
       this.pos.set(this.rest.subarray(0, n3)); this.prev.set(this.rest.subarray(0, n3));
       this.vel.fill(0, 0, n3); this.frc.fill(0, 0, n3);
       this.L0.set(this.snapshot.L0); this.broken.fill(0); this.nBroken = 0; this.bBreak.fill(0);
-      this.bEp.fill(0); this.bScf.fill(1); this.nodeYield.fill(-1e9);
+      this.bEp.fill(0); this.bHard.fill(1); this.bH2.fill(1); this.bScf.fill(1); this.nodeYield.fill(-1e9); this.lastYield = -1e9;
       if (this.nSE) { this.sL0.set(this.snapshot.sL0); this.sBroken.fill(0); this.sEst.fill(-1); this.fBst.fill(-1); }
       if (this.nSD) { this.sTh0.set(this.snapshot.sTh0); this.sDst.fill(-1); }
       for (const c of this.cells) c.V0 = c.V0o;
-      this.fDent.fill(0); this.fActive.fill(0); this.fCalm.fill(0); this.fBent.fill(0); this.nActive = 0;
+      this.fDent.fill(0); this.fActive.fill(0); this.fCalm.fill(0); this.fBent.fill(0); this.fNext.fill(0); this.nActive = 0;
       for (const fr of this.frames) { fr.q.set([1, 0, 0, 0]); fr.R.set([1, 0, 0, 0, 1, 0, 0, 0, 1]); fr.c.set(fr.C); fr.step = -1; }
       this.wheels.forEach((w, i) => {
         w.w.set(this.snapshot.wheels[i]); w.omega = 0; w.theta = 0; w.steer = 0; w.depth.fill(0); w.bent = 0;
@@ -1114,7 +1119,7 @@ function physicsLib() {
     beamForces(C) {
       const pos = this.pos, vel = this.vel, frc = this.frc, inv = this.inv, ba = this.ba, bb = this.bb, L0 = this.L0, L0o = this.L0o;
       const bk = this.bk, bc = this.bc, kcap = this.bKcap, yT = this.bdef, yC = this.bdefC, Ep = this.bEp, scf = this.bScf, brT = this.bbrT, brC = this.bbrC, brP = this.bbrP;
-      const broken = this.broken, btype = this.btype, slack = this.bSlack, PL = VEHICLE.plastic, DENSE = VEHICLE.densify;
+      const broken = this.broken, btype = this.btype, slack = this.bSlack, PL = VEHICLE.plastic, DENSE = VEHICLE.densify, HD = this.bHard, H2 = this.bH2;
       const iD = 1 / PL.D, iq = 1 / PL.q, st = this.steps, flowMark = 0.3 * DT, list = C.beams;
       let n = C.nb;
       for (let q = 0; q < n;) {
@@ -1143,7 +1148,7 @@ function physicsLib() {
           // hardening raises the yield force by `hard`; a member that has yielded also unloads along a stiffer
           // path (hard^2 (1 + eps_p / epsK), within what the substep allows), so a crushed member stores, and
           // springs back, only a fraction of the elastic strain a fresh one does.
-          const hard = Ep[j] > 0 ? 1 + PL.H * Math.log(1 + Ep[j] / PL.eps0) : 1, h2 = Ep[j] > 0 ? Math.min(hard * hard * (1 + Ep[j] / PL.epsK), kcap[j]) : 1;
+          const hard = HD[j], h2 = H2[j];
           const e = (L - l0) / l0, ys = hard / h2;
           if (e > yT[j] * ys || (e < -yC[j] * ys && L > DENSE * lo)) {
             const y = (e > 0 ? yT[j] : yC[j]) * ys * (1 + Math.pow(Math.abs(vr) / lo * iD, iq));
@@ -1153,7 +1158,8 @@ function physicsLib() {
             if (l0 !== old) {
               const dEp = Math.abs(l0 - old) / lo;
               Ep[j] += dEp; L0[j] = l0;
-              if (dEp > flowMark && Ep[j] > 0.08) this.nodeYield[ia] = this.nodeYield[ib] = st;   // real crumpling, not creep
+              HD[j] = 1 + PL.H * Math.log(1 + Ep[j] / PL.eps0); H2[j] = Math.min(HD[j] * HD[j] * (1 + Ep[j] / PL.epsK), kcap[j]);
+              if (dEp > flowMark && Ep[j] > 0.08) this.nodeYield[ia] = this.nodeYield[ib] = this.lastYield = st;   // real crumpling, not creep
               if (Math.abs(l0 - lo) * (l0 > lo ? sc : 1) > brP[j] * lo) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
             }
           }
@@ -1245,14 +1251,25 @@ function physicsLib() {
     // and pumps energy into a tumbling body.
     collideBlock(bk) {
       this.blockFrame(bk);
-      this.blockFrame(bk, this.prev, bk.cp, bk.Ep);
       const pos = this.pos, prev = this.prev, inv = this.inv, E = bk.E, Ep = bk.Ep, c = bk.c, cp = bk.cp, BN = bk.nodes, K = bk.k;
       const Cn = bk.cands, ba = this.ba, bb = this.bb, broken = this.broken, hx = bk.h[0], hy = bk.h[1], hz = bk.h[2];
+      // which side of the box's slabs each candidate node is on (6 bits): a beam whose two ends are both
+      // beyond the same face can't reach into the box, which is convex, so most beams cost one AND
+      const cn = bk.cn, code = bk.code, CA = bk.ca, CB = bk.cb;
+      let any = false;
+      for (let k = 0; k < cn.length; k++) {
+        const i = cn[k] * 3, px = pos[i] - c[0], py = pos[i + 1] - c[1], pz = pos[i + 2] - c[2];
+        const lx = px * E[0] + py * E[1] + pz * E[2], ly = px * E[3] + py * E[4] + pz * E[5], lz = px * E[6] + py * E[7] + pz * E[8];
+        code[k] = (lx > hx ? 1 : 0) | (lx < -hx ? 2 : 0) | (ly > hy ? 4 : 0) | (ly < -hy ? 8 : 0) | (lz > hz ? 16 : 0) | (lz < -hz ? 32 : 0);
+      }
+      for (let q = 0; q < Cn.length; q++) if ((code[CA[q]] & code[CB[q]]) === 0 && !broken[Cn[q]]) { any = true; break; }
+      if (!any) return;
+      this.blockFrame(bk, this.prev, bk.cp, bk.Ep);
       const z0 = BN[0] * 3, z4 = BN[4] * 3;   // which way the frame's third axis points along the corners' +z bit
       const sz = (pos[z4] - pos[z0]) * E[6] + (pos[z4 + 1] - pos[z0 + 1]) * E[7] + (pos[z4 + 2] - pos[z0 + 2]) * E[8] >= 0 ? 1 : -1;
       for (let q = 0; q < Cn.length; q++) {
         const j = Cn[q];
-        if (broken[j]) continue;
+        if (broken[j] || (code[CA[q]] & code[CB[q]]) !== 0) continue;
         const ia = ba[j], ib = bb[j], a = ia * 3, b = ib * 3;
         if (this.ctxSleeping(this.part[ia])) continue;
         for (let s = 0; s < 4; s++) {
@@ -1316,6 +1333,7 @@ function physicsLib() {
     wakeFlex() {
       const pos = this.pos, N = this.edN, W = this.edW, active = this.fActive, world = this.world;
       const cls = this.clusters, T = this._t;
+      const crashing = this.steps - this.lastYield < CRUMPLE;
       for (let ci = 0; ci < cls.length; ci++) {
         const cl = cls[ci], C = this.ctxOf(cl.part);
         if (C.sleeping) continue;
@@ -1329,14 +1347,24 @@ function physicsLib() {
         }
         // skin over structure that is flowing plastically wakes too: crumpling sheet metal is simulated
         let crumpling = false;
-        for (let q = 0; q < an.length; q++) if (this.steps - this.nodeYield[an[q]] < CRUMPLE) { crumpling = true; break; }
+        if (crashing) for (let q = 0; q < an.length; q++) if (this.steps - this.nodeYield[an[q]] < CRUMPLE) { crumpling = true; break; }
         const pad = cl.pad;
-        const nearObstacle = mny - pad <= 0.03 || world.near(mnx - pad, mny - pad, mnz - pad, mxx + pad, mxy + pad, mxz + pad, C.cols, C.nCols);
+        const nearWall = C.nCols > 0 && world.near(mnx - pad, mny - pad, mnz - pad, mxx + pad, mxy + pad, mxz + pad, C.cols, C.nCols);
+        const nearObstacle = nearWall || mny - pad <= 0.03;
         if (!crumpling && !nearObstacle) continue;
-        const fl = cl.flex;
+        const fl = cl.flex, steps = this.steps, vel = this.vel, NF = this.fNext;
         for (let q = 0; q < fl.length; q++) {
           const f = fl[q];
           if (active[f]) continue;
+          // only the ground near: a flexnode clearly above it is next tested once it could have come down
+          // to the 2.5 cm margin even at its dominant node's sink rate plus 3 m/s (lower panels ride within
+          // a cluster pad of the ground all the time, and testing them all every millisecond was costly)
+          if (!crumpling && !nearWall) {
+            if (steps < NF[f]) continue;
+            const n0 = N[f * ED_K] * 3, D = this.fDent, f3 = f * 3;
+            const clear = pos[n0 + 1] - this.fReach[f] - Math.sqrt(D[f3] * D[f3] + D[f3 + 1] * D[f3 + 1] + D[f3 + 2] * D[f3 + 2]) - 0.025;
+            if (clear > 0) { NF[f] = steps + Math.min(200, Math.floor(clear / ((Math.max(0, -vel[n0 + 1]) + 3) * DT))); continue; }
+          }
           let wake = false;
           if (crumpling) {
             // only flexnodes riding mostly on the crumpling nodes
@@ -1354,6 +1382,7 @@ function physicsLib() {
           }
           this.flexTarget(f, T);
           if (wake || T[1] < 0.025 || world.insideMargin(T[0], T[1], T[2], 0.025, C.cols, C.nCols)) this.activate(f, T[0], T[1], T[2]);
+          else if (!crumpling && !nearWall) NF[f] = steps + Math.min(200, Math.floor((T[1] - 0.025) / ((Math.max(0, -vel[N[f * ED_K] * 3 + 1]) + 3) * DT)));   // its own clearance
         }
       }
     }
@@ -2390,6 +2419,11 @@ function physicsLib() {
         if (clear) cands.push(j);
       }
       bk.cands = Int32Array.from(cands);
+      // the candidates' distinct nodes, and each candidate's two ends as slots in that list
+      const slot = new Map();
+      for (const j of cands) for (const i of [sim.ba[j], sim.bb[j]]) if (!slot.has(i)) slot.set(i, slot.size);
+      bk.cn = Int32Array.from(slot.keys()); bk.code = new Uint8Array(slot.size);
+      bk.ca = Int32Array.from(cands, j => slot.get(sim.ba[j])); bk.cb = Int32Array.from(cands, j => slot.get(sim.bb[j]));
     }
 
     // --- masses: the structure carries what the blocks, hubs, parts and skin don't
@@ -2630,7 +2664,7 @@ function physicsLib() {
       this.lockup = this.gear >= 3 && rpmW > 1300 && accel < 0.92 && this.shiftT <= 0;
       const stall = 1700 + 900 * accel;
       let rpm = Math.max(rpmW, 700), mult = 1, lock = 1;
-      if (!this.lockup && rpmW < stall) { rpm = Math.max(rpmW, 700 + (stall - 700) * accel); mult = 1 + 0.9 * (1 - rpmW / stall); lock = rpmW / stall; }
+      if (!this.lockup && rpmW < stall) { rpm = Math.max(rpmW, 700 + (stall - 700) * accel); mult = 1 + 0.6 * (1 - rpmW / stall); lock = rpmW / stall; }   // stall torque ratio 1.6
       this.rpm += (rpm - this.rpm) * Math.min(1, DT * 9);
       // shift schedule: upshift later and downshift (kickdown) earlier the harder the throttle is pressed
       if (this.shiftT > 0) this.shiftT -= DT;
@@ -2645,10 +2679,15 @@ function physicsLib() {
       // engine braking off throttle
       if (accel < 0.05 && rpmW > 900) Tw -= Math.sign(wavg) * (22 + this.rpm * 0.009) * Math.abs(ratio) * 0.86 / Math.max(n, 1);
       const Ieng = 0.28 * ratio * ratio / Math.max(n, 1) * lock;
+      // viscous centre coupling: the faster axle hands torque to the slower one, so the rear can't spin up on
+      // its own while the front grips (that read as driving on ice at every full-throttle launch)
+      let fo = 0, ro = 0, nf = 0, nr = 0;
+      for (const w of wheels) if (w.drive) { if (w.front) { fo += w.omega; nf++; } else { ro += w.omega; nr++; } }
+      const Tc = nf && nr ? 300 * (ro / nr - fo / nf) : 0;
       for (let i = 0; i < wheels.length; i++) {
         const w = wheels[i];
         const mate = wheels[i ^ 1];   // viscous limited-slip coupling between the two wheels of each axle
-        w.driveT = w.drive ? Tw * (w.front ? 0.8 : 1.2) + 60 * (mate.omega - w.omega) : 0;   // 40 / 60 front / rear
+        w.driveT = w.drive ? Tw * (w.front ? 0.8 : 1.2) + 60 * (mate.omega - w.omega) + (w.front ? Tc / nf : -Tc / nr) : 0;   // 40 / 60 front / rear
         w.Ieff = w.I + (w.drive ? Ieng : 0);
         w.brakeT = brake * (w.front ? 3800 : 2600);
       }
@@ -2800,7 +2839,8 @@ function physicsLib() {
           rest2[t * 3 + e] = (P[b] - P[a]) ** 2 + (P[b + 1] - P[a + 1]) ** 2 + (P[b + 2] - P[a + 2]) ** 2;
         }
         this.skins.push({ fid, phi, off, restP: P, restN: Nr, refN: new Float32Array(nv * 3), nrm: new Float32Array(nv * 3), index, index0: index.slice(),
-          rest2, torn: new Uint8Array(nt), dented: false, nv, frame: 0, nrmFrame: -1, nrmValid: false, panel: m.cat === 'panel', part: m.part, name: m.name, meshIndex, uses, item, pw: null, pb: null, pt: null, pz: null });
+          rest2, torn: new Uint8Array(nt), dented: false, nv, frame: 0, nrmFrame: -1, nrmValid: false, panel: m.cat === 'panel', part: m.part, name: m.name, meshIndex, uses, item, pw: null, pb: null, pt: null, pz: null,
+          fl: Int32Array.from(uses.reduce((a, u, f) => (u && a.push(f), a), [])), rigid: false });
         return item;
       }
       if (m.cat === 'axle' && sim.wheels.length === 4) {
@@ -2921,7 +2961,16 @@ function physicsLib() {
     pack(out, steer) {
       const sim = this.sim;
       sim.syncVisualState();
-      const pos = sim.pos, Rt = sim.frameR, FR = sim.fRot, fs3 = sim.fStart * 3;
+      const pos = sim.pos, Rt = sim.frameR, FR = sim.fRot, fs3 = sim.fStart * 3, RS = sim.rest;
+      // each flexnode's affine map x -> R x + T (T = p - R rest), so a vertex needs one blended matrix:
+      // sum w (p + R (v - rest)) = (sum w R) v + sum w T
+      const nf = sim.nFlex, TT = this.fTT && this.fTT.length === nf * 3 ? this.fTT : (this.fTT = new Float64Array(nf * 3));
+      for (let f = 0, t = 0, b = fs3; f < nf; f++, t += 9, b += 3) {
+        const x = RS[b], y = RS[b + 1], z = RS[b + 2];
+        TT[f * 3] = pos[b] - (FR[t] * x + FR[t + 1] * y + FR[t + 2] * z);
+        TT[f * 3 + 1] = pos[b + 1] - (FR[t + 3] * x + FR[t + 4] * y + FR[t + 5] * z);
+        TT[f * 3 + 2] = pos[b + 2] - (FR[t + 6] * x + FR[t + 7] * y + FR[t + 8] * z);
+      }
       const pleating = this.bayCompression(), Rb = this.pRb, PA = PLEAT_GAIN * PLEAT / 4;
       let nrmBudget = this.normalBudget || NORMAL_BUDGET;
       this.frames = (this.frames || 0) + 1;
@@ -2929,25 +2978,27 @@ function physicsLib() {
       const S = this.skins, start = this.frames % S.length;
       for (let k = 0; k < S.length; k++) {
         const s = S[(start + k) % S.length];
-        const po = s.item.offset, no = po + s.nv * 3;
+        const po = s.item.offset + 17, no = po + s.nv * 3;
         const { fid, phi, off, restP, restN, refN, nv } = s;
         const plW = pleating ? s.pw : null, plB = s.pb, plT = s.pt, plS = s.pz;
+        // An intact panel moves as a rigid body: then one matrix, fitted to its flexnodes, replaces skinning
+        // all its vertices (and the page uploads nothing). It stays skinned while it is pleated or any of its
+        // flexnodes is awake or dented, and while a flexnode sits more than 7 mm off the fit (16 mm to leave):
+        // structure that has bent, or flexes hard under braking and cornering.
+        if (!plW && this.rigidFit(s, out, s.item.offset)) continue;
+        out[s.item.offset] = 0;
         if (plW) s.dented = true;   // pleated panels need real normals: the shading is what makes the folds read
         const recompute = s.dented;
-        for (let v = 0, v3 = 0, v4 = 0, v12 = 0; v < nv; v++, v3 += 3, v4 += 4, v12 += 12) {
-          let px = 0, py = 0, pz = 0, nx = 0, ny = 0, nz = 0;
-          const n0x = restN[v3], n0y = restN[v3 + 1], n0z = restN[v3 + 2];
+        for (let v = 0, v3 = 0, v4 = 0; v < nv; v++, v3 += 3, v4 += 4) {
+          let m0 = 0, m1 = 0, m2 = 0, m3 = 0, m4 = 0, m5 = 0, m6 = 0, m7 = 0, m8 = 0, tx = 0, ty = 0, tz = 0;
           for (let j = 0; j < 4; j++) {
-            const f = fid[v4 + j], w = phi[v4 + j], b = fs3 + f * 3, t = f * 9, o = v12 + j * 3;
-            const ox = off[o], oy = off[o + 1], oz = off[o + 2];
-            const r0 = FR[t], r1 = FR[t + 1], r2 = FR[t + 2], r3 = FR[t + 3], r4 = FR[t + 4], r5 = FR[t + 5], r6 = FR[t + 6], r7 = FR[t + 7], r8 = FR[t + 8];
-            px += w * (pos[b] + r0 * ox + r1 * oy + r2 * oz);
-            py += w * (pos[b + 1] + r3 * ox + r4 * oy + r5 * oz);
-            pz += w * (pos[b + 2] + r6 * ox + r7 * oy + r8 * oz);
-            nx += w * (r0 * n0x + r1 * n0y + r2 * n0z);
-            ny += w * (r3 * n0x + r4 * n0y + r5 * n0z);
-            nz += w * (r6 * n0x + r7 * n0y + r8 * n0z);
+            const f = fid[v4 + j], w = phi[v4 + j], t = f * 9, f3 = f * 3;
+            m0 += w * FR[t]; m1 += w * FR[t + 1]; m2 += w * FR[t + 2]; m3 += w * FR[t + 3]; m4 += w * FR[t + 4]; m5 += w * FR[t + 5]; m6 += w * FR[t + 6]; m7 += w * FR[t + 7]; m8 += w * FR[t + 8];
+            tx += w * TT[f3]; ty += w * TT[f3 + 1]; tz += w * TT[f3 + 2];
           }
+          const vx = restP[v3], vy = restP[v3 + 1], vz = restP[v3 + 2], n0x = restN[v3], n0y = restN[v3 + 1], n0z = restN[v3 + 2];
+          let px = tx + m0 * vx + m1 * vy + m2 * vz, py = ty + m3 * vx + m4 * vy + m5 * vz, pz = tz + m6 * vx + m7 * vy + m8 * vz;
+          let nx = m0 * n0x + m1 * n0y + m2 * n0z, ny = m3 * n0x + m4 * n0y + m5 * n0z, nz = m6 * n0x + m7 * n0y + m8 * n0z;
           const l = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
           nx *= l; ny *= l; nz *= l;
           if (plW && plW[v] > 0) {
@@ -3011,6 +3062,38 @@ function physicsLib() {
       }
     }
 
+    // Rigid fit of a skinned panel to its flexnodes: their mean rotation (orthonormalised) and the shift of
+    // their centroid. Writes the flag and matrix and returns true while every flexnode is within tolerance.
+    rigidFit(s, out, o) {
+      const sim = this.sim, pos = sim.pos, R = sim.rest, FR = sim.fRot, fs = sim.fStart, fl = s.fl, n = fl.length, act = sim.fActive, bent = sim.fBent;
+      if (!n) return false;
+      for (let q = 0; q < n; q++) if (act[fl[q]] || bent[fl[q]]) { s.rigid = false; return false; }   // dents show exactly
+      let a0 = 0, a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0, a6 = 0, a7 = 0, a8 = 0, cx = 0, cy = 0, cz = 0, rx = 0, ry = 0, rz = 0;
+      for (let q = 0; q < n; q++) {
+        const f = fl[q], t = f * 9, i = (fs + f) * 3;
+        a0 += FR[t]; a1 += FR[t + 1]; a2 += FR[t + 2]; a3 += FR[t + 3]; a4 += FR[t + 4]; a5 += FR[t + 5]; a6 += FR[t + 6]; a7 += FR[t + 7]; a8 += FR[t + 8];
+        cx += pos[i]; cy += pos[i + 1]; cz += pos[i + 2]; rx += R[i]; ry += R[i + 1]; rz += R[i + 2];
+      }
+      cx /= n; cy /= n; cz /= n; rx /= n; ry /= n; rz /= n;
+      // Gram-Schmidt on the mean rotation's columns
+      let l = Math.sqrt(a0 * a0 + a3 * a3 + a6 * a6) || 1; a0 /= l; a3 /= l; a6 /= l;
+      let d = a1 * a0 + a4 * a3 + a7 * a6; a1 -= d * a0; a4 -= d * a3; a7 -= d * a6;
+      l = Math.sqrt(a1 * a1 + a4 * a4 + a7 * a7) || 1; a1 /= l; a4 /= l; a7 /= l;
+      a2 = a3 * a7 - a6 * a4; a5 = a6 * a1 - a0 * a7; a8 = a0 * a4 - a3 * a1;
+      const tol = s.rigid ? 2.56e-4 : 4.9e-5;   // (16 mm)^2 to stay rigid, (7 mm)^2 to become rigid: the body's elastic flex
+      for (let q = 0; q < n; q++) {
+        const i = (fs + fl[q]) * 3, ox = R[i] - rx, oy = R[i + 1] - ry, oz = R[i + 2] - rz;
+        const ex = cx + a0 * ox + a1 * oy + a2 * oz - pos[i], ey = cy + a3 * ox + a4 * oy + a5 * oz - pos[i + 1], ez = cz + a6 * ox + a7 * oy + a8 * oz - pos[i + 2];
+        if (ex * ex + ey * ey + ez * ez > tol) { s.rigid = false; return false; }
+      }
+      s.rigid = true;
+      const m = this._r9;
+      m[0] = a0; m[1] = a1; m[2] = a2; m[3] = a3; m[4] = a4; m[5] = a5; m[6] = a6; m[7] = a7; m[8] = a8;
+      out[o] = 1;
+      this.writeMatrix(out, o + 1, m, cx - (a0 * rx + a1 * ry + a2 * rz), cy - (a3 * rx + a4 * ry + a5 * rz), cz - (a6 * rx + a7 * ry + a8 * rz));
+      return true;
+    }
+
     writeMatrix(out, o, m, tx, ty, tz) {
       out[o] = m[0]; out[o + 1] = m[3]; out[o + 2] = m[6]; out[o + 3] = 0;
       out[o + 4] = m[1]; out[o + 5] = m[4]; out[o + 6] = m[7]; out[o + 7] = 0;
@@ -3043,7 +3126,7 @@ function physicsLib() {
       L.flex = o; o += sim.nFlex;
       L.wheels = o; L.wheelStride = 16 + 1 + 2 * VEHICLE.wheel.rays + 6; o += sim.wheels.length * L.wheelStride;
       L.fx = o; o += 4 + FX_MAX * 8;
-      for (const it of this.binder.items) { it.offset = o; o += it.mode === 'skin' ? it.nv * 6 : 16; }
+      for (const it of this.binder.items) { it.offset = o; o += it.mode === 'skin' ? 17 + it.nv * 6 : 16; }   // skin: rigid flag, matrix, positions, normals
       L.floats = o;
       this.warmUp();
       return this.summary();
@@ -3203,6 +3286,7 @@ function physicsLib() {
         sim.prev[i * 3] = sim.pos[i * 3] - sim.vel[i * 3] * DT; sim.prev[i * 3 + 1] = sim.pos[i * 3 + 1] - sim.vel[i * 3 + 1] * DT; sim.prev[i * 3 + 2] = sim.pos[i * 3 + 2] - sim.vel[i * 3 + 2] * DT;
       }
       if (speed) for (const w of sim.wheels) w.omega = (vx * s + vz * c) / w.radius;   // rolling with the heading component
+      sim.fNext.fill(0);   // moved: every flexnode's ground clearance is stale
       vehicleState(sim, this.meta, this.state); this.ctrl.fwdSpeed = this.state.speed; this.pv.set(this.state.vel);
     }
 
@@ -3867,7 +3951,8 @@ class VehicleView {
       if (b.mode === 'skin') {
         const pa = m.geom.attributes.position, na = m.geom.attributes.normal;
         pa.setUsage(THREE.DynamicDrawUsage); na.setUsage(THREE.DynamicDrawUsage);
-        this.skins.push({ pa, na, o: b.offset, n3: b.nv * 3 });
+        mesh.matrixAutoUpdate = false;
+        this.skins.push({ mesh, pa, na, o: b.offset, n3: b.nv * 3, restP: pa.array, restN: na.array, rigid: true });
       } else {
         mesh.matrixAutoUpdate = false;
         this.rigid.push({ mesh, o: b.offset });
@@ -3886,19 +3971,19 @@ class VehicleView {
     this.bayShown = true;
     // headlight reflectors (left, right): their skinned vertices place the headlight beams
     this.lamps = [/headlight_l/, /headlight_r/].map(rx => this.meshes.findIndex(m => rx.test(m.name) && m.material === mats.headlight))
-      .map(i => (i >= 0 ? this.meshes[i].geometry.attributes.position : null));
+      .map(i => (i >= 0 ? this.meshes[i] : null));
     this.debug = false;
     this.buildDebug();
   }
 
   // Centre of headlight `side` (0 left, 1 right) this frame; false if the model has none.
   lampPos(side, out) {
-    const pa = this.lamps[side];
-    if (!pa) return false;
-    const a = pa.array, n = a.length / 3;
+    const mesh = this.lamps[side];
+    if (!mesh) return false;
+    const a = mesh.geometry.attributes.position.array, n = a.length / 3;
     let x = 0, y = 0, z = 0;
     for (let i = 0; i < a.length; i += 3) { x += a[i]; y += a[i + 1]; z += a[i + 2]; }
-    out.set(x / n, y / n, z / n);
+    out.set(x / n, y / n, z / n).applyMatrix4(mesh.matrix);   // the matrix is the identity while the lamp is skinned
     return true;
   }
 
@@ -3906,9 +3991,16 @@ class VehicleView {
   apply(buf) {
     const f = new Float32Array(buf), L = this.summary.layout;
     for (let k = 0; k < this.skins.length; k++) {
-      const s = this.skins[k];
-      s.pa.array = f.subarray(s.o, s.o + s.n3); s.pa.needsUpdate = true;
-      s.na.array = f.subarray(s.o + s.n3, s.o + 2 * s.n3); s.na.needsUpdate = true;
+      // an intact panel: its rest geometry under one matrix; a deformed one: this frame's vertices
+      const s = this.skins[k], o = s.o + 17;
+      if (f[s.o] === 1) {
+        if (!s.rigid) { s.rigid = true; s.pa.array = s.restP; s.na.array = s.restN; s.pa.needsUpdate = s.na.needsUpdate = true; }
+        s.mesh.matrix.fromArray(f, s.o + 1); s.mesh.matrixWorldNeedsUpdate = true;
+      } else {
+        if (s.rigid) { s.rigid = false; s.mesh.matrix.identity(); s.mesh.matrixWorldNeedsUpdate = true; }
+        s.pa.array = f.subarray(o, o + s.n3); s.pa.needsUpdate = true;
+        s.na.array = f.subarray(o + s.n3, o + 2 * s.n3); s.na.needsUpdate = true;
+      }
     }
     for (let k = 0; k < this.rigid.length; k++) { const r = this.rigid[k]; r.mesh.matrix.fromArray(f, r.o); r.mesh.matrixWorldNeedsUpdate = true; }
     for (let i = 0; i < this.wheelVis.length; i++) this.updateWheel(this.wheelVis[i], f, L.wheels + i * L.wheelStride);
@@ -4607,7 +4699,7 @@ class CameraRig {
     const h = Math.atan2(state.fwd.x, state.fwd.z);
     let dh = h - this.heading;
     dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-    this.heading += dh * Math.min(1, dt * 3.2);
+    this.heading += dh * Math.min(1, dt * 6);   // a lazier camera showed the truck from the side in every turn, as if it slid
     this.idle += dt;
     if (this.idle > 2.5) { this.userYaw *= Math.pow(0.2, dt); this.userPitch *= Math.pow(0.2, dt); }
     if (this.mode === 0 || this.mode === 1) {
@@ -4626,7 +4718,7 @@ class CameraRig {
     cam.position.copy(this.pos);
     cam.lookAt(this.look);
     if (this.mode === 2) cam.fov += ((this.pos.distanceTo(target) > 40 ? 22 : 45) * this.fovZoom - cam.fov) * Math.min(1, dt * 2);
-    else cam.fov += (58 - cam.fov) * Math.min(1, dt * 3);
+    else cam.fov += (58 + Math.min(10, Math.abs(state.speed) * 0.3) - cam.fov) * Math.min(1, dt * 3);   // a touch wider at speed
     cam.updateProjectionMatrix();
   }
 }
@@ -5011,7 +5103,7 @@ async function main() {
     if (!link.busy) {
       let n = Math.floor(acc / DT + 1e-9);
       if (n > cap) { n = cap; acc = 0; } else acc -= n * DT;
-      if (n > 0 || needFrame) { link.step(n, input, view.debug); needFrame = false; stepsWindow += n; }
+      if (n > 0 || needFrame) { link.step(n, input, view.debug); needFrame = false; }
     } else if (acc > cap * DT) acc = cap * DT;
     stepsT += dtF;
     if (stepsT >= 0.5) { hz = stepsWindow / stepsT; stepsWindow = 0; stepsT = 0; }
@@ -5020,6 +5112,7 @@ async function main() {
     if (buf) {
       const f = view.apply(buf);
       readFrame(f);
+      stepsWindow += f[8];   // substeps the physics thread actually ran (it may stop a batch early)
       fx.ingest(f, summary, state, view);
       if (snapNext) { rig.snap(state); snapNext = false; }
     }
