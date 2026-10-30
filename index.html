@@ -298,7 +298,7 @@ function physicsLib() {
     susp: {
       kVf: 46000, kVr: 52000, zetaBump: 0.22, zetaRebound: 0.55, knee: 0.13, digress: 0.38,
       arbF: 26000, arbR: 12000, bump: 0.11, droop: 0.16, kB: 6e5, kS: 6e5, cS: 5000,
-      yieldS: 0.05, maxBend: 0.22, couple: 1.0,
+      yieldS: 0.04, maxBend: 0.38, couple: 1.0,   // a hard hit shoves a front wheel back into the door
     },
     // Flexnodes: tie frequency / damping to the structure; a settled dent spreads over `brush` metres with
     // `share` of its depth at the centre, falling smoothly to zero at the edge.
@@ -336,18 +336,21 @@ function physicsLib() {
     // and brC the compressive one (structural metal crumples instead of snapping when crushed), brP the
     // plastic budget of a bracket. A support strut with slack engages only once shortened by that fraction.
     beams: {
-      chassis:    { E: 1.5e6, zeta: 0.08 },
-      cab:        { E: 1.3e6, zeta: 0.08 },                          // safety cell
-      crumple:    { E: 7.5e5, zeta: 0.08 },                          // rails ahead of the cowl
-      cross:      { E: 7.5e5, yieldT: 0.012, zeta: 0.08 },           // crumple-zone cross members: weak in tension, so crushed bays bulge
-      frameX:     { E: 2.5e6, zeta: 0.08 },                          // rail-to-rail twist bracing
+      // A 1990s body-on-frame pickup: no engineered crumple zone and a cab that is strong, not a cage. At
+      // 50 km/h the front crushes ~0.2 m and the cab holds; at 100 km/h the front is gone to the wheels,
+      // the engine is driven ~0.4 m back into the firewall and the cab's front folds, the floor buckling.
+      chassis:    { E: 1.5e6, yield: 0.03, zeta: 0.08 },
+      cab:        { E: 5.5e5, yield: 0.022, zeta: 0.08 },            // the cab: holds in a moderate hit, folds in front of a severe one
+      crumple:    { E: 5.0e5, zeta: 0.08 },                          // rails ahead of the cowl
+      cross:      { E: 5.0e5, yieldT: 0.012, zeta: 0.08 },           // crumple-zone cross members: weak in tension, so crushed bays bulge
+      frameX:     { E: 1.4e6, yield: 0.015, zeta: 0.08 },            // rail-to-rail twist bracing
       hood:       { E: 4.0e4, zeta: 0.18 },
       hoodFold:   { E: 4.0e4, yield: 0.012, zeta: 0.18 },            // underside around the hood's middle row: gives first, so the hood folds up into a ridge
       hoodPanel:  { E: 1.2e5, zeta: 0.18 },                          // the hood's outer segments: stiff, so the two halves of the fold stay flat
       door:       { E: 6.5e4, zeta: 0.1 },
       fender:     { E: 5.0e4, yield: 0.02, zeta: 0.15 },            // thin sheet over the wheel arch: crumples readily
-      attachFender: { E: 5.5e4, yield: 0.035, brP: 0.17, brC: 0.5, zeta: 0.25 },    // the bolts along its front and top edges
-      attachFenderRear: { E: 7.0e4, yield: 0.035, brP: 0.4, brk: 0.5, brC: 0.8, zeta: 0.25 },   // at the door pillar: holds longest
+      attachFender: { E: 5.5e4, yield: 0.035, brP: 0.08, brk: 0.25, brC: 0.5, zeta: 0.25 },    // the bolts along its front and top edges
+      attachFenderRear: { E: 7.0e4, yield: 0.035, brP: 0.2, brk: 0.35, brC: 0.8, zeta: 0.25 },  // at the door pillar: holds longest
       bumper:     { E: 5.5e4, zeta: 0.35 },
       attach:     { E: 5.5e4, yield: 0.035, brP: 0.18, brC: 0.4, zeta: 0.3 },
       attachHood: { E: 6.0e4, yield: 0.035, brP: 0.2, brC: 0.55, zeta: 0.25 },
@@ -355,7 +358,7 @@ function physicsLib() {
       attachDoor: { E: 9.0e4, yield: 0.035, brP: 0.22, brk: 0.45, brC: 0.6, zeta: 0.25 },
       support:    { E: 4.0e4, yield: 9, brk: 99, zeta: 0.15 },       // part rests: the hood on the fenders, doors on the sills
       cabSupport: { E: 1.2e6, yield: 9, brk: 99, slack: 0.12, zeta: 0.2 },   // hidden struts across and along the cab
-      mount:      { E: 9.0e5, yield: 0.06, brk: 99, zeta: 0.3 },     // engine / gearbox mounts
+      mount:      { E: 9.0e5, yield: 0.06, brk: 99, brP: 0.2, zeta: 0.3 },   // engine / gearbox mounts: tear once bent far
       rigid:      { E: Infinity, yield: 9, brk: 99, zeta: 0.3 },     // engine / gearbox lattices: as stiff as the substep allows
     },
     // Volume cells: every chassis bay and every part lattice cell is a closed polyhedron whose volume is a
@@ -363,14 +366,14 @@ function physicsLib() {
     // volume plastically, floor / ceil the limits of that flow. Crushing a bay lengthwise therefore pushes
     // its side walls outward first, and the cab keeps its shape far longer than the crumple zones.
     volume: {
-      crumple: { K: 1.5e7, Py: 2.4e5, floor: 0.45, ceil: 1.4 },
-      cab:     { K: 1.5e7, Py: 6.0e5, floor: 0.6, ceil: 1.2 },
+      crumple: { K: 1.5e7, Py: 1.0e5, floor: 0.2, ceil: 1.4 },
+      cab:     { K: 1.5e7, Py: 2.2e5, floor: 0.45, ceil: 1.2 },
       rear:    { K: 1.5e7, Py: 2.4e5, floor: 0.45, ceil: 1.4 },
       hood:    { K: 1.0e6, Py: 8.0e4, floor: 0.35, ceil: 1.8 },   // flat panel cells on light nodes: soft enough for the substep
       door:    { K: 1.2e6, Py: 6.0e4, floor: 0.4, ceil: 1.5 },
       bumper:  { K: 4.0e6, Py: 6.0e4, floor: 0.4, ceil: 1.5 },
     },
-    densify: 0.32,   // crushed below 32 % of its length a beam is packed metal: no further plastic flow
+    densify: 0.18,   // crushed below 18 % of its length a beam is packed metal: no further plastic flow
   };
 
   // Tyre: radial stiffness from the tread probes, friction from a single contact patch per wheel. The patch
@@ -3913,17 +3916,18 @@ function radiatorTexture() {
    matte and dulls chrome; the tyres go grey-brown and the wheels collect brake dust. */
 const GRIME = {
   uDirt: { value: 0.35 },
+  uCrack: { value: 0 }, uCrackC: { value: new THREE.Vector2(0, 1.3) },   // the windshield's cracks: how far, and where the web is centred
   uWheels: { value: new THREE.Vector4(1.5, -1.5, 0.38, 0.4) },   // front axle z, rear axle z, hub height, tyre radius (model space)
 };
 function grime(mat, mode) {
   mat.userData.grimePatch = (sh) => {
-    sh.uniforms.uDirt = GRIME.uDirt; sh.uniforms.uWheels = GRIME.uWheels;
+    sh.uniforms.uDirt = GRIME.uDirt; sh.uniforms.uWheels = GRIME.uWheels; sh.uniforms.uCrack = GRIME.uCrack; sh.uniforms.uCrackC = GRIME.uCrackC;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 rest;\nvarying vec3 vRest;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = rest;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform float uDirt; uniform vec4 uWheels; varying vec3 vRest;
+        uniform float uDirt, uCrack; uniform vec4 uWheels; uniform vec2 uCrackC; varying vec3 vRest;
         float gHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
         float gNoise(vec3 x) {
           vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -3946,6 +3950,9 @@ function grime(mat, mode) {
           dirtAmt = clamp(smoothstep(0.32, 0.72, mask + (nLow - 0.5) * 0.7 + (n1 - 0.5) * 0.3 + (n2 - 0.5) * 0.3 * mask) + speck * 0.8, 0.0, 1.0) * uDirt;
           vec3 wn = normalize((vec4(vNormal, 0.0) * viewMatrix).xyz);
           dustAmt = smoothstep(0.5, 0.95, abs(wn.y)) * step(0.0, wn.y * (gl_FrontFacing ? 1.0 : -1.0)) * (0.25 + 0.75 * n1) * (0.25 + 0.5 * uDirt);
+        #elif ${mode} == 3
+          // windshield: kept clean by the wipers; it cracks instead (below)
+          dirtAmt = 0.0; dustAmt = 0.0;
         #else
           // wheels: dust over the tyre, brake dust on the rim
           dirtAmt = (0.4 + 0.45 * n1 + 0.15 * n3) * uDirt;
@@ -3954,7 +3961,24 @@ function grime(mat, mode) {
         #endif
         diffuseColor.rgb = mix(diffuseColor.rgb, dirtCol, clamp(dirtAmt, 0.0, 1.0) * 0.85);
         diffuseColor.rgb = mix(diffuseColor.rgb, dustCol, clamp(dustAmt, 0.0, 1.0) * 0.45);
-        float grimeAmt = clamp(max(dirtAmt, dustAmt * 0.7), 0.0, 1.0);`)
+        float grimeAmt = clamp(max(dirtAmt, dustAmt * 0.7), 0.0, 1.0);
+        #if ${mode} == 3
+          // laminated glass hit hard: a crushed white star at the impact, spokes running out from it and
+          // broken rings around it, all as thin lines in the glass's own plane
+          if (uCrack > 0.0) {
+            vec2 q = vRest.xy - uCrackC;
+            float r = length(q), ang = atan(q.y, q.x);
+            float sp = abs(fract(ang / 6.2832 * 15.0 + (gNoise(vec3(ang * 2.0, r * 5.0, 3.0)) - 0.5) * 0.5) - 0.5) * 6.2832 * r / 15.0;
+            float spoke = smoothstep(0.005, 0.0012, sp) * smoothstep(0.95 * uCrack + 0.05, 0.05, r);
+            float rd = abs(fract(r * 8.0 + (n1 - 0.5) * 0.7) - 0.5) / 8.0;
+            float ring = smoothstep(0.0045, 0.001, rd) * smoothstep(0.45 * uCrack + 0.02, 0.03, r) * step(0.45, gNoise(vec3(ang * 3.0, r * 6.0, 7.0)));
+            float star = smoothstep(0.09, 0.02, r) * (0.6 + 0.4 * n3);
+            float crack = clamp(max(max(spoke, ring), star), 0.0, 1.0) * smoothstep(0.0, 0.3, uCrack);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.88, 0.9), crack);
+            diffuseColor.a = max(diffuseColor.a, crack * 0.9);
+            grimeAmt = max(grimeAmt, crack * 0.6);
+          }
+        #endif`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.93, grimeAmt);')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor *= 1.0 - grimeAmt * 0.85;')
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat *= 1.0 - grimeAmt;\n#endif');
@@ -3978,6 +4002,7 @@ function makeMaterials(envMap) {
     exhaust: g(std({ color: 0x4e4740, roughness: 0.7, metalness: 0.6, envMapIntensity: 0.4 }), 0),
     interior: std({ color: 0x3a3632, roughness: 0.85, metalness: 0.0, envMapIntensity: 0.25 }),
     glass: g(std({ color: 0x27323a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.5, envMapIntensity: 1.5, depthWrite: false }), 0),
+    windshield: g(std({ color: 0x27323a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.5, envMapIntensity: 1.5, depthWrite: false }), 3),
     headlight: std({ color: 0xfff8ec, emissive: 0xfff1d2, emissiveIntensity: 2.4, roughness: 0.12, metalness: 0.6 }),   // reflector + bulb
     parking: std({ color: 0xffe9c4, emissive: 0xffcf86, emissiveIntensity: 0.8, roughness: 0.25 }),
     taillight: std({ color: 0x7a0c08, emissive: 0x5a0402, emissiveIntensity: 0.8, roughness: 0.25 }),
@@ -3995,7 +4020,8 @@ function makeMaterials(envMap) {
 function pickMaterial(m, mats) {
   const mn = ((m.srcMat && m.srcMat.name) || '').toLowerCase(), n = m.name;
   if (/headlightglass|headlight[_\s.-]?lens/.test(n)) return mats.lens;
-  if (/glass/.test(mn) || /glass|windshield|backlight/.test(n)) return mats.glass;
+  if (/windshield/.test(n)) return mats.windshield;
+  if (/glass/.test(mn) || /glass|backlight/.test(n)) return mats.glass;
   if (/parkinglight/.test(mn)) return mats.parking;
   if (/headlight/.test(mn)) return mats.headlight;
   if (/radiator/.test(n) && !/radtube/.test(n)) return mats.radiator;
@@ -4117,6 +4143,9 @@ class VehicleView {
   }
 
   // Centre of headlight `side` (0 left, 1 right) this frame; false if the model has none.
+  // Smashed headlights: the lenses and turn-signal glass are gone (the reflectors stay, dark).
+  smashLamps(on) { for (const m of this.meshes) if (/headlightglass|signal_[lr]/.test(m.name)) m.visible = !on; }
+
   lampPos(side, out) {
     const mesh = this.lamps[side];
     if (!mesh) return false;
@@ -5188,7 +5217,7 @@ async function main() {
   if (GFX[params.get('gfx')]) settings.gfx = params.get('gfx');
   if (!TIMES[settings.time]) settings.time = 'day';
   if (!GFX[settings.gfx]) settings.gfx = 'high';
-  let lampLevel = 0, beamLevel = 0, lightsOn = false;
+  let lampLevel = 0, beamLevel = 0, lightsOn = false, lampsBroken = false;
 
   function applyTime(name) {
     const T = TIMES[name], u = envr.skyMat.uniforms, sun = new THREE.Vector3(...T.sun).normalize();
@@ -5215,10 +5244,11 @@ async function main() {
   // half strength.
   function setLights(on) {
     lightsOn = on;
-    beamLevel = on ? (TIMES[settings.time].beams || 0.5) : 0;
-    mats.headlight.emissiveIntensity = on ? 2.4 + 5 * beamLevel : 0.35;
-    mats.lens.emissiveIntensity = on ? 0.22 + 1.6 * beamLevel : 0.04;
-    mats.parking.emissiveIntensity = on ? 0.8 + 1.6 * beamLevel : 0.2;
+    const lit = on && !lampsBroken;   // smashed headlights stay dark; the tail lights still work
+    beamLevel = lit ? (TIMES[settings.time].beams || 0.5) : 0;
+    mats.headlight.emissiveIntensity = lit ? 2.4 + 5 * beamLevel : (lampsBroken ? 0 : 0.35);
+    mats.lens.emissiveIntensity = lit ? 0.22 + 1.6 * beamLevel : 0.04;
+    mats.parking.emissiveIntensity = lit ? 0.8 + 1.6 * beamLevel : (lampsBroken ? 0 : 0.2);
     mats.taillight.emissiveIntensity = on ? 0.8 + 2.4 * beamLevel : 0.3;
     $('btnLights').setAttribute('aria-pressed', String(on));
     updateLights();
@@ -5333,7 +5363,7 @@ async function main() {
   function doReset(silent) {
     acc = 0;
     if (!silent) pushFeed('VEHICLE RESET');
-    return link.call('reset').then(() => { link.dropLatest(); view.reset(); fx.reset(); GRIME.uDirt.value = DIRT0; needFrame = true; snapNext = true; });
+    return link.call('reset').then(() => { link.dropLatest(); view.reset(); fx.reset(); GRIME.uDirt.value = DIRT0; GRIME.uCrack.value = 0; if (lampsBroken) { lampsBroken = false; view.smashLamps(false); setLights(lightsOn); } needFrame = true; snapNext = true; });
   }
   function cycleCam() { rig.mode = (rig.mode + 1) % 3; rig.userYaw = rig.userPitch = 0; $('camName').textContent = rig.names[rig.mode]; }
   function toggleNodes() { const on = !view.debug; view.setDebug(on); needFrame = true; $('btnNodes').setAttribute('aria-pressed', String(on)); }
@@ -5425,6 +5455,10 @@ async function main() {
       const f = view.apply(buf);
       readFrame(f);
       stepsWindow += f[8];   // substeps the physics thread actually ran (it may stop a batch early)
+      // a front crushed 15 cm smashes the headlights; past ~20 cm the windshield starts to crack, more the harder the hit
+      if (!lampsBroken && f[41] > 0.15) { lampsBroken = true; view.smashLamps(true); setLights(lightsOn); }
+      const crack = Math.min(1, Math.max(0, (f[41] - 0.2) / 0.22));
+      if (crack > GRIME.uCrack.value) { if (GRIME.uCrack.value === 0) GRIME.uCrackC.value.set((Math.random() - 0.5) * 0.8, 1.27 + Math.random() * 0.08); GRIME.uCrack.value = crack; }
       // road dirt builds up with distance (dirty after ~5 km), faster while the tyres spin
       const simDt = f[8] * DT;
       let spin = 0;

@@ -126,7 +126,7 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 Plasticity and fracture:
 
 - **Plastic set:** once a beam is stretched or compressed more than 5 % beyond its rest length (`msd.yield`), its rest length moves for good. It keeps its new length, like crumpled metal.
-- **Packed metal:** below 32 % of its factory length a beam stops flowing.
+- **Packed metal:** below 18 % of its factory length a beam stops flowing.
 - **Breaking:** a beam stretched more than 30 % past its factory length (`msd.break`) is deleted from its body's live beam list (swapped with the last live beam). Under compression, structural metal crumples instead of snapping. Mounting brackets also tear once their plastic budget is used up, and keep their own tuned limits.
 
 **Volume cells.** Every bay between two chassis rings is a closed hexagonal prism, and every part lattice cube is a hexahedron. Each is a pressure spring: p = K·(V0 − V)/V0 pushes its corners along the exact closed-surface volume gradient, with damping on the rate of volume change. Past the cell's yield pressure, the rest volume flows plastically between a floor and a ceiling. Below the floor it densifies: its yield pressure climbs steeply, but it keeps flowing rather than storing the crush as a spring.
@@ -170,6 +170,24 @@ Ten mechanics run inside the mass-spring loop on top of the beams, cells and she
 9. **Stretch-limit thinning.** Plastic stretch thins the metal: a beam's breaking strain shrinks to max(`thinMin`, 1 − `thin`·ε<sub>stretch</sub>) of its original value. Sheet edges tear the same way. Panel triangles stretched past 1.8× are cut out of the rendered mesh, so overstretched metal splits into strips.
 10. **Shear twist diagonals.** Stiff diagonal shear beams (`frameX`) brace the left and right rails, each spanning two chassis bays. A corner impact therefore twists the whole frame, cab and bed instead of folding one rail on its own.
 
+## How hard it crashes
+
+The truck is built like a 1990s body-on-frame pickup: it has no engineered crumple zone, and its cab is strong but not a safety cage.
+
+| Wall hit | Front crush | Engine pushed back | What it looks like |
+| --- | --- | --- | --- |
+| 30 km/h | ~8 cm | — | bumper and grille pushed in, a fender bolt or two gone |
+| 50 km/h | ~28 cm | 10 cm | the nose folds, the hood ridges up, headlights smash, a fender hangs or falls |
+| 80 km/h | ~47 cm | 31 cm | the front crushed to the wheels, the windshield cracked across, the frame twisted |
+| 100 km/h | ~53 cm | 40 cm | the engine driven into the firewall, the cab's front folding with the A-pillars bent and the floor buckled, a front wheel shoved back, the fenders torn off |
+
+Two visual cues come from the crush itself:
+
+- **Headlights:** once the front has crushed 15 cm the headlights are smashed. Their lenses and turn-signal glass are gone and they stay dark, though the tail lights still work.
+- **Windshield:** past about 20 cm the windshield cracks. A crushed white star forms at a random point near its base, with spokes and broken rings running out from it, and the cracks reach further the harder the hit.
+
+RESET VEHICLE repairs both.
+
 ## Detaching parts
 
 Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood and the left and right front fenders. Each hangs on named brackets of attachment beams:
@@ -191,7 +209,7 @@ Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, 
 - Struts behind it, which only push, stand in for the inner apron. A crushed fender therefore folds out and back instead of in under the hood.
 - The rear bolts at the door pillar hold longest.
 
-At 50 km/h into the wall a fender buckles. At 60 km/h its front and top bolts tear and it hangs from the rear ones. At 80 km/h one fender rips off and falls by the wall, leaving the inner wheel arch exposed. A torn-off fender keeps its dents but drops the accordion pleats, which follow the chassis' crumple zone.
+The front and top bolts give early, so from about 50 km/h into the wall a fender folds back and hangs from its rear bolts, or rips off and falls by the wall, leaving the inner wheel arch exposed. At 100 km/h one or both come off. A torn-off fender keeps its dents but drops the accordion pleats, which follow the chassis' crumple zone.
 
 **The hood's roof fold.** The hood is a 3 × 5 × 2 lattice, from the hinge row at the cowl to the latch at the front:
 
@@ -209,7 +227,7 @@ A frontal hit therefore folds the hood up into a ridge with two flat halves, lik
 - progressive bump and droop stops;
 - front and rear anti-roll bars.
 
-Laterally and fore-aft the hub is held by a stiff link that bends plastically in crashes.
+Laterally and fore-aft the hub is held by a stiff link that bends plastically in crashes, up to 38 cm, so a hard frontal hit shoves a front wheel back into the door.
 
 **Tyres.**
 - **Normal force:** the probe ring measures how far the tyre is compressed against the world, which gives the radial force.
