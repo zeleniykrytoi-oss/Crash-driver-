@@ -2,11 +2,11 @@
 
 A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
-- 1034 beams: structural, shear (diagonal) and support;
-- 45 volume cells;
-- a sheet-metal skin of 5574 stretch springs and 3458 dihedral bending springs.
+- 982 beams: structural, shear (diagonal) and support;
+- 43 volume cells;
+- a sheet-metal skin of 5620 stretch springs and 3535 dihedral bending springs.
 
-In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate, headlights, grille and taillights hang from their hinges, bolts and clips or tear off when their brackets fail. The front bumper and the headlights never come off: at most one side tears loose and hangs, and the other side stays as it was.
+In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate and taillights hang from their hinges, bolts and clips or tear off when their brackets fail. The grille never comes off: at most one side tears loose and hangs, and the other side stays as it was. The headlights stay on the crushed front, cracked and dark.
 
 The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area is a white gridmap under a blue sky with clouds, ringed by pale dunes, with ruled grey blocks, a steel post, a suspension test course, a drag strip, a skid pad and palm islands.
 
@@ -147,7 +147,7 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 - **Rigid blocks:** 8 corner nodes each for the engine and the gearbox.
 - **Hubs:** 4, one per wheel centre.
 - **Tread probes:** 256, a fixed 2 × 32 ring per wheel.
-- **Flexnodes:** 3976 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
+- **Flexnodes:** 3992 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
 
 **Beams.** Each beam is a spring-damper along its axis: F = k·(L − L0) + c·v<sub>rel</sub>, with k = E/L0 and c set by the family's damping ratio. There are three kinds:
 
@@ -215,14 +215,14 @@ The truck is built like a 1990s body-on-frame pickup: it has no engineered crump
 
 Two visual cues come from the crush itself:
 
-- **Headlights:** once the front has crushed 15 cm the headlights are smashed. Their lenses and turn-signal glass are gone and they stay dark, though the tail lights still work.
+- **Headlights:** once the front has crushed 15 cm the headlights are smashed. Their lenses crack and frost over and they stay dark, though the tail lights still work.
 - **Windshield:** past about 20 cm the windshield cracks. A crushed white star forms at a random point near its base, with spokes and broken rings running out from it, and the cracks reach further the harder the hit.
 
 RESET VEHICLE repairs both.
 
 ## Detaching parts
 
-Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood, the left and right front fenders, the tailgate, the left and right headlights and the left and right taillights. The grille is cut out of the fascia (the triangles between the headlights) into a part of its own. Each part hangs on named brackets of attachment beams:
+Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood, the left and right front fenders, the tailgate and the left and right taillights. The grille is cut out of the fascia (the triangles between the headlights) into a part of its own. Each part hangs on named brackets of attachment beams:
 
 | Part | Lattice | Brackets |
 | --- | --- | --- |
@@ -231,16 +231,15 @@ Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, 
 | Front fenders | 4 × 2 × 2 | front bolts, two top bolts, rear bolts at the door pillar |
 | Tailgate | 3 × 2 × 2 | two hinges below, two latches above |
 | Bumpers | 4 × 2 × 2 | four middle bolts and two end brackets |
-| Headlights, grille, taillights | 2 × 2 × 2 box fitted to the part | left and right plastic clips at the face toward the cab |
+| Grille, taillights | 2 × 2 × 2 box fitted to the part | left and right plastic clips at the face toward the cab |
 
-The grille and taillights are small housings on plastic clips that let go early: a 50 km/h wall hit knocks the grille out.
+The taillights are small housings on plastic clips that let go early.
 
-**Tethered parts: the front bumper and the headlights.** These never come off. Each of their brackets belongs to the left or the right side of the part. The first bracket to fail picks the loose side, and from then on every bracket on the other side holds: its remaining beams can no longer break and stay elastic, so that side keeps its shape. The part's own lattice can't tear either. The part can only hang from one side, never fly off.
+**The grille never comes off.** It is a tethered part. Each of its brackets belongs to the left or the right side. The first bracket to fail picks the loose side, and from then on every bracket on the other side holds: its remaining beams can no longer break and stay elastic, so that side keeps its shape. The grille's own lattice can't tear either. A 50 km/h wall hit pops one side, and the grille swings down and hangs from the other. Across straight hits at 50 to 110 km/h and angled hits at 50 to 140 km/h it never came off.
 
-- **Front bumper:** its four middle bolts shear early and the two end brackets hold longest. In a straight hit the bumper is pushed in and stays on. In an offset or angled hit one side's bolts and end tear, and the bumper hangs from the other end with its loose end on the ground. The rear bumper keeps even, stronger bolts and can still come off.
-- **Headlights:** each hangs on a left and a right clip. A hard hit can pop one clip, and the lamp tilts out on the other. A smashed headlight stays dark.
+**The headlights stay on the truck.** The lamps and turn signals are skinned to the fascia's sheet metal, not hung on brackets. They stay on the visible face of a crushed front and crumple with it. Once the front has crushed 15 cm their lenses crack and frost over with a web of white cracks, and the bulbs go dark.
 
-Across straight hits at 50 to 110 km/h and angled hits at 50 to 140 km/h, the bumper and both headlights stayed on the truck every time. The tailgate swings on its hinges once its latches tear and comes off in a hard rear hit.
+**The front bumper.** Its four middle bolts shear early and the two end brackets hold longest. In a straight hit the bumper is pushed in and stays on. In an offset or angled hit one side tears first and the bumper hangs from its other end; a hard one tears it off. The rear bumper keeps even, stronger bolts.
 
 - **Bracket failure:** a bracket lets go as a unit after losing half its beams (a hood latch after its first). Failures stay local, so a door whose upper hinge and latch tear off swings and hangs on its lower hinge.
 - **Load sharing:** each snapped beam concentrates stress in its bracket neighbours (mechanic 7). A moderate hit leaves a part hanging; a severe one tears it free as one panel.

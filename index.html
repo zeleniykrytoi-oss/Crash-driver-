@@ -861,7 +861,7 @@ function physicsLib() {
       this.btype = new Uint8Array(NB); this.bpart = new Uint8Array(NB); this.bBreak = new Int32Array(NB);
       this.broken = new Uint8Array(NB);   // 0 intact, 1 snapped, 2 disabled (support beam of a detached part)
       this.bgroup = new Int16Array(NB).fill(-1); this.groups = []; this.groupNeed = []; this.groupHits = [];
-      // Tethered parts (the front bumper, the headlights) can't come off: each bracket has a side, and once
+      // Tethered parts (the grille) can't come off: each bracket has a side, and once
       // one side's bracket fails the other side's attachment beams are kept (bKeep 2: unbreakable and
       // elastic), so the part hangs from that side. Their own lattice never tears (bKeep 1).
       this.bKeep = new Uint8Array(NB); this.groupSide = []; this.groupPart = [];
@@ -2606,7 +2606,7 @@ function physicsLib() {
     }
     for (let p = 1; p < N_PARTS; p++) if (!sim.parts[p]) sim.parts[p] = { id: p, n0: sim.nNodes, n1: sim.nNodes, attach: [], support: [], detached: false, ctx: 0, dent: 0 };
     // brackets become break groups: a bracket fails after half its beams (a hood latch after its first)
-    const TETHERED = [P_BUMPER_F, P_HEADLIGHT_L, P_HEADLIGHT_R];
+    const TETHERED = [P_GRILLE];
     for (let p = 1; p < N_PARTS; p++) {
       const map = new Map();
       for (const j of sim.parts[p].attach) {
@@ -4036,8 +4036,8 @@ function meshNameChain(o) {
 function detectPart(chain) {
   if (/hood|bonnet/.test(chain)) return P_HOOD;
   if (/tailgate/.test(chain)) return P_TAILGATE;
-  if (/(headlight|signal)[a-z]*[_\s.-]?(l|left)([_\s.\-\d]|$)/.test(chain)) return P_HEADLIGHT_L;
-  if (/(headlight|signal)[a-z]*[_\s.-]?(r|right)([_\s.\-\d]|$)/.test(chain)) return P_HEADLIGHT_R;
+  // the headlights and signals stay with the body: they're skinned to the fascia's sheet metal, so they stay
+  // on the visible face of a crushed front, crumple with it and never come off (they crack and go dark)
   if (/taillight[a-z]*[_\s.-]?(l|left)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_L;
   if (/taillight[a-z]*[_\s.-]?(r|right)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_R;
   if (/grille/.test(chain)) return P_GRILLE;
@@ -4323,6 +4323,8 @@ function makeMaterials(envMap) {
     trim: g(std({ color: 0xb5b2aa, roughness: 0.3, metalness: 0.85, envMapIntensity: 1.1 }), 0),          // grille surround between the headlights
     radiator: std({ color: 0xffffff, map: radiatorTexture(), roughness: 0.9, metalness: 0.25, envMapIntensity: 0.2 }),
     lens: g(std({ color: 0xf2f5f7, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.34, emissive: 0xfff2d8, emissiveIntensity: 0.22, envMapIntensity: 1.6, depthWrite: false }), 0),
+    // a smashed lens: frosted glass webbed with white cracks (planar UVs, see VehicleView)
+    lensBroken: g(std({ color: 0xffffff, map: crackTexture(), roughness: 0.45, metalness: 0.0, transparent: true, opacity: 0.9, envMapIntensity: 0.9, depthWrite: false }), 0),
     chrome: g(std({ color: 0xdcd8cf, roughness: 0.2, metalness: 1.0, envMapIntensity: 1.1 }), 0),
     mech: g(std({ color: 0x2b2a28, roughness: 0.78, metalness: 0.3, envMapIntensity: 0.35 }), 0),
     exhaust: g(std({ color: 0x4e4740, roughness: 0.7, metalness: 0.6, envMapIntensity: 0.4 }), 0),
@@ -4399,6 +4401,33 @@ function latheX(prof, S, radialOffset) {
 }
 
 // Reorder an indexed geometry's triangles into two material groups: pred(centroid) false -> 0, true -> 1.
+// Cracked glass: a few impact stars with spokes and broken rings, white on frosted grey, tiling.
+function crackTexture() {
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d'), rng = mulberry32(31);
+  ctx.fillStyle = 'rgba(205,212,218,0.42)'; ctx.fillRect(0, 0, S, S);
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineCap = 'round';
+  for (let k = 0; k < 3; k++) {
+    const cx = rng() * S, cy = rng() * S;
+    for (let a = 0; a < 6.283; a += 0.35 + rng() * 0.5) {   // spokes, each a jagged line
+      let x = cx, y = cy, d = a;
+      ctx.lineWidth = 1 + rng(); ctx.beginPath(); ctx.moveTo(x, y);
+      for (let q = 0; q < 7; q++) { d += (rng() - 0.5) * 0.5; x += Math.cos(d) * (8 + rng() * 16); y += Math.sin(d) * (8 + rng() * 16); ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    for (const r of [14 + rng() * 10, 34 + rng() * 16]) {   // broken rings
+      ctx.lineWidth = 1; ctx.beginPath();
+      for (let a = 0; a < 6.283; a += 0.3) { const rr = r * (0.85 + rng() * 0.3); if (rng() < 0.3) { ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); continue; } ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(cx, cy, 3 + rng() * 3, 0, 7); ctx.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 // Front-facing planar UVs (x, y) at `scale` repeats per metre.
 function planarUV(geom, scale) {
   const P = geom.attributes.position.array, n = P.length / 3, uv = new Float32Array(n * 2);
@@ -4461,7 +4490,18 @@ class VehicleView {
 
   // Centre of headlight `side` (0 left, 1 right) this frame; false if the model has none.
   // Smashed headlights: the lenses and turn-signal glass are gone (the reflectors stay, dark).
-  smashLamps(on) { for (const m of this.meshes) if (/headlightglass|signal_[lr]/.test(m.name)) m.visible = !on; }
+  // Smashed headlights: the lenses crack and frost over (they stay on the truck); the bulbs go dark (setLights).
+  smashLamps(on) {
+    for (const m of this.meshes) {
+      if (!/headlightglass/.test(m.name)) continue;
+      if (on && !m.geometry.userData.crackUV) {   // planar UVs from the undamaged shape for the crack texture
+        const R = m.geometry.attributes.rest.array, uv = new Float32Array(R.length / 3 * 2);
+        for (let v = 0; v < R.length / 3; v++) { uv[v * 2] = R[v * 3] * 9; uv[v * 2 + 1] = R[v * 3 + 1] * 9; }
+        m.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); m.geometry.userData.crackUV = true;
+      }
+      m.material = on ? this.mats.lensBroken : this.mats.lens;
+    }
+  }
 
   lampPos(side, out) {
     const mesh = this.lamps[side];
@@ -5565,15 +5605,16 @@ async function main() {
     if (fr.length && rr.length) GRIME.uWheels.value.set(avg(fr, w => w.c.z), avg(rr, w => w.c.z), avg(W, w => w.c.y), avg(W, w => w.radius));
   }
   // every lit material renders through the shadow cascades
-  scene.traverse((o) => {
-    const list = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+  const throughCascades = (list) => {
     for (const mt of list) {
       if (!mt.isMeshStandardMaterial || mt.userData.csm) continue;
       csm.setupMaterial(mt); mt.userData.csm = true;
       // the cascades replace onBeforeCompile: run theirs, then the grime's
       if (mt.userData.grimePatch) { const csmPatch = mt.onBeforeCompile; mt.onBeforeCompile = (sh, r) => { csmPatch.call(mt, sh, r); mt.userData.grimePatch(sh); }; }
     }
-  });
+  };
+  scene.traverse((o) => throughCascades(Array.isArray(o.material) ? o.material : (o.material ? [o.material] : [])));
+  throughCascades(Object.values(mats));   // and those swapped in later (the cracked lens)
 
   // post-processing: HDR render -> light bloom -> ACES tone map -> subtle warm balance -> FXAA (when the
   // graphics preset renders without MSAA)
@@ -6028,7 +6069,7 @@ async function main() {
       readFrame(f);
       stepsWindow += f[8];   // substeps the physics thread actually ran (it may stop a batch early)
       // a front crushed 15 cm smashes the headlights; past ~20 cm the windshield starts to crack, more the harder the hit
-      if (!lampsBroken && (f[41] > 0.15 || (f[25] & ((1 << P_HEADLIGHT_L) | (1 << P_HEADLIGHT_R))))) { lampsBroken = true; view.smashLamps(true); setLights(lightsOn); }
+      if (!lampsBroken && f[41] > 0.15) { lampsBroken = true; view.smashLamps(true); setLights(lightsOn); }
       const crack = Math.min(1, Math.max(0, (f[41] - 0.2) / 0.22));
       if (crack > GRIME.uCrack.value) { if (GRIME.uCrack.value === 0) GRIME.uCrackC.value.set((Math.random() - 0.5) * 0.8, 1.27 + Math.random() * 0.08); GRIME.uCrack.value = crack; }
       // road dirt builds up with distance (dirty after ~5 km), faster while the tyres spin
