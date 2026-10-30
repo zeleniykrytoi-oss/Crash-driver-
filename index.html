@@ -375,12 +375,12 @@ function physicsLib() {
   // gives slip-ratio / slip-angle forces at speed and true static friction at a standstill. The force is
   // capped by a Coulomb limit that falls from the static (peak) value to the kinetic one as slip grows.
   const TYRE = {
-    mu: 1.0, kinetic: 0.78, s0: 0.2, vRef: 2.5,
+    mu: 0.92, kinetic: 0.76, s0: 0.2, vRef: 2.5,   // all-season truck tyres on dry concrete: ~0.85 g braking
     Cx: 14, Cy: 9,                 // longitudinal / cornering stiffness per unit load (per unit slip)
     sigmaX: 0.25, sigmaY: 0.5,     // relaxation lengths, m
     damp: 3.0,                     // low-speed patch damping per unit load, s/m
     loadSens: 0.1,                 // grip falls 10 % per 100 % overload
-    rr: 0.013,                     // rolling resistance coefficient
+    rr: 0.015,                     // rolling resistance coefficient (light-truck tyres)
   };
 
   const ED_K = 6;                   // structural nodes blended by each flexnode (embedded deformation)
@@ -392,6 +392,8 @@ function physicsLib() {
   const SETTLE = stepsIn(0.2);      // an awake flexnode untouched this long settles and sleeps
   const CALM = stepsIn(0.04);       // ... or one calm for this long
   const NORMAL_BUDGET = 20000;      // triangles of dented panels whose normals are recomputed per frame
+  const FX_MAX = 48;                // effect events (sparks, dust) sampled per batch for the page
+  const FX_SCRAPE = 1, FX_SNAP = 2, FX_IMPACT = 3;
   const PLEAT = 0.24;               // rest wavelength of the accordion pleats in a crushed bay (m)
   const PLEAT_GAIN = 1.4;           // pleat depth over the inextensible-sheet value, so the folds read clearly
 
@@ -691,6 +693,10 @@ function physicsLib() {
       this.vehicle = null; this.meta = null;
       this.steps = 0; this.nBroken = 0; this.dentEvents = 0;
       this.events = [];
+      // effect events for the page (sparks, dust): a reservoir sample of the batch's scrapes, impacts and
+      // snapped beams, FX_MAX of them, 8 floats each (kind, x, y, z, vx, vy, vz, strength), and how many of
+      // each kind the batch offered (a scraping node offers one every substep), so the page emits per second
+      this.fx = new Float32Array(FX_MAX * 8); this.nFx = 0; this.fxSeen = 0; this.fxCount = new Float32Array(4);
       this.onDent = null;
       this._F = new Float64Array(9); this._w = new Float64Array(4); this._t = new Float64Array(3); this._M = new Float64Array(9);
     }
@@ -777,7 +783,7 @@ function physicsLib() {
       for (const i of ids) for (let k = 0; k < 3; k++) c0[k] += R[i * 3 + k] / 8;
       const h = [0, 1, 2].map(k => Math.abs(R[ids[7] * 3 + k] - R[ids[0] * 3 + k]) / 2);
       const blk = { name, nodes: Int32Array.from(ids), beams, mass, wb: 1 / mass, h, c0, cands: new Int32Array(0),
-        c: new Float64Array(3), E: new Float64Array(9) };
+        c: new Float64Array(3), E: new Float64Array(9), cp: new Float64Array(3), Ep: new Float64Array(9), k: new Float64Array(8) };
       this.blocks.push(blk);
       return blk;
     }
@@ -1071,8 +1077,20 @@ function physicsLib() {
 
     // A snapped attachment beam concentrates its load on its neighbours: their stress counts double (up to
     // four times), so a torn corner unzips along the panel's edge.
+    // Offer an effect event; a reservoir sample keeps FX_MAX of them per batch, spread over all it saw.
+    fxEvent(kind, i3, vx, vy, vz, strength) {
+      this.fxCount[kind]++;
+      const n = this.fxSeen++;
+      let slot = this.nFx;
+      if (slot >= FX_MAX) { slot = Math.floor(Math.random() * (n + 1)); if (slot >= FX_MAX) return; } else this.nFx++;
+      const o = slot * 8, pos = this.pos;
+      this.fx[o] = kind; this.fx[o + 1] = pos[i3]; this.fx[o + 2] = pos[i3 + 1]; this.fx[o + 3] = pos[i3 + 2];
+      this.fx[o + 4] = vx; this.fx[o + 5] = vy; this.fx[o + 6] = vz; this.fx[o + 7] = strength;
+    }
+
     snap(j) {
       this.broken[j] = 1; this.bBreak[j] = this.steps; this.nBroken++;
+      { const a = this.ba[j] * 3, v = this.vel; this.fxEvent(FX_SNAP, a, v[a], v[a + 1], v[a + 2], 1); }
       this.concentrate(j);
       if (this.bgroup[j] >= 0) this.breakGroup(this.bgroup[j]);
     }
@@ -1201,8 +1219,8 @@ function physicsLib() {
       }
     }
 
-    blockFrame(bk) {
-      const pos = this.pos, N = bk.nodes, c = bk.c, E = bk.E;
+    blockFrame(bk, pos = this.pos, c = bk.c, E = bk.E) {
+      const N = bk.nodes;
       c[0] = c[1] = c[2] = 0;
       for (let k = 0; k < 8; k++) { const i = N[k] * 3; c[0] += pos[i] / 8; c[1] += pos[i + 1] / 8; c[2] += pos[i + 2] / 8; }
       let ax = 0, ay = 0, az = 0, bx = 0, by = 0, bz = 0;
@@ -1219,12 +1237,19 @@ function physicsLib() {
     }
 
     // Crumple-zone beams driven into the engine or gearbox are pushed back out of the block (position level,
-    // after integration), so the front end has to pile up against a hard unit.
+    // after integration), so the front end has to pile up against a hard unit. Only the penetration this
+    // step added (the point's depth through the same face in the block's previous frame, so the block's
+    // spin counts) is removed, and the block takes the reaction at the contact point itself, spread over
+    // its corners by trilinear weights: an inelastic contact that can only take energy out. Pushing the
+    // whole depth out, or handing the reaction to the block's centre, fires points off a spinning block
+    // and pumps energy into a tumbling body.
     collideBlock(bk) {
       this.blockFrame(bk);
-      const pos = this.pos, inv = this.inv, E = bk.E, Cn = bk.cands, ba = this.ba, bb = this.bb, broken = this.broken;
-      const hx = bk.h[0], hy = bk.h[1], hz = bk.h[2], wB = bk.wb;
-      let mvx = 0, mvy = 0, mvz = 0;
+      this.blockFrame(bk, this.prev, bk.cp, bk.Ep);
+      const pos = this.pos, prev = this.prev, inv = this.inv, E = bk.E, Ep = bk.Ep, c = bk.c, cp = bk.cp, BN = bk.nodes, K = bk.k;
+      const Cn = bk.cands, ba = this.ba, bb = this.bb, broken = this.broken, hx = bk.h[0], hy = bk.h[1], hz = bk.h[2];
+      const z0 = BN[0] * 3, z4 = BN[4] * 3;   // which way the frame's third axis points along the corners' +z bit
+      const sz = (pos[z4] - pos[z0]) * E[6] + (pos[z4 + 1] - pos[z0 + 1]) * E[7] + (pos[z4 + 2] - pos[z0 + 2]) * E[8] >= 0 ? 1 : -1;
       for (let q = 0; q < Cn.length; q++) {
         const j = Cn[q];
         if (broken[j]) continue;
@@ -1232,27 +1257,31 @@ function physicsLib() {
         if (this.ctxSleeping(this.part[ia])) continue;
         for (let s = 0; s < 4; s++) {
           const t = s / 3, u = 1 - t;
-          const px = pos[a] * u + pos[b] * t - bk.c[0] - mvx, py = pos[a + 1] * u + pos[b + 1] * t - bk.c[1] - mvy, pz = pos[a + 2] * u + pos[b + 2] * t - bk.c[2] - mvz;
+          const px = pos[a] * u + pos[b] * t - c[0], py = pos[a + 1] * u + pos[b + 1] * t - c[1], pz = pos[a + 2] * u + pos[b + 2] * t - c[2];
           const lx = px * E[0] + py * E[1] + pz * E[2], dxp = hx - Math.abs(lx);
           if (dxp <= 0) continue;
           const ly = px * E[3] + py * E[4] + pz * E[5], dyp = hy - Math.abs(ly);
           if (dyp <= 0) continue;
           const lz = px * E[6] + py * E[7] + pz * E[8], dzp = hz - Math.abs(lz);
           if (dzp <= 0) continue;
-          let d = dxp, o = 0, sg = lx >= 0 ? 1 : -1;
-          if (dyp < d) { d = dyp; o = 3; sg = ly >= 0 ? 1 : -1; }
-          if (dzp < d) { d = dzp; o = 6; sg = lz >= 0 ? 1 : -1; }
-          const nx = E[o] * sg, ny = E[o + 1] * sg, nz = E[o + 2] * sg;
-          const wa = inv[ia] * u, wb = inv[ib] * t, W = wa * u + wb * t + wB;
+          let d = dxp, o = 0, sg = lx >= 0 ? 1 : -1, h = hx;
+          if (dyp < d) { d = dyp; o = 3; sg = ly >= 0 ? 1 : -1; h = hy; }
+          if (dzp < d) { d = dzp; o = 6; sg = lz >= 0 ? 1 : -1; h = hz; }
+          // the same point's depth through the same face a step ago
+          const qx = prev[a] * u + prev[b] * t - cp[0], qy = prev[a + 1] * u + prev[b + 1] * t - cp[1], qz = prev[a + 2] * u + prev[b + 2] * t - cp[2];
+          const fresh = Math.min(d, d - Math.max(0, h - sg * (qx * Ep[o] + qy * Ep[o + 1] + qz * Ep[o + 2])));
+          if (!(fresh > 0)) continue;
+          // the block's material point under the contact, as trilinear weights of its corners
+          const fx = 0.5 + 0.5 * lx / hx, fy = 0.5 + 0.5 * ly / hy, fz = 0.5 + 0.5 * sz * lz / hz;
+          let Wb = 0;
+          for (let k = 0; k < 8; k++) { const w = (k & 1 ? fx : 1 - fx) * (k & 2 ? fy : 1 - fy) * (k & 4 ? fz : 1 - fz); K[k] = w; Wb += w * w * inv[BN[k]]; }
+          const wa = inv[ia] * u, wb = inv[ib] * t, W = wa * u + wb * t + Wb;
           if (W <= 0) continue;
-          const dl = d / W;
-          pos[a] += wa * dl * nx; pos[a + 1] += wa * dl * ny; pos[a + 2] += wa * dl * nz;
-          pos[b] += wb * dl * nx; pos[b + 1] += wb * dl * ny; pos[b + 2] += wb * dl * nz;
-          mvx -= wB * dl * nx; mvy -= wB * dl * ny; mvz -= wB * dl * nz;
+          const dl = fresh / W, nx = E[o] * sg * dl, ny = E[o + 1] * sg * dl, nz = E[o + 2] * sg * dl;
+          pos[a] += wa * nx; pos[a + 1] += wa * ny; pos[a + 2] += wa * nz;
+          pos[b] += wb * nx; pos[b + 1] += wb * ny; pos[b + 2] += wb * nz;
+          for (let k = 0; k < 8; k++) { const i = BN[k] * 3, w = K[k] * inv[BN[k]]; pos[i] -= w * nx; pos[i + 1] -= w * ny; pos[i + 2] -= w * nz; }
         }
-      }
-      if (mvx !== 0 || mvy !== 0 || mvz !== 0) {
-        for (let k = 0; k < 8; k++) { const i = bk.nodes[k] * 3; pos[i] += mvx; pos[i + 1] += mvy; pos[i + 2] += mvz; }
       }
     }
 
@@ -1313,7 +1342,7 @@ function physicsLib() {
             // only flexnodes riding mostly on the crumpling nodes
             let wy = 0;
             for (let k = 0, b = f * ED_K; k < ED_K; k++) if (this.steps - this.nodeYield[N[b + k]] < CRUMPLE) wy += W[b + k];
-            wake = wy > 0.35 && this.nActive < SHEET_BUDGET;
+            wake = wy > 0.35 && this.nActive < (this.sheetBudget || SHEET_BUDGET);
           }
           if (!wake && !nearObstacle) continue;
           if (!wake) {
@@ -1429,7 +1458,7 @@ function physicsLib() {
         const k = Math.min(SH.kEdge, 0.5 * B * m / (2 * Math.max(degE[sE[2 * e]], degE[sE[2 * e + 1]])));
         this.sK[e] = k; this.sC[e] = 2 * SH.zeta * Math.sqrt(k * m / 2);
       }
-      this.sKD = new Float64Array(this.nSD); this.sCD = new Float64Array(this.nSD);
+      this.sKD = new Float64Array(this.nSD); this.sCD = new Float64Array(this.nSD); this.sG2 = new Float64Array(this.nSD);
       const G = new Float64Array(12);
       for (let d = 0; d < this.nSD; d++) {
         const o = 4 * d;
@@ -1442,7 +1471,7 @@ function physicsLib() {
         }
         if (!(g2 > 0)) continue;
         const k = Math.min(SH.kBend, 0.35 * B * m / (dg * gmax * gsum));
-        this.sKD[d] = k; this.sCD[d] = 2 * SH.zetaBend * Math.sqrt(k * m / g2);
+        this.sKD[d] = k; this.sCD[d] = 2 * SH.zetaBend * Math.sqrt(k * m / g2); this.sG2[d] = g2;
       }
     }
 
@@ -1521,7 +1550,7 @@ function physicsLib() {
         if (act[fb]) { frc[b] -= f * nx; frc[b + 1] -= f * ny; frc[b + 2] -= f * nz; }
       }
       // dihedral bending: torque -k (theta - theta0) - c dtheta/dt about the shared edge
-      const G = this._G || (this._G = new Float64Array(12)), yB = SH.bendYield, sKD = this.sKD, sCD = this.sCD;
+      const G = this._G || (this._G = new Float64Array(12)), yB = SH.bendYield, sKD = this.sKD, sCD = this.sCD, sG2 = this.sG2;
       for (let k = 0; k < nD; k++) {
         const d = this.sAD[k], o = d * 4, f1 = sD[o], f2 = sD[o + 1], f3 = sD[o + 2], f4 = sD[o + 3];
         if (sKD[d] === 0) continue;
@@ -1534,7 +1563,12 @@ function physicsLib() {
         this.sTh0[d] = th0;
         const rate = G[0] * vel[i1] + G[1] * vel[i1 + 1] + G[2] * vel[i1 + 2] + G[3] * vel[i2] + G[4] * vel[i2 + 1] + G[5] * vel[i2 + 2]
           + G[6] * vel[i3] + G[7] * vel[i3 + 1] + G[8] * vel[i3 + 2] + G[9] * vel[i4] + G[10] * vel[i4 + 1] + G[11] * vel[i4 + 2];
-        const tau = -(sKD[d] * C + sCD[d] * rate);
+        // A crushed triangle that folds nearly flat makes the angle gradient (and so the hinge's stiffness
+        // k |G|^2) blow up like 1 / height^2; held at four times its rest stiffness, the hinge stays inside
+        // the explicit step instead of firing its nodes off.
+        const g2 = G[0] * G[0] + G[1] * G[1] + G[2] * G[2] + G[3] * G[3] + G[4] * G[4] + G[5] * G[5] + G[6] * G[6] + G[7] * G[7] + G[8] * G[8] + G[9] * G[9] + G[10] * G[10] + G[11] * G[11];
+        const cap = g2 > 4 * sG2[d] ? 4 * sG2[d] / g2 : 1;
+        const tau = -(sKD[d] * C + sCD[d] * rate) * cap;
         if (act[f1]) { frc[i1] += tau * G[0]; frc[i1 + 1] += tau * G[1]; frc[i1 + 2] += tau * G[2]; }
         if (act[f2]) { frc[i2] += tau * G[3]; frc[i2 + 1] += tau * G[4]; frc[i2 + 2] += tau * G[5]; }
         if (act[f3]) { frc[i3] += tau * G[6]; frc[i3 + 1] += tau * G[7]; frc[i3 + 2] += tau * G[8]; }
@@ -1615,11 +1649,13 @@ function physicsLib() {
       // penetration carries no impulse, so it can't glue a node to the wall)
       const dN = d < fresh ? d : fresh;
       if (dN <= 0) return;
+      if (fresh > 4 * DT) this.fxEvent(FX_IMPACT, i3, 0, fresh / DT, 0, fresh / DT);   // slammed in at > 4 m/s: dust
       const dx = pos[i3] - prev[i3], dy = pos[i3 + 1] - prev[i3 + 1], dz = pos[i3 + 2] - prev[i3 + 2];
       const dn = dx * nx + dy * ny + dz * nz;
       const tx = dx - dn * nx, ty = dy - dn * ny, tz = dz - dn * nz;
       const tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
       if (tl < 1e-12) return;
+      if (tl > 3 * DT) this.fxEvent(FX_SCRAPE, i3, tx / DT, ty / DT, tz / DT, tl / DT);   // metal sliding on concrete at > 3 m/s: sparks
       const k = tl < 1.15 * mu * dN ? 1 : mu * dN / tl;
       pos[i3] -= tx * k; pos[i3 + 1] -= ty * k; pos[i3 + 2] -= tz * k;
     }
@@ -1845,6 +1881,7 @@ function physicsLib() {
           if (ke > lim) { const r = lim / ke; w.ux *= r; w.uy *= r; }
         }
         om = omN;
+        w.slipV = Math.sqrt((vx - om * re) * (vx - om * re) + vy * vy); w.rollV = avx;   // for tyre smoke and dust on the page
         Fx *= sumN; Fy *= sumN;
         const FX = Fx * ex + Fy * tx, FY = Fx * ey + Fy * ty, FZ = Fx * ez + Fy * tz;
         frc[h3] += FX; frc[h3 + 1] += FY; frc[h3 + 2] += FZ;
@@ -1852,7 +1889,7 @@ function physicsLib() {
         w.fx = Fx; w.fy = Fy;
       } else {
         om = this.brakeClamp(om, dw);
-        w.ux = 0; w.uy = 0; w.fx = 0; w.fy = 0;
+        w.ux = 0; w.uy = 0; w.fx = 0; w.fy = 0; w.slipV = 0; w.rollV = 0;
       }
       w.slip = slip; w.sliding = sliding;
       w.omega = om;
@@ -1887,7 +1924,7 @@ function physicsLib() {
       if (M <= 0) return;
       vx /= M; vy /= M; vz /= M;
       const sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
-      const k = -0.5 * 1.2 * 1.15 * sp / M;   // rho * CdA
+      const k = -0.5 * 1.2 * 1.45 * sp / M;   // rho * CdA (a full-size pickup: Cd ~0.48 on ~3 m^2)
       const ax = k * vx, ay = k * vy, az = k * vz;
       for (let r = 0; r < C.ranges.length; r++) for (let i = C.ranges[r][0]; i < C.ranges[r][1]; i++) { const m = mass[i], i3 = i * 3; frc[i3] += m * ax; frc[i3 + 1] += m * ay; frc[i3 + 2] += m * az; }
     }
@@ -2562,10 +2599,20 @@ function physicsLib() {
   }
 
   /* ------------------ drivetrain + driver input (automatic, torque converter, 4WD) ------------------ */
+  // A Gavril D-Series V8, the class of a Ford F-150 5.0: about 245 hp at 4500 rpm and 425 N m at 3500 rpm,
+  // a 4-speed automatic with E4OD ratios whose torque converter locks up in 3rd and 4th, a 3.55 axle,
+  // rear-biased 4WD with viscous limited-slip axles, and a 178 km/h speed limiter like a road truck's.
+  const ENGINE_CURVE = [[700, 300], [1000, 330], [2000, 395], [3000, 420], [3500, 425], [4000, 410], [4500, 385], [5000, 350], [5500, 300], [6000, 240]];
+  const REDLINE = 5600, V_LIMIT = 178 / 3.6;
   class Drivetrain {
-    constructor() { this.gears = [2.85, 1.78, 1.3, 1.0, 0.8]; this.rev = 3.0; this.final = 3.73; this.reset(); }
-    reset() { this.gear = 1; this.rpm = 800; this.shiftT = 0; this.revHold = 0; }
-    torque(rpm) { const x = (rpm - 3000) / 2700; return 340 * Math.max(0.38, 1 - 0.85 * x * x); }
+    constructor() { this.gears = [2.71, 1.54, 1.0, 0.71]; this.rev = 2.18; this.final = 3.55; this.reset(); }
+    reset() { this.gear = 1; this.rpm = 700; this.shiftT = 0; this.revHold = 0; this.lockup = false; }
+    torque(rpm) {
+      const C = ENGINE_CURVE;
+      if (rpm <= C[0][0]) return C[0][1];
+      for (let i = 1; i < C.length; i++) if (rpm < C[i][0]) { const t = (rpm - C[i - 1][0]) / (C[i][0] - C[i - 1][0]); return C[i - 1][1] + t * (C[i][1] - C[i - 1][1]); }
+      return C[C.length - 1][1];
+    }
     update(inp, wheels, fwdSpeed) {
       const thr = inp.throttle, brk = inp.brake;
       if (this.gear > 0) {
@@ -2578,24 +2625,30 @@ function physicsLib() {
       for (const w of wheels) if (w.drive) { wsum += w.omega; n++; }
       const wavg = n ? wsum / n : 0;
       const rpmW = Math.abs(wavg * ratio) * 9.549296585513721;
-      const stall = 1500 + 1400 * accel;
-      let rpm = Math.max(rpmW, 750), mult = 1, lock = 1;
-      if (rpmW < stall) { rpm = Math.max(rpmW, 750 + (stall - 750) * accel); mult = 1 + 0.55 * (1 - rpmW / stall); lock = rpmW / stall; }
-      this.rpm += (rpm - this.rpm) * Math.min(1, DT * 10);
+      // torque converter: slips up to its stall speed (higher with more throttle) and multiplies torque
+      // meanwhile; in 3rd and 4th above 1300 rpm and off full throttle it locks up
+      this.lockup = this.gear >= 3 && rpmW > 1300 && accel < 0.92 && this.shiftT <= 0;
+      const stall = 1700 + 900 * accel;
+      let rpm = Math.max(rpmW, 700), mult = 1, lock = 1;
+      if (!this.lockup && rpmW < stall) { rpm = Math.max(rpmW, 700 + (stall - 700) * accel); mult = 1 + 0.9 * (1 - rpmW / stall); lock = rpmW / stall; }
+      this.rpm += (rpm - this.rpm) * Math.min(1, DT * 9);
+      // shift schedule: upshift later and downshift (kickdown) earlier the harder the throttle is pressed
       if (this.shiftT > 0) this.shiftT -= DT;
       else if (this.gear > 0) {
-        if (rpmW > 4700 && this.gear < 5) { this.gear++; this.shiftT = 0.3; }
-        else if (rpmW < 1700 && this.gear > 1) { this.gear--; this.shiftT = 0.3; }
+        const up = 1900 + 3300 * accel, down = 1100 + 1900 * accel;
+        if (rpmW > up && this.gear < this.gears.length) { this.gear++; this.shiftT = 0.35; }
+        else if (this.gear > 1 && rpmW * this.gears[this.gear - 2] / this.gears[this.gear - 1] < Math.min(up - 300, REDLINE - 400) && rpmW < down) { this.gear--; this.shiftT = 0.3; }
       }
-      if (rpmW > 5400) accel = 0;
-      const Te = this.torque(this.rpm) * accel * mult * (this.shiftT > 0 ? 0.3 : 1);
-      let Tw = Te * ratio * 0.88 / Math.max(n, 1);
-      if (accel < 0.05 && rpmW > 900) Tw -= Math.sign(wavg) * (16 + this.rpm * 0.007) * Math.abs(ratio) * 0.88 / Math.max(n, 1);
-      const Ieng = 0.22 * ratio * ratio / Math.max(n, 1) * lock;
+      if (rpmW > REDLINE + 200 || Math.abs(fwdSpeed) > V_LIMIT) accel = 0;   // rev limiter, speed limiter
+      const Te = this.torque(this.rpm) * accel * mult * (this.shiftT > 0 ? 0.35 : 1);
+      let Tw = Te * ratio * 0.86 / Math.max(n, 1);
+      // engine braking off throttle
+      if (accel < 0.05 && rpmW > 900) Tw -= Math.sign(wavg) * (22 + this.rpm * 0.009) * Math.abs(ratio) * 0.86 / Math.max(n, 1);
+      const Ieng = 0.28 * ratio * ratio / Math.max(n, 1) * lock;
       for (let i = 0; i < wheels.length; i++) {
         const w = wheels[i];
         const mate = wheels[i ^ 1];   // viscous limited-slip coupling between the two wheels of each axle
-        w.driveT = w.drive ? Tw + 60 * (mate.omega - w.omega) : 0;
+        w.driveT = w.drive ? Tw * (w.front ? 0.8 : 1.2) + 60 * (mate.omega - w.omega) : 0;   // 40 / 60 front / rear
         w.Ieff = w.I + (w.drive ? Ieng : 0);
         w.brakeT = brake * (w.front ? 3800 : 2600);
       }
@@ -2614,7 +2667,7 @@ function physicsLib() {
       const sim = this.sim;
       this.drive.update(this.input, sim.wheels, this.fwdSpeed);
       // speed-sensitive lock with Ackermann geometry; positive steer turns left
-      const v = Math.abs(this.fwdSpeed), maxA = 0.6 / (1 + v / 9);
+      const v = Math.abs(this.fwdSpeed), maxA = 0.5 / (1 + v / 10);   // ~29 degrees of lock at rest: a 12 m turning circle
       const d = this.input.steer * maxA, WB = this.meta.wheelbase, T = this.meta.track;
       let dl = d, dr = d;
       if (Math.abs(d) > 1e-4) {
@@ -2870,7 +2923,7 @@ function physicsLib() {
       sim.syncVisualState();
       const pos = sim.pos, Rt = sim.frameR, FR = sim.fRot, fs3 = sim.fStart * 3;
       const pleating = this.bayCompression(), Rb = this.pRb, PA = PLEAT_GAIN * PLEAT / 4;
-      let nrmBudget = NORMAL_BUDGET;
+      let nrmBudget = this.normalBudget || NORMAL_BUDGET;
       this.frames = (this.frames || 0) + 1;
       // start the normals budget at a different panel each frame, so every dented panel gets its turn
       const S = this.skins, start = this.frames % S.length;
@@ -2988,7 +3041,8 @@ function physicsLib() {
       L.nodes = o; o += sim.nNodes * 3;
       L.beams = o; o += sim.nBeams * 3;
       L.flex = o; o += sim.nFlex;
-      L.wheels = o; L.wheelStride = 16 + 1 + 2 * VEHICLE.wheel.rays + 4; o += sim.wheels.length * L.wheelStride;
+      L.wheels = o; L.wheelStride = 16 + 1 + 2 * VEHICLE.wheel.rays + 6; o += sim.wheels.length * L.wheelStride;
+      L.fx = o; o += 4 + FX_MAX * 8;
       for (const it of this.binder.items) { it.offset = o; o += it.mode === 'skin' ? it.nv * 6 : 16; }
       L.floats = o;
       this.warmUp();
@@ -3098,8 +3152,12 @@ function physicsLib() {
         out[o + 16] = w.theta;
         for (let k = 0; k < w.depth.length; k++) out[o + 17 + k] = w.depth[k];
         const e = o + 17 + w.depth.length;
-        out[e] = w.load; out[e + 1] = w.slip; out[e + 2] = w.steer; out[e + 3] = w.bent;
+        out[e] = w.load; out[e + 1] = w.slip; out[e + 2] = w.steer; out[e + 3] = w.bent; out[e + 4] = w.slipV || 0; out[e + 5] = w.rollV || 0;
       });
+      // effect events gathered over the batch, then cleared for the next one
+      out[L.fx] = sim.nFx; out[L.fx + 1] = sim.fxCount[FX_SCRAPE]; out[L.fx + 2] = sim.fxCount[FX_SNAP]; out[L.fx + 3] = sim.fxCount[FX_IMPACT];
+      out.set(sim.fx.subarray(0, sim.nFx * 8), L.fx + 4);
+      sim.nFx = 0; sim.fxSeen = 0; sim.fxCount.fill(0);
       if (debug) {
         const pos = sim.pos;
         for (let i = 0, n3 = sim.nNodes * 3; i < n3; i++) out[L.nodes + i] = pos[i];
@@ -3127,6 +3185,8 @@ function physicsLib() {
       if (op === 'run') return this.run(a);
       if (op === 'probe') return this.probe();
       if (op === 'bench') return this.bench(a.frames || 30);
+      if (op === 'detail') { this.sim.sheetBudget = a.sheet | 0 || SHEET_BUDGET; this.binder.normalBudget = a.normals | 0 || NORMAL_BUDGET; return true; }
+      if (op === 'energy') return this.energy();
       throw new Error('unknown command ' + op);
     }
 
@@ -3184,6 +3244,35 @@ function physicsLib() {
       const t2 = performance.now();
       for (let k = 0; k < frames; k++) this.sim.syncVisualState();
       return { stepMsPerFrame: +(tStep / frames).toFixed(2), packMs: +(tPack / frames).toFixed(2), syncMs: +((performance.now() - t2) / frames).toFixed(2), active: this.sim.nActive };
+    }
+
+    // Energy of the structure (J), for tests: kinetic, its share spinning about the centre of mass, the share
+    // of that which is rigid tumbling (1/2 L . I^-1 L, the rest is vibration), the wheels' own spin, the
+    // potential energy above the ground and the elastic energy.
+    energy() {
+      const sim = this.sim, pos = sim.pos, vel = sim.vel, n = sim.fStart;
+      let M = 0, ke = 0, pe = 0, px = 0, py = 0, pz = 0, cx = 0, cy = 0, cz = 0;
+      for (let i = 0; i < n; i++) {
+        if (sim.inv[i] === 0) continue;
+        const m = sim.mass[i], i3 = i * 3, vx = vel[i3], vy = vel[i3 + 1], vz = vel[i3 + 2];
+        M += m; ke += 0.5 * m * (vx * vx + vy * vy + vz * vz); pe += m * G * pos[i3 + 1];
+        px += m * vx; py += m * vy; pz += m * vz; cx += m * pos[i3]; cy += m * pos[i3 + 1]; cz += m * pos[i3 + 2];
+      }
+      const ux = px / M, uy = py / M, uz = pz / M;
+      cx /= M; cy /= M; cz /= M;
+      let Lx = 0, Ly = 0, Lz = 0, Ixx = 0, Iyy = 0, Izz = 0, Ixy = 0, Ixz = 0, Iyz = 0;
+      for (let i = 0; i < n; i++) {
+        if (sim.inv[i] === 0) continue;
+        const m = sim.mass[i], i3 = i * 3, rx = pos[i3] - cx, ry = pos[i3 + 1] - cy, rz = pos[i3 + 2] - cz, vx = vel[i3] - ux, vy = vel[i3 + 1] - uy, vz = vel[i3 + 2] - uz;
+        Lx += m * (ry * vz - rz * vy); Ly += m * (rz * vx - rx * vz); Lz += m * (rx * vy - ry * vx);
+        Ixx += m * (ry * ry + rz * rz); Iyy += m * (rx * rx + rz * rz); Izz += m * (rx * rx + ry * ry); Ixy -= m * rx * ry; Ixz -= m * rx * rz; Iyz -= m * ry * rz;
+      }
+      const a = Iyy * Izz - Iyz * Iyz, b = Ixz * Iyz - Ixy * Izz, c = Ixy * Iyz - Ixz * Iyy, det = Ixx * a + Ixy * b + Ixz * c;
+      const wx = (a * Lx + b * Ly + c * Lz) / det, wy = (b * Lx + (Ixx * Izz - Ixz * Ixz) * Ly + (Ixy * Ixz - Ixx * Iyz) * Lz) / det, wz = (c * Lx + (Ixy * Ixz - Ixx * Iyz) * Ly + (Ixx * Iyy - Ixy * Ixy) * Lz) / det;
+      let wheels = 0;
+      for (const w of sim.wheels) wheels += 0.5 * w.I * w.omega * w.omega;
+      return { ke: Math.round(ke), spin: Math.round(ke - 0.5 * M * (ux * ux + uy * uy + uz * uz)), tumble: Math.round(0.5 * (wx * Lx + wy * Ly + wz * Lz)), omega: +Math.hypot(wx, wy, wz).toFixed(2),
+        wheels: Math.round(wheels), pe: Math.round(pe), elastic: this.elasticEnergy() };
     }
 
     // Elastic energy stored in the beams and the volume cells (J), for tests.
@@ -3296,7 +3385,7 @@ function physicsLib() {
   }
 
   return { DT, MAX_NODES, MAX_BEAMS, MAX_STEPS, STATS, NODE_STRUCT, NODE_HUB, NODE_TREAD, NODE_FLEX, NODE_BLOCK,
-    BEAM_STRUCT, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD,
+    BEAM_STRUCT, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, FX_SCRAPE, FX_SNAP, FX_IMPACT, P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD,
     PART_LABELS, VEHICLE, TYRE, World, SimCore, mulberry32 };
 }
 
@@ -3335,10 +3424,10 @@ function workerMain(LIB) {
 }
 
 const PHYS = physicsLib();   // this thread's copy: constants, the World for the scene, and the fallback core
-const { DT, MAX_STEPS, NODE_FLEX, NODE_TREAD, NODE_HUB, NODE_BLOCK, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR,
+const { DT, MAX_STEPS, NODE_FLEX, NODE_TREAD, NODE_HUB, NODE_BLOCK, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, FX_SCRAPE, FX_SNAP, FX_IMPACT,
   P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, mulberry32 } = PHYS;
 const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a];
-const BATCH_MS = 24;   // a batch of substeps stops early past this much time, so a heavy moment can't hold a frame back
+const BATCH_MS = 45;   // a batch of substeps stops early past this much time, so a heavy moment can't hold a frame back
 
 class PhysicsLink {
   constructor() {
@@ -4001,6 +4090,313 @@ class VehicleView {
   }
 }
 
+/* Particle effects: tyre smoke, dust, radiator steam and sparks, driven by the physics thread's wheel data
+   (slip and rolling speed per tyre) and its effect events (metal scraping on concrete, ground impacts,
+   snapping beams). Smoke-like particles are camera-facing billboards cut from a procedural puff atlas, lit
+   with the time of day's sun and sky colours (brighter on top, so the puffs read as volumes) and sorted back
+   to front. Sparks are additive streaks stretched along their velocity, hot enough to bloom, that bounce
+   on the ground. Everything advances with simulation time, so slow motion slows the smoke too. */
+function smokeAtlas() {
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d'), rng = mulberry32(99);
+  for (let k = 0; k < 4; k++) {
+    const ox = (k % 2) * 128, oy = Math.floor(k / 2) * 128;
+    // a billowy puff: overlapping soft blobs, each lit from above (bright top, grey underside)
+    for (let b = 0; b < 16; b++) {
+      const a = rng() * Math.PI * 2, d = Math.sqrt(rng()) * 30, r = 16 + rng() * 26;
+      const x = ox + 64 + Math.cos(a) * d, y = oy + 66 + Math.sin(a) * d * 0.8;
+      const g = ctx.createRadialGradient(x, y - r * 0.35, r * 0.1, x, y, r);
+      const lit = Math.round(200 + rng() * 55), shade = Math.round(120 + rng() * 40), al = 0.16 + rng() * 0.2;
+      g.addColorStop(0, `rgba(${lit},${lit},${lit},${al})`);
+      g.addColorStop(0.55, `rgba(${shade + 40},${shade + 40},${shade + 40},${al * 0.7})`);
+      g.addColorStop(1, `rgba(${shade},${shade},${shade},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(ox, oy, 128, 128);
+    }
+    // keep the edge of each cell fully transparent
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-in';
+    const m = ctx.createRadialGradient(ox + 64, oy + 64, 30, ox + 64, oy + 64, 62);
+    m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = m; ctx.fillRect(ox, oy, 128, 128);
+    ctx.restore();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
+  return t;
+}
+
+class ParticleFX {
+  constructor(scene) {
+    const MAXS = 2400, MAXK = 900;
+    this.capS = MAXS; this.capK = MAXK; this.budS = 1200; this.budK = 450; this.rate = 1;
+    // smoke-like particles: position, velocity, age, life, start / end size, alpha, rotation, spin, tint,
+    // drag (toward the wind), buoyancy, atlas frame
+    this.sP = new Float32Array(MAXS * 3); this.sV = new Float32Array(MAXS * 3); this.sAge = new Float32Array(MAXS); this.sLife = new Float32Array(MAXS);
+    this.sS0 = new Float32Array(MAXS); this.sS1 = new Float32Array(MAXS); this.sA = new Float32Array(MAXS); this.sRot = new Float32Array(MAXS);
+    this.sSpin = new Float32Array(MAXS); this.sTint = new Float32Array(MAXS * 3); this.sDrag = new Float32Array(MAXS); this.sBuoy = new Float32Array(MAXS);
+    this.sFrame = new Float32Array(MAXS); this.nS = 0;
+    this.kP = new Float32Array(MAXK * 3); this.kV = new Float32Array(MAXK * 3); this.kAge = new Float32Array(MAXK); this.kLife = new Float32Array(MAXK); this.kW = new Float32Array(MAXK); this.nK = 0;
+    this.keys = new Uint32Array(MAXS);
+    this.wheelAcc = new Float32Array(16); this.steamAcc = 0; this.simT = 0; this.steamT0 = -1; this.pending = 0;
+    this.wind = new THREE.Vector3(0.7, 0, 0.35);
+    this._v = new THREE.Vector3(); this._a = new THREE.Vector3(); this._b = new THREE.Vector3();
+
+    const quad = (x0, x1, y0, y1) => {
+      const g = new THREE.InstancedBufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute([x0, y0, 0, x1, y0, 0, x1, y1, 0, x0, y1, 0], 3));
+      g.setIndex([0, 1, 2, 0, 2, 3]);
+      return g;
+    };
+    const inst = (g, name, n, size) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(n * size), size); a.setUsage(THREE.DynamicDrawUsage); g.setAttribute(name, a); return a; };
+    const gs = quad(-0.5, 0.5, -0.5, 0.5);
+    this.aPos = inst(gs, 'iPos', MAXS, 3); this.aSize = inst(gs, 'iSize', MAXS, 1); this.aAlpha = inst(gs, 'iAlpha', MAXS, 1);
+    this.aRot = inst(gs, 'iRot', MAXS, 1); this.aFrame = inst(gs, 'iFrame', MAXS, 1); this.aTint = inst(gs, 'iTint', MAXS, 3);
+    gs.instanceCount = 0;
+    this.smokeMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false,
+      uniforms: { map: { value: smokeAtlas() }, uSun: { value: new THREE.Color(0.6, 0.58, 0.55) }, uAmb: { value: new THREE.Color(0.5, 0.53, 0.56) } },
+      vertexShader: `attribute vec3 iPos; attribute float iSize, iAlpha, iRot, iFrame; attribute vec3 iTint;
+        varying vec2 vUv; varying float vA, vTop; varying vec3 vTint;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(iPos, 1.0);
+          float c = cos(iRot), s = sin(iRot);
+          mv.xy += vec2(c * position.x - s * position.y, s * position.x + c * position.y) * iSize;
+          mv.z += iSize * 0.35;   // pulled toward the camera, so big puffs don't slice into the ground
+          gl_Position = projectionMatrix * mv;
+          vUv = (vec2(mod(iFrame, 2.0), floor(iFrame / 2.0)) + position.xy + 0.5) * 0.5;
+          vA = iAlpha; vTint = iTint; vTop = position.y + 0.5;
+        }`,
+      fragmentShader: `uniform sampler2D map; uniform vec3 uSun, uAmb;
+        varying vec2 vUv; varying float vA, vTop; varying vec3 vTint;
+        void main() {
+          vec4 t = texture2D(map, vUv);
+          float a = t.a * vA;
+          if (a < 0.002) discard;
+          vec3 light = uAmb * (0.7 + 0.3 * vTop) + uSun * (0.12 + 0.88 * vTop);   // lit from above: bright crowns, shaded undersides
+          gl_FragColor = vec4(vTint * light * t.rgb, a);
+        }`,
+    });
+    this.smoke = new THREE.Mesh(gs, this.smokeMat);
+    this.smoke.frustumCulled = false; this.smoke.renderOrder = 10;
+    scene.add(this.smoke);
+
+    const gk = quad(0, 1, -1, 1);
+    this.kPos = inst(gk, 'iPos', MAXK, 3); this.kVel = inst(gk, 'iVel', MAXK, 3); this.kHeat = inst(gk, 'iHeat', MAXK, 1); this.kWid = inst(gk, 'iWidth', MAXK, 1);
+    gk.instanceCount = 0;
+    this.sparkMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: `attribute vec3 iPos, iVel; attribute float iHeat, iWidth;
+        varying float vHeat; varying vec2 vQ;
+        void main() {
+          vec4 head = modelViewMatrix * vec4(iPos, 1.0), tail = modelViewMatrix * vec4(iPos - iVel * 0.03, 1.0);
+          vec2 d = head.xy - tail.xy; float l = length(d);
+          vec2 dir = l > 1e-5 ? d / l : vec2(1.0, 0.0);
+          vec4 mv = mix(tail, head, position.x);
+          mv.xy += vec2(-dir.y, dir.x) * position.y * iWidth;
+          gl_Position = projectionMatrix * mv;
+          vHeat = iHeat; vQ = position.xy;
+        }`,
+      fragmentShader: `varying float vHeat; varying vec2 vQ;
+        void main() {
+          float across = 1.0 - abs(vQ.y), a = across * across * (0.2 + 0.8 * vQ.x);
+          vec3 c = mix(vec3(1.0, 0.22, 0.03), vec3(1.0, 0.78, 0.38), vHeat);
+          c = mix(c, vec3(1.0, 0.97, 0.88), vHeat * vHeat);
+          gl_FragColor = vec4(c * (1.5 + 7.0 * vHeat), a);
+        }`,
+    });
+    this.sparks = new THREE.Mesh(gk, this.sparkMat);
+    this.sparks.frustumCulled = false; this.sparks.renderOrder = 11;
+    scene.add(this.sparks);
+  }
+
+  // Particle budgets and emission scale from the graphics preset.
+  setBudget(smoke, sparks, rate) { this.budS = Math.min(this.capS, smoke); this.budK = Math.min(this.capK, sparks); this.rate = rate; this.nS = Math.min(this.nS, this.budS); this.nK = Math.min(this.nK, this.budK); }
+
+  // Smoke takes the time of day's light: the sun's colour from above, the sky's all round, the floodlights.
+  setLight(T) {
+    const sun = new THREE.Color(T.sunColor).multiplyScalar(T.sunI * 0.18), amb = new THREE.Color(T.sky).multiplyScalar(T.hemiI * 0.9);
+    amb.add(new THREE.Color(0xffdcae).multiplyScalar(0.18 * T.lamps));
+    this.smokeMat.uniforms.uSun.value.copy(sun); this.smokeMat.uniforms.uAmb.value.copy(amb);
+  }
+
+  reset() { this.nS = 0; this.nK = 0; this.steamT0 = -1; this.steamAcc = 0; this.wheelAcc.fill(0); }
+
+  puff(x, y, z, vx, vy, vz, life, s0, s1, a0, tint, drag, buoy) {
+    if (this.nS >= this.budS) return;
+    const i = this.nS++, i3 = i * 3;
+    this.sP[i3] = x; this.sP[i3 + 1] = y; this.sP[i3 + 2] = z; this.sV[i3] = vx; this.sV[i3 + 1] = vy; this.sV[i3 + 2] = vz;
+    this.sAge[i] = 0; this.sLife[i] = life; this.sS0[i] = s0; this.sS1[i] = s1; this.sA[i] = a0;
+    this.sRot[i] = Math.random() * 6.283; this.sSpin[i] = (Math.random() - 0.5) * 0.8; this.sFrame[i] = Math.floor(Math.random() * 4);
+    this.sTint[i3] = tint[0]; this.sTint[i3 + 1] = tint[1]; this.sTint[i3 + 2] = tint[2]; this.sDrag[i] = drag; this.sBuoy[i] = buoy;
+  }
+
+  spark(x, y, z, vx, vy, vz, life, w) {
+    if (this.nK >= this.budK) return;
+    const i = this.nK++, i3 = i * 3;
+    this.kP[i3] = x; this.kP[i3 + 1] = y; this.kP[i3 + 2] = z; this.kV[i3] = vx; this.kV[i3 + 1] = vy; this.kV[i3 + 2] = vz;
+    this.kAge[i] = 0; this.kLife[i] = life; this.kW[i] = w;
+  }
+
+  // Emit from one physics frame (it covered f[8] substeps of simulation time).
+  ingest(f, summary, state, view) {
+    const L = summary.layout, dt = f[8] * DT, R = this.rate, rnd = Math.random;
+    if (!(dt > 0)) return;
+    this.pending += dt; this.simT += dt;
+    const vel = state.vel, SMOKE = [0.93, 0.93, 0.94], DUST = [0.76, 0.73, 0.68];
+    // tyres: smoke from the contact patch while it slips, a little dust while rolling fast
+    summary.wheels.forEach((w, i) => {
+      const o = L.wheels + i * L.wheelStride, e = o + 17 + 2 * w.nr;
+      const load = f[e], slipV = f[e + 4], rollV = f[e + 5];
+      if (load < 300) return;
+      const ux = f[o + 4], uy = f[o + 5], uz = f[o + 6], r = w.radius * 0.9;
+      const px = f[o + 12] - ux * r, py = Math.max(0.06, f[o + 13] - uy * r), pz = f[o + 14] - uz * r;
+      const ax = f[o], ay = f[o + 1], az = f[o + 2], half = w.width * 0.4;
+      let rate = 0;
+      if (slipV > 1.5) rate += 45 * (slipV - 1.5) * Math.min(1.6, load / 4500);
+      this.wheelAcc[i] += rate * R * dt;
+      while (this.wheelAcc[i] >= 1) {
+        this.wheelAcc[i] -= 1;
+        const s = (rnd() - 0.5) * 2 * half, strong = Math.min(1, (slipV - 1.2) / 5);
+        this.puff(px + ax * s, py + 0.08, pz + az * s, vel.x * 0.25 + (rnd() - 0.5) * 0.9, 0.45 + rnd() * 0.6, vel.z * 0.25 + (rnd() - 0.5) * 0.9,
+          4 + rnd() * 3, 0.45 + rnd() * 0.25, 3.2 + rnd() * 1.6, 0.18 + 0.42 * strong, SMOKE, 1.3, 0.25);
+      }
+      const dust = (rollV > 10 ? 1.8 * (rollV - 10) : 0) + (slipV > 2 ? 4 * slipV : 0);
+      this.wheelAcc[8 + i] += dust * R * dt;
+      while (this.wheelAcc[8 + i] >= 1) {
+        this.wheelAcc[8 + i] -= 1;
+        this.puff(px + (rnd() - 0.5) * 0.3, py + 0.03, pz + (rnd() - 0.5) * 0.3, vel.x * 0.15 + (rnd() - 0.5) * 0.6, 0.25 + rnd() * 0.35, vel.z * 0.15 + (rnd() - 0.5) * 0.6,
+          1.3 + rnd(), 0.25 + rnd() * 0.15, 1.4 + rnd() * 0.7, 0.2 + rnd() * 0.1, DUST, 2.6, -0.05);
+      }
+    });
+    // physics events: sparks where metal scrapes, sparks and metal dust where beams snap, dust where the body
+    // slams down. The batch sends a sample of its events and how many of each kind it saw, so each sampled
+    // one stands for count / sampled of them: a scraping node offers one per 0.5 ms substep, which makes the
+    // spark shower a rate per scraping node and second, whatever the frame rate.
+    const nE = f[L.fx], E = L.fx + 4, got = this._got || (this._got = new Float32Array(4)), wt = this._wt || (this._wt = new Float32Array(4));
+    got.fill(0);
+    for (let k = 0; k < nE; k++) got[f[E + k * 8]]++;
+    for (let c = 1; c < 4; c++) wt[c] = got[c] ? f[L.fx + c] / got[c] : 0;
+    // a big impact's dust is held to ~60 puffs a batch (times the preset's rate): a little, not a sandstorm
+    let dustAsk = 0;
+    for (let k = 0; k < nE; k++) { const o = E + k * 8; if (f[o] === FX_IMPACT) dustAsk += wt[FX_IMPACT] * Math.min(5, 0.6 + f[o + 7] / 4); }
+    const dustK = 0.5 * R * Math.min(1, 120 / Math.max(dustAsk, 1e-6));
+    for (let k = 0; k < nE; k++) {
+      const o = E + k * 8, kind = f[o], x = f[o + 1], y = Math.max(0.03, f[o + 2]), z = f[o + 3], vx = f[o + 4], vy = f[o + 5], vz = f[o + 6], str = f[o + 7];
+      if (kind === FX_SCRAPE) {
+        // steel on concrete: ~12 sparks a second per scraping node per m/s of sliding, a little grit
+        const per = wt[kind] * R * DT, n = Math.floor(12 * str * per + rnd());
+        for (let q = 0; q < n; q++) {
+          const m = 0.35 + rnd() * 0.5;
+          this.spark(x, y + 0.02, z, vx * m + (rnd() - 0.5) * 4, 0.6 + rnd() * 3.2, vz * m + (rnd() - 0.5) * 4, 0.25 + rnd() * 0.65, 0.011 + rnd() * 0.012);
+        }
+        if (rnd() < 4 * per) this.puff(x, y + 0.05, z, vx * 0.2, 0.3, vz * 0.2, 1.4 + rnd(), 0.22, 1.2, 0.2, DUST, 2.2, 0.02);
+      } else if (kind === FX_SNAP) {
+        const n = Math.round((5 + rnd() * 8) * R * Math.min(wt[kind], 3));
+        for (let q = 0; q < n; q++) this.spark(x, y, z, vx * 0.4 + (rnd() - 0.5) * 9, (rnd() - 0.2) * 7, vz * 0.4 + (rnd() - 0.5) * 9, 0.2 + rnd() * 0.5, 0.01 + rnd() * 0.01);
+        if (rnd() < 0.6) this.puff(x, y, z, vx * 0.3, 0.4, vz * 0.3, 1.5 + rnd(), 0.25, 1.5, 0.28, [0.55, 0.54, 0.52], 2, 0.1);
+      } else if (kind === FX_IMPACT) {
+        const n = Math.floor(wt[kind] * Math.min(5, 0.6 + str / 4) * dustK + rnd());
+        for (let q = 0; q < n; q++) {
+          const a = rnd() * 6.283, sp = 1.5 + rnd() * 2.5;
+          this.puff(x, y + 0.05, z, Math.cos(a) * sp + vel.x * 0.2, 0.5 + rnd(), Math.sin(a) * sp + vel.z * 0.2, 1.8 + rnd() * 1.2, 0.45, 2.6 + rnd(), 0.38, DUST, 2.4, 0.0);
+        }
+      }
+    }
+    // a burst radiator: coolant steam from the grille for half a minute, with dark smoke after a very hard hit
+    const crush = f[41];
+    if (crush < 0.02) this.steamT0 = -1;
+    else if (crush > 0.08) {
+      if (this.steamT0 < 0) this.steamT0 = this.simT;
+      const level = Math.min(1, (crush - 0.08) / 0.22) * Math.exp(-(this.simT - this.steamT0) / 30);
+      this.steamAcc += 80 * level * R * dt;
+      if (this.steamAcc >= 1) {
+        const p = this._a, q = this._b;
+        if (view.lampPos(0, p) && view.lampPos(1, q)) p.add(q).multiplyScalar(0.5); else p.copy(state.cm).addScaledVector(state.fwd, 2.1);
+        p.addScaledVector(state.fwd, -0.35).addScaledVector(state.up, 0.25);
+        while (this.steamAcc >= 1) {
+          this.steamAcc -= 1;
+          const dark = crush > 0.3 && rnd() < 0.25;
+          this.puff(p.x + (rnd() - 0.5) * 0.5, p.y, p.z + (rnd() - 0.5) * 0.5, vel.x + state.fwd.x * rnd() * 0.5 + (rnd() - 0.5) * 0.6, 1.5 + rnd() * 1.0, vel.z + state.fwd.z * rnd() * 0.5 + (rnd() - 0.5) * 0.6,
+            2.2 + rnd() * 1.6, 0.35 + rnd() * 0.15, 2.3 + rnd() * 1.1, 0.62, dark ? [0.36, 0.35, 0.34] : [0.9, 0.92, 0.95], 1.6, dark ? 0.9 : 1.8);
+        }
+      }
+    }
+  }
+
+  // Advance by the simulation time received since the last call, then write the instance buffers.
+  update(camera) {
+    const dt = this.pending; this.pending = 0;
+    const wx = this.wind.x, wz = this.wind.z;
+    if (dt > 0) {
+      for (let i = 0; i < this.nS;) {
+        this.sAge[i] += dt;
+        if (this.sAge[i] >= this.sLife[i]) { this.killS(i); continue; }
+        const i3 = i * 3, d = Math.min(1, this.sDrag[i] * dt);
+        this.sV[i3] += (wx - this.sV[i3]) * d; this.sV[i3 + 1] += -this.sV[i3 + 1] * d + this.sBuoy[i] * dt; this.sV[i3 + 2] += (wz - this.sV[i3 + 2]) * d;
+        this.sP[i3] += this.sV[i3] * dt; this.sP[i3 + 1] += this.sV[i3 + 1] * dt; this.sP[i3 + 2] += this.sV[i3 + 2] * dt;
+        if (this.sP[i3 + 1] < 0.05) { this.sP[i3 + 1] = 0.05; if (this.sV[i3 + 1] < 0) this.sV[i3 + 1] = 0; }
+        this.sRot[i] += this.sSpin[i] * dt;
+        i++;
+      }
+      for (let i = 0; i < this.nK;) {
+        this.kAge[i] += dt;
+        if (this.kAge[i] >= this.kLife[i]) { this.killK(i); continue; }
+        const i3 = i * 3, d = 1 - Math.min(1, 0.5 * dt);
+        this.kV[i3] *= d; this.kV[i3 + 1] = this.kV[i3 + 1] * d - 9.81 * dt; this.kV[i3 + 2] *= d;
+        this.kP[i3] += this.kV[i3] * dt; this.kP[i3 + 1] += this.kV[i3 + 1] * dt; this.kP[i3 + 2] += this.kV[i3 + 2] * dt;
+        if (this.kP[i3 + 1] < 0.01) { this.kP[i3 + 1] = 0.01; this.kV[i3 + 1] = Math.abs(this.kV[i3 + 1]) * 0.3; this.kV[i3] *= 0.55; this.kV[i3 + 2] *= 0.55; this.kAge[i] += 0.05; }
+        i++;
+      }
+    }
+    // smoke, sorted back to front along the view direction
+    const cp = camera.position, dir = camera.getWorldDirection(this._v), keys = this.keys, n = this.nS;
+    for (let i = 0; i < n; i++) {
+      const i3 = i * 3, depth = (this.sP[i3] - cp.x) * dir.x + (this.sP[i3 + 1] - cp.y) * dir.y + (this.sP[i3 + 2] - cp.z) * dir.z;
+      keys[i] = ((65535 - Math.min(65535, Math.max(0, Math.round(depth * 200)))) << 16 | i) >>> 0;
+    }
+    const sorted = keys.subarray(0, n).sort();
+    const P = this.aPos.array, S = this.aSize.array, A = this.aAlpha.array, Ro = this.aRot.array, Fr = this.aFrame.array, Ti = this.aTint.array;
+    for (let k = 0; k < n; k++) {
+      const i = sorted[k] & 0xffff, i3 = i * 3, k3 = k * 3, t = this.sAge[i] / this.sLife[i];
+      P[k3] = this.sP[i3]; P[k3 + 1] = this.sP[i3 + 1]; P[k3 + 2] = this.sP[i3 + 2];
+      S[k] = this.sS0[i] + (this.sS1[i] - this.sS0[i]) * (1 - (1 - t) * (1 - t));
+      A[k] = this.sA[i] * Math.min(1, t * 12) * Math.pow(1 - t, 1.6);
+      Ro[k] = this.sRot[i]; Fr[k] = this.sFrame[i];
+      Ti[k3] = this.sTint[i3]; Ti[k3 + 1] = this.sTint[i3 + 1]; Ti[k3 + 2] = this.sTint[i3 + 2];
+    }
+    for (const a of [this.aPos, this.aSize, this.aAlpha, this.aRot, this.aFrame, this.aTint]) { a.needsUpdate = true; a.clearUpdateRanges && a.clearUpdateRanges(); }
+    this.smoke.geometry.instanceCount = n;
+    const KP = this.kPos.array, KV = this.kVel.array, KH = this.kHeat.array, KW = this.kWid.array;
+    for (let i = 0; i < this.nK; i++) {
+      const i3 = i * 3;
+      KP[i3] = this.kP[i3]; KP[i3 + 1] = this.kP[i3 + 1]; KP[i3 + 2] = this.kP[i3 + 2];
+      KV[i3] = this.kV[i3]; KV[i3 + 1] = this.kV[i3 + 1]; KV[i3 + 2] = this.kV[i3 + 2];
+      KH[i] = 1 - this.kAge[i] / this.kLife[i]; KW[i] = this.kW[i];
+    }
+    for (const a of [this.kPos, this.kVel, this.kHeat, this.kWid]) a.needsUpdate = true;
+    this.sparks.geometry.instanceCount = this.nK;
+  }
+
+  killS(i) {
+    const j = --this.nS;
+    if (i === j) return;
+    const i3 = i * 3, j3 = j * 3;
+    for (let c = 0; c < 3; c++) { this.sP[i3 + c] = this.sP[j3 + c]; this.sV[i3 + c] = this.sV[j3 + c]; this.sTint[i3 + c] = this.sTint[j3 + c]; }
+    this.sAge[i] = this.sAge[j]; this.sLife[i] = this.sLife[j]; this.sS0[i] = this.sS0[j]; this.sS1[i] = this.sS1[j]; this.sA[i] = this.sA[j];
+    this.sRot[i] = this.sRot[j]; this.sSpin[i] = this.sSpin[j]; this.sDrag[i] = this.sDrag[j]; this.sBuoy[i] = this.sBuoy[j]; this.sFrame[i] = this.sFrame[j];
+  }
+
+  killK(i) {
+    const j = --this.nK;
+    if (i === j) return;
+    const i3 = i * 3, j3 = j * 3;
+    for (let c = 0; c < 3; c++) { this.kP[i3 + c] = this.kP[j3 + c]; this.kV[i3 + c] = this.kV[j3 + c]; }
+    this.kAge[i] = this.kAge[j]; this.kLife[i] = this.kLife[j]; this.kW[i] = this.kW[j];
+  }
+}
+
 /* =========================================================================================
    5. SCENE: test bench, sky, sunlight (cascaded shadows, set up in main) + sky-bounce fill
    ========================================================================================= */
@@ -4342,6 +4738,9 @@ async function main() {
   };
   window.addEventListener('resize', resize);
 
+  // tyre smoke, dust, steam and sparks
+  const fx = new ParticleFX(scene);
+
   // headlight beams, placed on the headlight reflectors every frame
   const beams = [0, 1].map(() => {
     const l = new THREE.SpotLight(0xfff1d8, 0, 60, 0.42, 0.45, 2);
@@ -4364,10 +4763,14 @@ async function main() {
   // Graphics presets: render resolution, sun shadows and their map size, anti-aliasing (MSAA, or FXAA
   // without it), bloom, how many floodlights render, and shadows from the headlight beams.
   const GFX = {
-    low: { pr: 0.75, shadows: false, size: 512, msaa: 0, bloom: false, floods: 2, beamShadows: false, label: '¾ resolution · no shadows · FXAA' },
-    medium: { pr: 1.0, shadows: true, size: 1024, msaa: 0, bloom: true, floods: 5, beamShadows: false, label: '1× resolution · 1024 px shadows · FXAA · bloom' },
-    high: { pr: 1.5, shadows: true, size: 2048, msaa: 4, bloom: true, floods: 5, beamShadows: false, label: 'up to 1.5× resolution · 2048 px shadows · 4× MSAA · bloom' },
-    ultra: { pr: 2.0, shadows: true, size: 4096, msaa: 8, bloom: true, floods: 5, beamShadows: true, label: 'up to 2× resolution · 4096 px shadows · 8× MSAA · bloom · headlight shadows' },
+    low: { pr: 0.75, shadows: false, size: 512, msaa: 0, bloom: false, floods: 2, beamShadows: false, sheet: 150, normals: 8000, smoke: 220, sparks: 90, fx: 0.4,
+      label: '¾ resolution · no shadows · FXAA · light skin detail · 220 smoke / 90 spark particles' },
+    medium: { pr: 1.0, shadows: true, size: 1024, msaa: 0, bloom: true, floods: 5, beamShadows: false, sheet: 300, normals: 14000, smoke: 600, sparks: 220, fx: 0.7,
+      label: '1× resolution · 1024 px shadows · FXAA · bloom · 600 smoke / 220 spark particles' },
+    high: { pr: 1.5, shadows: true, size: 2048, msaa: 4, bloom: true, floods: 5, beamShadows: false, sheet: 500, normals: 20000, smoke: 1200, sparks: 450, fx: 1,
+      label: 'up to 1.5× resolution · 2048 px shadows · 4× MSAA · bloom · 1200 smoke / 450 spark particles' },
+    ultra: { pr: 2.0, shadows: true, size: 4096, msaa: 8, bloom: true, floods: 5, beamShadows: true, sheet: 800, normals: 30000, smoke: 2400, sparks: 900, fx: 1.6,
+      label: 'up to 2× resolution · 4096 px shadows · 8× MSAA · bloom · headlight shadows · 2400 smoke / 900 spark particles' },
   };
   const envCache = { day: envr.env };
   const litMaterials = () => {
@@ -4392,6 +4795,7 @@ async function main() {
     envr.hemi.color.set(T.sky); envr.hemi.groundColor.set(T.gnd); envr.hemi.intensity = T.hemiI;
     renderer.toneMappingExposure = T.exposure;
     scene.fog.color.set(T.fog);
+    fx.setLight(T);
     bloom.strength = T.bloom;
     // reflections follow the sky
     if (!envCache[name]) envCache[name] = envr.makeEnv();
@@ -4436,6 +4840,8 @@ async function main() {
     fxaa.enabled = samples === 0;
     bloom.enabled = G.bloom;
     if (shadowsChanged) for (const mt of litMaterials()) mt.needsUpdate = true;
+    link.call('detail', { sheet: G.sheet, normals: G.normals });   // lighter skin detail on weaker presets
+    fx.setBudget(G.smoke, G.sparks, G.fx);
     updateLights();
     resize();
     needFrame = true;
@@ -4523,7 +4929,7 @@ async function main() {
   function doReset(silent) {
     acc = 0;
     if (!silent) pushFeed('VEHICLE RESET');
-    return link.call('reset').then(() => { link.dropLatest(); view.reset(); needFrame = true; snapNext = true; });
+    return link.call('reset').then(() => { link.dropLatest(); view.reset(); fx.reset(); needFrame = true; snapNext = true; });
   }
   function cycleCam() { rig.mode = (rig.mode + 1) % 3; rig.userYaw = rig.userPitch = 0; $('camName').textContent = rig.names[rig.mode]; }
   function toggleNodes() { const on = !view.debug; view.setDebug(on); needFrame = true; $('btnNodes').setAttribute('aria-pressed', String(on)); }
@@ -4560,7 +4966,7 @@ async function main() {
 
   // console / automation hook: hook.call(op, args) runs commands inside the physics thread
   const hook = window.__crashDriver = {
-    link, summary, view, rig, renderer, composer, scene, camera, csm, state, stats, settings, mode: link.mode, paused: false,
+    link, summary, view, rig, renderer, composer, scene, camera, csm, state, stats, settings, fx, mode: link.mode, paused: false,
     call: (op, args) => link.call(op, args),
     reset: () => doReset(true),
     refresh: () => { needFrame = true; },
@@ -4595,12 +5001,13 @@ async function main() {
     input.steer = steerState.v;
 
     // Fixed 0.5 ms substeps: the frame time is split into as many as are due, and the physics thread runs
-    // them while this thread renders the last frame. A batch never holds more substeps than the physics
-    // thread can run, with its skinning, in about 22 ms (its substep rate is measured from the last
-    // batches), and a backlog beyond that is dropped: a heavy moment such as an impact plays as smooth slow
-    // motion, never as a slideshow of catch-up batches.
+    // them while this thread renders the last frame. Real time comes first: a batch may hold as many
+    // substeps as the physics thread can run, with its skinning, in about 40 ms (its substep rate is
+    // measured from the last batches), so a slower device keeps real time at a lower frame rate. Only a
+    // backlog beyond that is dropped: a moment too heavy even for that (an impact on a slow device) plays as
+    // smooth slow motion, never as a slideshow of huge catch-up batches.
     if (hook.paused) acc = 0; else acc += dtF * timeScale;
-    const cap = Math.max(6, Math.min(MAX_STEPS, Math.floor(stats.stepRate * Math.max(8, 22 - stats.packMs))));
+    const cap = Math.max(8, Math.min(MAX_STEPS, Math.floor(stats.stepRate * Math.max(12, 40 - stats.packMs))));
     if (!link.busy) {
       let n = Math.floor(acc / DT + 1e-9);
       if (n > cap) { n = cap; acc = 0; } else acc -= n * DT;
@@ -4611,7 +5018,9 @@ async function main() {
 
     const buf = link.take();
     if (buf) {
-      readFrame(view.apply(buf));
+      const f = view.apply(buf);
+      readFrame(f);
+      fx.ingest(f, summary, state, view);
       if (snapNext) { rig.snap(state); snapNext = false; }
     }
     if (link.events.length) {
@@ -4630,6 +5039,7 @@ async function main() {
     }
     if (Math.abs(camera.fov - csmFov) > 0.4) { csm.updateFrustums(); csmFov = camera.fov; }
     camera.updateMatrixWorld();
+    fx.update(camera);
     csm.update();
     envr.sky.position.copy(camera.position);
     grade.uniforms.uTime.value = now / 1000;
@@ -4643,7 +5053,10 @@ async function main() {
       $('gear').textContent = g < 0 ? 'R' : String(g);
       $('rpm').textContent = String(Math.round(stats.rpm / 10) * 10);
       $('rpmBar').style.width = Math.min(100, stats.rpm / 55) + '%';
-      $('sHz').textContent = Math.round(hz) + ' Hz' + (timeScale !== 1 ? ' · ×0.05' : '');
+      // below real time (the device can't keep up) the HUD says by how much
+      const rtf = hz * DT;
+      $('sHz').textContent = Math.round(hz) + ' Hz' + (timeScale !== 1 ? ' · ×0.05' : (rtf < 0.93 && !hook.paused ? ' · ×' + rtf.toFixed(2) : ''));
+      $('sHz').classList.toggle('hot', timeScale === 1 && rtf < 0.93 && !hook.paused);
       $('sMs').textContent = stats.solveMs.toFixed(1) + ' + ' + stats.packMs.toFixed(1) + ' ms';
       $('sBroken').textContent = String(stats.broken);
       $('sBroken').classList.toggle('hot', stats.broken > 0);
