@@ -2,11 +2,11 @@
 
 A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
-- 982 beams: structural, shear (diagonal) and support;
-- 43 volume cells;
-- a sheet-metal skin of 5620 stretch springs and 3535 dihedral bending springs.
+- 956 beams: structural, shear (diagonal) and support;
+- 42 volume cells;
+- a sheet-metal skin of 5608 stretch springs and 3519 dihedral bending springs.
 
-In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate and taillights hang from their hinges, bolts and clips or tear off when their brackets fail. The grille never comes off: at most one side tears loose and hangs, and the other side stays as it was. The headlights stay on the crushed front, cracked and dark.
+In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate and taillights hang from their hinges, bolts and clips or tear off when their brackets fail. The grille and the headlights never come off: they stay on the crushed front and bend with it, so a crash never opens a view into the engine bay. The headlights crack and go dark.
 
 The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area is a white gridmap under a blue sky with clouds, ringed by pale dunes, with ruled grey blocks, a steel post, a suspension test course, a drag strip, a skid pad and palm islands.
 
@@ -53,19 +53,19 @@ The windows and buttons are drawn in a plain desktop style (Segoe UI, light grey
 
 ## Controls
 
-| Action | Keyboard | Touch |
+| Action | Keyboard | Toolbar or touch |
 | --- | --- | --- |
-| Throttle | W / ↑ | THROTTLE paddle |
-| Brake (ABS); hold at a stop to reverse | S / ↓ | BRAKE paddle |
-| Steer | A D / ← → | ◀ ▶ buttons |
-| Reset vehicle | R | RESET VEHICLE |
-| Cycle camera (chase, orbit, trackside) | C | CAM |
-| Zoom in / out | + / − or the mouse wheel | + / − buttons, or pinch on the view |
-| Headlights on / off | L | LIGHTS |
-| f-node debug view | N | F-NODES |
-| Slow motion: 20× slower (×0.05), still whole 0.5 ms substeps | T | SLOW-MO |
-| Settings: deformation and graphics | G (Esc closes) | SETTINGS |
-| Main menu (pauses) | Esc | MENU |
+| Throttle | W / ↑ | Throttle pedal (touch) |
+| Brake (ABS); hold at a stop to reverse | S / ↓ | Brake pedal (touch) |
+| Steer | A D / ← → | ◀ ▶ buttons (touch) |
+| Reset vehicle | R | Reset |
+| Cycle camera (chase, orbit, trackside) | C | Camera |
+| Zoom in / out | + / − or the mouse wheel | + / −, or pinch on the view |
+| Headlights on / off | L | Lights |
+| Node and beam debug view | N | Node view |
+| Slow motion: 20× slower (×0.05), still whole 0.5 ms substeps | T | Slow motion |
+| Settings: deformation and graphics | G (Esc closes) | Settings |
+| Main menu (pauses) | Esc | Menu |
 | Orbit camera | drag on the view | drag on the view |
 
 The chase camera holds the truck's heading closely, so a hard turn doesn't show the truck from the side as if it slid. Its lens widens a little with speed.
@@ -98,10 +98,16 @@ The suspension course, driven toward the wall end:
 
 The humps are smooth raised-cosine profiles in the physics (their own collider type, with the slope's normal), not boxes, so the tyres roll over them. Each section is named on the floor.
 
-The HUD shows:
-- the solver rate and load (step time plus skinning time per frame, on the worker). When the device can't keep up with real time, the rate turns red with the playback factor, for example `×0.62`;
-- each tyre's share of the total load, so weight transfer is visible, with a tyre turning red while it slides;
-- the body's lateral and longitudinal acceleration.
+**HUD.** The in-game interface is a simulator's, not an arcade's. It uses Overpass and Overpass Mono, white text in sentence case on dark translucent panels, and a single orange accent for state.
+
+- **Toolbar** across the top: the Beams.Web mark with Menu, then Reset, Camera (with the current mode), Lights, Slow motion, Node view and Settings, each with its key. On the right are the structure's size, the solver rate and the zoom buttons. A toggled button gets an orange underline. On narrow screens the buttons shrink to icons.
+- **Physics app** at the upper left, which folds away; its state is remembered in the browser, and it starts folded on small screens. It shows nodes, beams, substep, solver, step and skinning time per frame, broken and deformed beams, active skin nodes and damage. Below those are each tyre's share of the load (weight transfer, red while the tyre slides) and the body's lateral and longitudinal g.
+- **Speedometer app** at the lower right: speed, gear and an rpm bar with a redline. On touch screens it moves to the bottom centre.
+- **Messages** in small dark toasts under the toolbar. Warnings, such as a detached part or structural failure, get an orange edge.
+- **Controls hint** at the lower left, which steps aside after 20 s, above the model credit.
+- **On-screen steering and pedals** only on touch screens.
+
+When the device can't keep up with real time, the solver rate turns red with the playback factor, for example `×0.62`. The picture itself is neutral, with no colour tint, vignette or grain; only the main menu has its black-and-white grade.
 
 ## Architecture
 
@@ -147,7 +153,7 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 - **Rigid blocks:** 8 corner nodes each for the engine and the gearbox.
 - **Hubs:** 4, one per wheel centre.
 - **Tread probes:** 256, a fixed 2 × 32 ring per wheel.
-- **Flexnodes:** 3992 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
+- **Flexnodes:** 4000 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
 
 **Beams.** Each beam is a spring-damper along its axis: F = k·(L − L0) + c·v<sub>rel</sub>, with k = E/L0 and c set by the family's damping ratio. There are three kinds:
 
@@ -218,11 +224,11 @@ Two visual cues come from the crush itself:
 - **Headlights:** once the front has crushed 15 cm the headlights are smashed. Their lenses crack and frost over and they stay dark, though the tail lights still work.
 - **Windshield:** past about 20 cm the windshield cracks. A crushed white star forms at a random point near its base, with spokes and broken rings running out from it, and the cracks reach further the harder the hit.
 
-RESET VEHICLE repairs both.
+Reset repairs both.
 
 ## Detaching parts
 
-Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood, the left and right front fenders, the tailgate and the left and right taillights. The grille is cut out of the fascia (the triangles between the headlights) into a part of its own. Each part hangs on named brackets of attachment beams:
+Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood, the left and right front fenders, the tailgate and the left and right taillights. Each part hangs on named brackets of attachment beams:
 
 | Part | Lattice | Brackets |
 | --- | --- | --- |
@@ -231,11 +237,11 @@ Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, 
 | Front fenders | 4 × 2 × 2 | front bolts, two top bolts, rear bolts at the door pillar |
 | Tailgate | 3 × 2 × 2 | two hinges below, two latches above |
 | Bumpers | 4 × 2 × 2 | four middle bolts and two end brackets |
-| Grille, taillights | 2 × 2 × 2 box fitted to the part | left and right plastic clips at the face toward the cab |
+| Taillights | 2 × 2 × 2 box fitted to the part | left and right plastic clips at the face toward the cab |
 
 The taillights are small housings on plastic clips that let go early.
 
-**The grille never comes off.** It is a tethered part. Each of its brackets belongs to the left or the right side. The first bracket to fail picks the loose side, and from then on every bracket on the other side holds: its remaining beams can no longer break and stay elastic, so that side keeps its shape. The grille's own lattice can't tear either. A 50 km/h wall hit pops one side, and the grille swings down and hangs from the other. Across straight hits at 50 to 110 km/h and angled hits at 50 to 140 km/h it never came off.
+**The grille stays with the body.** It is cut out of the fascia (the triangles between the headlights) into a trim mesh of its own, and skinned to the front's sheet metal like the fascia. It bends a little with a crushed front, mostly at its edges, but never falls out or hangs open, so the engine bay behind it never shows.
 
 **The headlights stay on the truck.** The lamps and turn signals are skinned to the fascia's sheet metal, not hung on brackets. They stay on the visible face of a crushed front and crumple with it. Once the front has crushed 15 cm their lenses crack and frost over with a web of white cracks, and the bulbs go dark.
 
@@ -302,7 +308,7 @@ Measured on the bench: 0–100 km/h in 8.0 s (0–60 mph in 7.6 s), 178 km/h on 
 
 ## Settings
 
-The SETTINGS button (or G), or Options in the main menu, opens a panel with two choices. They are remembered in this browser.
+Settings in the toolbar (or G), or Options in the main menu, opens a panel with two choices. They are remembered in this browser.
 
 **Deformation:**
 
@@ -347,7 +353,7 @@ The default is HIGH on desktop and MEDIUM on touch devices.
   - Mud collects low on the body (rockers, bumpers, lower doors), with a ragged edge and short run-down streaks, and it sprays up and back from each wheel with flung specks.
   - Dust settles on faces that look up.
   - Mud makes paint matte and dulls chrome. The tyres go grey-brown and the wheels collect brake dust.
-  - The truck starts with a light film of road dust and gets dirtier with distance, quite dirty after about 5 km, faster while its tyres spin. RESET VEHICLE washes it.
+  - The truck starts with a light film of road dust and gets dirtier with distance, quite dirty after about 5 km, faster while its tyres spin. Reset washes it.
 - **Materials:** physically based. Clearcoat coral-red paint with a working truck's sheen rather than a mirror finish, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, and chrome bumpers. The ground is the white gridmap with painted markings.
 - **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Each flexnode's map is affine (x → R·x + T), so a vertex needs one blended matrix: (Σ w·R)·v + Σ w·T.
 - **Intact panels:** a panel moving as a rigid body skips skinning altogether. The worker fits one matrix to its flexnodes (their mean rotation and the shift of their centroid), and the page draws the panel's rest geometry under it, uploading no vertices. A panel stays skinned while it is pleated, while any of its flexnodes is awake or dented, or while a flexnode sits more than 7 mm off the fit (16 mm to leave). That covers bent structure, and the frame and doors flexing under hard braking and cornering. An intact truck is drawn almost entirely from matrices. Normals are recomputed once a panel is dented. The panels take turns under a budget of 20,000 triangles per frame, since a crash dents many at once; a panel waiting for its turn shows its rotated rest normals.

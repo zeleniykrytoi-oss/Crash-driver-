@@ -6,29 +6,29 @@
 <title>Beams.Web</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Share+Tech+Mono&family=Ubuntu:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;500;600;700&family=Overpass+Mono:wght@400;600&family=Ubuntu:wght@400;500&display=swap">
 <style>
-/* Layout: full-bleed WebGL canvas; HUD pinned to the four screen corners inside the safe-area insets.
-   One deliberate look over a bright daylight scene: dark ink with a light halo for free-standing text,
-   smoked-glass panels with cream text, amber accents. No separate dark/light themes. */
+/* Layout: full-bleed WebGL canvas. The in-game HUD is a simulator's, not an arcade's: a thin toolbar across
+   the top, small dark "apps" (physics telemetry at the upper left, the speedometer at the lower right),
+   white text in a plain sans-serif, sentence case, and one orange accent kept for state. No separate
+   dark/light themes: the panels carry their own contrast over any sky. */
 :root {
-  --bg: #0d0b07;
-  --panel: rgba(22, 16, 8, 0.56);
-  --panel-edge: rgba(255, 190, 100, 0.24);
-  --ink: #f6ead0;
-  --muted: #c9b48a;
-  --accent: #ffa424;
-  --accent-ink: #1c1104;
-  --danger: #ff5a36;
-  --go: #b9e27c;
-  --hud-ink: #1a1d20;
-  --hud-muted: #464b51;
-  --hud-halo: 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 255, 255, 0.55);
-  --font-display: 'Saira Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
-  --font-data: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --bg: #0b0b0b;
+  --panel: rgba(17, 18, 20, 0.8);
+  --panel-hi: rgba(36, 38, 42, 0.9);
+  --panel-edge: rgba(255, 255, 255, 0.08);
+  --ink: #f1f2f3;
+  --muted: #9da3aa;
+  --accent: #ff6a13;
+  --accent-ink: #ffffff;
+  --danger: #ef5343;
+  --go: #63c25b;
+  --font-display: 'Overpass', 'Segoe UI', system-ui, sans-serif;
+  --font-data: 'Overpass Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --font-brand: 'Ubuntu', 'Segoe UI', system-ui, sans-serif;          /* the Beams.Web title and wordmark */
   --font-ui: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;         /* menu buttons and dialogs: plain desktop UI */
   --brand-orange: #f7941d;
+  --bar-h: 38px;
   --edge: 16px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
@@ -37,116 +37,131 @@
   color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); overflow: hidden; overscroll-behavior: none; }
-/* at night the free-standing HUD text turns light on a dark halo */
-body[data-time="night"] { --hud-ink: #f3e8d2; --hud-muted: #cbb894; --hud-halo: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.65); }
 body { font-family: var(--font-display); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
 #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
-#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud { position: fixed; inset: 0; pointer-events: none; font-size: 13px; }
 #hud button { pointer-events: auto; font-family: var(--font-display); cursor: pointer; -webkit-touch-callout: none; touch-action: none; }
-#hud button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#hud button:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.app { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 4px; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); pointer-events: auto; }
 
-/* --- top-left: brand + live physics telemetry --- */
-.brand { position: absolute; top: calc(var(--edge) + var(--safe-t)); left: calc(var(--edge) + var(--safe-l)); }
-.brand-title { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.04em; line-height: 0.9; color: var(--hud-ink); text-shadow: var(--hud-halo); }
-.brand-title span { color: var(--accent); margin-left: 0.04em; }
-.brand-sub { font-family: var(--font-data); font-size: 11px; letter-spacing: 0.08em; color: var(--hud-muted); text-shadow: var(--hud-halo); margin-top: 4px; text-transform: uppercase; }
-.stats { margin-top: 10px; display: grid; grid-template-columns: auto auto; column-gap: 12px; row-gap: 1px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px; font-family: var(--font-data); font-size: 11.5px; font-variant-numeric: tabular-nums; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); width: max-content; }
-.stats dt { color: var(--muted); letter-spacing: 0.08em; }
-.stats dd { margin: 0; text-align: right; color: var(--ink); }
+/* --- top toolbar --- */
+.bar { position: absolute; top: 0; left: 0; right: 0; height: calc(var(--bar-h) + var(--safe-t)); padding: var(--safe-t) calc(6px + var(--safe-r)) 0 calc(6px + var(--safe-l)); box-sizing: border-box;
+  display: flex; align-items: center; gap: 2px; background: rgba(14, 15, 17, 0.82); border-bottom: 1px solid var(--panel-edge); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: auto; }
+.bb { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px; color: var(--ink); background: transparent; border: 0; border-radius: 3px; font-size: 13px; font-weight: 500; white-space: nowrap; position: relative; }
+.bb:hover { background: rgba(255, 255, 255, 0.08); }
+.bb:active { background: rgba(255, 255, 255, 0.14); }
+.bb svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+.bb kbd { font-family: var(--font-data); font-size: 10.5px; color: var(--muted); padding: 1px 4px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 2px; line-height: 1.2; }
+.bb-val { color: var(--muted); }
+.bb[aria-pressed="true"], .bb[aria-expanded="true"] { background: rgba(255, 255, 255, 0.07); }
+.bb[aria-pressed="true"]::after, .bb[aria-expanded="true"]::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 1px; height: 2px; border-radius: 1px; background: var(--accent); }
+.bb-ic { padding: 0 8px; font-size: 17px; font-weight: 400; }
+.bb-mark svg { width: 24px; height: 18px; opacity: 1; stroke: none; }
+.bar-sep { width: 1px; height: 18px; margin: 0 6px; background: rgba(255, 255, 255, 0.12); flex: none; }
+.bar-fill { flex: 1 1 auto; }
+.bar-stat { font-family: var(--font-data); font-size: 11.5px; color: var(--muted); margin-right: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bar-stat.hot { color: var(--danger); }
+
+/* --- physics app (upper left), collapsible --- */
+.phys { position: absolute; top: calc(var(--bar-h) + var(--safe-t) + 10px); left: calc(10px + var(--safe-l)); width: 252px; }
+.app-head { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 28px; padding: 0 10px; box-sizing: border-box; background: transparent; border: 0; color: var(--ink); font-size: 12.5px; font-weight: 600; text-align: left; }
+.app-head svg { width: 12px; height: 12px; fill: none; stroke: var(--muted); stroke-width: 2; transition: transform 0.15s; }
+.phys.closed .app-head svg { transform: rotate(-90deg); }
+.phys.closed .phys-body { display: none; }
+.phys-body { padding: 2px 10px 10px; border-top: 1px solid var(--panel-edge); }
+.stats { margin: 8px 0 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.stats dt { color: var(--muted); white-space: nowrap; }
+.stats dd { margin: 0; text-align: right; color: var(--ink); font-family: var(--font-data); font-size: 11.5px; white-space: nowrap; }
 .stats dd.hot { color: var(--danger); }
-/* tyre load share (weight transfer) + body accelerations */
-.dyn { margin-top: 6px; display: flex; gap: 12px; align-items: center; padding: 6px 10px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px; width: max-content; font-family: var(--font-data); font-size: 11px; color: var(--muted); letter-spacing: 0.06em; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
-.tyres { display: grid; grid-template-columns: 9px 9px; column-gap: 13px; row-gap: 5px; }
-.tyres span { display: block; width: 9px; height: 20px; background: rgba(255, 236, 205, 0.16); position: relative; overflow: hidden; border-radius: 1px; }
-.tyres span i { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: var(--go); transition: height 0.12s linear; }
+.dyn { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--panel-edge); display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); }
+.tyres { display: grid; grid-template-columns: 8px 8px; column-gap: 12px; row-gap: 5px; }
+.tyres span { display: block; width: 8px; height: 18px; background: rgba(255, 255, 255, 0.1); position: relative; overflow: hidden; border-radius: 1px; }
+.tyres span i { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: #d9dde2; transition: height 0.12s linear; }
 .tyres span.slide i { background: var(--danger); }
-.dyn-txt { display: flex; flex-direction: column; gap: 2px; white-space: pre; }
-.dyn-txt b { font-weight: normal; color: var(--ink); }
-.statline { display: none; max-width: 44vw; margin-top: 4px; font-family: var(--font-data); font-size: 10px; color: var(--hud-muted); text-shadow: var(--hud-halo); letter-spacing: 0.04em; }
-.feed { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.feed li { font-weight: 700; font-size: 15px; letter-spacing: 0.06em; color: var(--accent-ink); background: var(--accent); padding: 2px 8px; width: max-content; transition: opacity 0.6s, transform 0.6s; }
-.feed li.warn { background: var(--danger); color: var(--ink); }
-.feed li.fade { opacity: 0; transform: translateX(-12px); }
+.dyn-txt { display: flex; flex-direction: column; gap: 3px; white-space: pre; }
+.dyn-txt b { font-weight: normal; color: var(--ink); font-family: var(--font-data); font-size: 11.5px; }
 
-/* --- top-right: reset + toggles --- */
-.tools { position: absolute; top: calc(var(--edge) + var(--safe-t)); right: calc(var(--edge) + var(--safe-r)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.reset { font-weight: 800; font-size: 20px; letter-spacing: 0.08em; padding: 12px 20px; color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,0.35), 0 6px 26px rgba(255, 150, 30, 0.45); }
-.reset:active { transform: translateY(1px) scale(0.98); filter: brightness(1.1); }
-.toggles { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.tog { font-weight: 700; font-size: 13px; letter-spacing: 0.08em; padding: 7px 10px; color: var(--ink); background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px; }
-.tog i { font-style: normal; color: var(--accent); margin-left: 4px; }
-.tog[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.tog[aria-pressed="true"] i { color: var(--accent-ink); }
-.zoom { display: flex; gap: 6px; }
-.zbtn { width: 40px; height: 36px; padding: 0; font-size: 22px; line-height: 1; }
+/* --- messages (top centre) --- */
+.feed { position: absolute; top: calc(var(--bar-h) + var(--safe-t) + 10px); left: 50%; transform: translateX(-50%); list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.feed li { font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--panel-edge); border-left: 3px solid var(--muted); border-radius: 3px; padding: 5px 12px; white-space: nowrap; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: opacity 0.6s, transform 0.6s; }
+.feed li.warn { border-left-color: var(--accent); }
+.feed li.fade { opacity: 0; transform: translateY(-6px); }
 
-/* --- settings panel (flows under the toggles in the tools column) --- */
-.settings { width: 300px; max-width: calc(100vw - 2 * var(--edge) - var(--safe-l) - var(--safe-r)); box-sizing: border-box; padding: 10px 12px 12px; background: rgba(22, 16, 8, 0.82); border: 1px solid var(--panel-edge); border-radius: 3px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); pointer-events: auto; z-index: 2; }
+/* --- settings app (under the toolbar, right) --- */
+.settings { position: absolute; top: calc(var(--bar-h) + var(--safe-t) + 10px); right: calc(10px + var(--safe-r)); width: 320px; max-width: calc(100vw - 20px - var(--safe-l) - var(--safe-r)); box-sizing: border-box; padding: 0 0 12px; z-index: 2; }
 .settings[hidden] { display: none; }
-.set-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 15px; letter-spacing: 0.1em; color: var(--ink); }
-.set-x { background: none; border: 0; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 4px; }
-.set-row { margin-top: 10px; }
-.set-lbl { display: block; font-family: var(--font-data); font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 5px; }
-.seg { display: flex; gap: 4px; }
-.seg button { flex: 1 1 0; min-width: 0; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; padding: 8px 4px; color: var(--ink); background: rgba(255, 236, 205, 0.08); border: 1px solid var(--panel-edge); border-radius: 3px; }
-.seg button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.set-note { margin: 10px 0 0; font-family: var(--font-data); font-size: 10.5px; line-height: 1.45; color: var(--muted); letter-spacing: 0.03em; }
+.set-head { display: flex; align-items: center; justify-content: space-between; height: 30px; padding-left: 12px; font-weight: 600; font-size: 12.5px; color: var(--ink); border-bottom: 1px solid var(--panel-edge); }
+#hud .set-x { width: 34px; height: 30px; background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1; padding: 0; }
+#hud .set-x:hover { color: var(--ink); }
+.set-row { margin: 12px 12px 0; }
+.set-lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.seg { display: flex; gap: 3px; }
+#hud .seg button { flex: 1 1 0; min-width: 0; font-weight: 500; font-size: 12.5px; padding: 7px 4px; color: var(--ink); background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 3px; }
+#hud .seg button:hover { background: rgba(255, 255, 255, 0.11); }
+#hud .seg button[aria-checked="true"] { background: rgba(255, 106, 19, 0.16); border-color: var(--accent); }
+.set-note { margin: 12px 12px 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
 
-/* --- bottom-centre: speedo --- */
-.gauge { position: absolute; left: 50%; bottom: calc(10px + var(--safe-b)); transform: translateX(-50%); text-align: center; }
-.speed { font-weight: 800; font-style: italic; font-size: 54px; line-height: 0.9; font-variant-numeric: tabular-nums; color: var(--hud-ink); text-shadow: var(--hud-halo); }
-.speed small { font-size: 16px; font-style: normal; font-weight: 700; color: var(--hud-muted); margin-left: 4px; letter-spacing: 0.06em; }
-.gear-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 2px; font-family: var(--font-data); font-size: 13px; color: var(--hud-muted); text-shadow: var(--hud-halo); }
-.gear-row #gear { color: var(--accent); font-size: 18px; min-width: 1.2em; }
-.rpm { width: 120px; height: 6px; background: rgba(26, 29, 32, 0.25); border-radius: 2px; overflow: hidden; }
-.rpm i { display: block; height: 100%; width: 10%; background: linear-gradient(90deg, var(--go), var(--accent) 70%, var(--danger)); }
-.credit { margin-top: 6px; font-family: var(--font-data); font-size: 9.5px; color: var(--hud-muted); text-shadow: var(--hud-halo); max-width: 60vw; }
-.credit a { color: var(--hud-muted); }
-.credit a { pointer-events: auto; }
+/* --- speedometer app (lower right) --- */
+.speedo { position: absolute; right: calc(10px + var(--safe-r)); bottom: calc(10px + var(--safe-b)); width: 176px; padding: 10px 12px 11px; box-sizing: border-box; }
+.sp-main { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
+#spd { font-size: 40px; font-weight: 600; line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.sp-unit { font-size: 12px; color: var(--muted); }
+.sp-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+#gear { flex: none; width: 22px; height: 22px; display: grid; place-items: center; font-weight: 700; font-size: 13px; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 3px; }
+.rpm { flex: 1 1 auto; height: 4px; background: rgba(255, 255, 255, 0.12); border-radius: 2px; overflow: hidden; position: relative; }
+.rpm::after { content: ''; position: absolute; top: 0; bottom: 0; left: 91%; right: 0; background: rgba(239, 83, 67, 0.55); }   /* redline from 5000 rpm */
+.rpm i { display: block; height: 100%; width: 10%; background: #e9ecef; position: relative; z-index: 1; }
+#rpm { font-family: var(--font-data); font-size: 11px; color: var(--muted); min-width: 34px; text-align: right; }
 
-/* --- touch controls --- */
+/* --- lower left: controls hint (fades after a while) and the model credit --- */
+.foot { position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(10px + var(--safe-b)); max-width: min(560px, 52vw); display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.keys { margin: 0; padding: 6px 10px; font-size: 11.5px; line-height: 1.5; color: #d4d7da; transition: opacity 1.2s; }
+.keys.gone { opacity: 0; pointer-events: none; }
+.keys kbd { font-family: var(--font-data); font-size: 10.5px; color: var(--ink); padding: 0 3px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 2px; }
+.credit { font-size: 10.5px; color: rgba(255, 255, 255, 0.82); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75); }
+.credit a { color: inherit; pointer-events: auto; }
+
+/* --- touch controls: dark glass, white glyphs --- */
 .pad { position: absolute; bottom: calc(var(--edge) + var(--safe-b)); display: flex; gap: 12px; align-items: flex-end; }
 .pad-steer { left: calc(var(--edge) + var(--safe-l)); }
 .pad-pedals { right: calc(var(--edge) + var(--safe-r)); }
-.ctl { border: 2px solid rgba(255, 236, 205, 0.6); background: rgba(22, 24, 27, 0.42); color: var(--ink); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; transition: background 0.08s, border-color 0.08s, transform 0.08s; }
-.ctl.on { transform: scale(0.95); border-color: var(--accent); background: rgba(255, 164, 36, 0.38); }
-.steer { width: 88px; height: 88px; border-radius: 50%; }
-.steer svg { width: 38px; height: 38px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
-.paddle { width: 74px; border-radius: 10px; font-weight: 800; font-size: 15px; letter-spacing: 0.1em; writing-mode: vertical-rl; transform-origin: bottom; }
-.paddle.brake { height: 140px; border-color: rgba(255, 110, 80, 0.55); }
-.paddle.throttle { height: 178px; border-color: rgba(190, 230, 130, 0.55); }
-.paddle.brake.on { background: rgba(255, 90, 54, 0.42); border-color: var(--danger); }
-.paddle.throttle.on { background: rgba(185, 226, 124, 0.38); border-color: var(--go); }
-.keys { position: absolute; bottom: calc(var(--edge) + var(--safe-b) + 108px); left: calc(var(--edge) + var(--safe-l)); margin: 0; font-family: var(--font-data); font-size: 10.5px; color: var(--hud-muted); text-shadow: var(--hud-halo); letter-spacing: 0.04em; max-width: 46vw; }
-@media (hover: none) and (pointer: coarse) { .keys { display: none; } }
-@media (max-width: 720px) {
-  .brand-title { font-size: 23px; }
-  .stats { font-size: 10px; padding: 6px 8px; column-gap: 8px; }
-  .reset { font-size: 16px; padding: 10px 14px; }
-  .tog { font-size: 11px; padding: 6px 8px; }
-  .speed { font-size: 40px; }
-  .credit { display: none; }
-  .gauge { bottom: calc(var(--edge) + var(--safe-b) + 150px); }
+.ctl { border: 1px solid rgba(255, 255, 255, 0.28); background: rgba(17, 18, 20, 0.55); color: var(--ink); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; transition: background 0.08s, border-color 0.08s, transform 0.08s; }
+.ctl.on { transform: scale(0.96); border-color: var(--accent); background: rgba(255, 106, 19, 0.22); }
+.steer { width: 84px; height: 84px; border-radius: 50%; }
+.steer svg { width: 34px; height: 34px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.paddle { width: 70px; border-radius: 8px; font-weight: 600; font-size: 12.5px; letter-spacing: 0.06em; writing-mode: vertical-rl; }
+.paddle.brake { height: 136px; }
+.paddle.throttle { height: 172px; }
+@media (hover: hover) and (pointer: fine) { .pad { display: none; } }   /* the on-screen pedals are for touch screens only */
+@media (hover: none) and (pointer: coarse) {
+  .keys { display: none; }
+  .speedo { right: 50%; transform: translateX(50%); bottom: calc(var(--edge) + var(--safe-b)); width: 150px; padding: 8px 10px; }
+  #spd { font-size: 32px; }
+  .foot { bottom: calc(var(--edge) + var(--safe-b) + 100px); }
+}
+@media (max-width: 900px) {
+  .bb-label, .bb kbd, .bb-val, .bar-stat { display: none; }
+  .bb { padding: 0 9px; }
+  .bb-mark .bb-label { display: inline; }
 }
 @media (max-width: 560px) {
-  .brand-title { font-size: 20px; }
-  .brand-sub, .stats, .dyn, .keys { display: none; }
-  .statline { display: block; }
+  .phys { width: min(252px, calc(100vw - 20px)); }
   .feed li { font-size: 12px; }
-  .reset { font-size: 14px; padding: 9px 12px; }
-  .toggles { max-width: 190px; }
-  .steer { width: 76px; height: 76px; }
-  .paddle { width: 64px; }
+  .bb { padding: 0 8px; }
+  .bar-sep { margin: 0 2px; }
+  .steer { width: 74px; height: 74px; }
+  .paddle { width: 62px; }
+  .credit { max-width: 70vw; }
+}
+@media (max-width: 430px) { .bb-mark .bb-label { display: none; } }
+@media (max-width: 560px) and (hover: none) and (pointer: coarse) {
+  .speedo { bottom: calc(var(--edge) + var(--safe-b) + 190px); }   /* above the steering and pedal buttons */
 }
 @media (max-height: 520px) {
-  .stats, .dyn { display: none; }
-  .steer { width: 70px; height: 70px; }
+  .steer { width: 68px; height: 68px; }
   .paddle.brake { height: 104px; }
   .paddle.throttle { height: 128px; }
-  .paddle { width: 62px; }
-  .gauge { bottom: calc(8px + var(--safe-b)); }
-  .speed { font-size: 34px; }
-  .credit { display: none; }
+  .paddle { width: 60px; }
 }
 
 /* --- loader --- */
@@ -165,7 +180,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 #menu { position: fixed; inset: 0; z-index: 4; display: none; font-family: var(--font-brand); color: #fff; }
 body.in-menu #menu { display: block; }
 body.in-menu #hud { z-index: 6; }   /* only the settings panel shows, as the Options window */
-body.in-menu #hud > :not(.tools), body.in-menu .tools > :not(#settings) { display: none !important; }
+body.in-menu #hud > :not(#settings) { display: none !important; }
 .mn-shade { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(ellipse 80% 75% at 58% 50%, transparent 45%, rgba(0, 0, 0, 0.5) 80%, rgba(0, 0, 0, 0.9) 100%),
               linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 32%, transparent 58%); }
@@ -268,81 +283,85 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
 <canvas id="view" tabindex="0" aria-label="3D driving view"></canvas>
 
 <div id="hud">
-  <header class="brand">
-    <div class="brand-title">BEAMS<span>.WEB</span></div>
-    <div class="brand-sub">Mass-spring soft-body simulator · 2000&nbsp;Hz · physics worker</div>
-    <dl class="stats" aria-label="Physics telemetry">
-      <dt>NODES</dt><dd id="sNodes">0</dd>
-      <dt>BEAMS</dt><dd id="sBeams">0</dd>
-      <dt>STEP</dt><dd>0.500 ms · 2000 Hz</dd>
-      <dt>SIM RATE</dt><dd id="sHz">2000 Hz</dd>
-      <dt>SOLVER</dt><dd id="sSolver">MASS-SPRING</dd>
-      <dt>STEP + SKIN</dt><dd id="sMs">0.0 + 0.0 ms</dd>
-      <dt>BROKEN</dt><dd id="sBroken">0</dd>
-      <dt>DEFORMED</dt><dd id="sDeformed">0</dd>
-      <dt>FLEX ACTIVE</dt><dd id="sActive">0</dd>
-      <dt>DAMAGE</dt><dd id="sDamage">0%</dd>
-    </dl>
-    <div class="dyn" aria-label="Tyre load share and body acceleration">
-      <div class="tyres" title="Tyre load share: front left, front right, rear left, rear right"><span><i id="tyre0"></i></span><span><i id="tyre1"></i></span><span><i id="tyre2"></i></span><span><i id="tyre3"></i></span></div>
-      <div class="dyn-txt"><span>TYRE LOAD</span><b id="gMeter"> 0.00 g LAT ·  0.00 g LON</b></div>
-    </div>
-    <div class="statline" id="statLine">4500 NODES · 0 BEAMS · 0.5 ms STEP</div>
-    <ol id="feed" class="feed" aria-live="polite"></ol>
-  </header>
+  <nav class="bar" aria-label="Game toolbar">
+    <button id="btnMenu" class="bb bb-mark" type="button" aria-controls="menu" title="Main menu (Esc)"><svg viewBox="0 0 64 48" aria-hidden="true"><use href="#bwMark"/></svg><span class="bb-label">Menu</span></button>
+    <span class="bar-sep"></span>
+    <button id="btnReset" class="bb" type="button" title="Reset vehicle (R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3.7h3.7"/></svg><span class="bb-label">Reset</span><kbd>R</kbd></button>
+    <button id="btnCam" class="bb" type="button" title="Camera (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.5h3.6l1.8-2.6h6.2l1.8 2.6h3.6v10h-17z"/><circle cx="12" cy="13.2" r="3.2"/></svg><span class="bb-label">Camera</span><span class="bb-val" id="camName">Chase</span><kbd>C</kbd></button>
+    <button id="btnLights" class="bb" type="button" aria-pressed="false" title="Headlights (L)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6.5a5.5 5.5 0 0 0 0 11h2.5v-11z"/><path d="M15.5 8.5 20 7.5M15.5 12H20M15.5 15.5 20 16.5"/></svg><span class="bb-label">Lights</span><kbd>L</kbd></button>
+    <button id="btnSlow" class="bb" type="button" aria-pressed="false" title="Slow motion ×0.05 (T)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.5"/><path d="M12 8.5v4l2.8 1.8M9.5 3.5h5"/></svg><span class="bb-label">Slow motion</span><kbd>T</kbd></button>
+    <button id="btnNodes" class="bb" type="button" aria-pressed="false" title="Node and beam view (N)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6.8h8M7 8.8l4 7.4M17 7.8l-4 8.4"/></svg><span class="bb-label">Node view</span><kbd>N</kbd></button>
+    <button id="btnSettings" class="bb" type="button" aria-expanded="false" aria-controls="settings" title="Settings (G)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span class="bb-label">Settings</span><kbd>G</kbd></button>
+    <span class="bar-fill"></span>
+    <span class="bar-stat" id="statLine">4500 nodes · 0 beams</span>
+    <span class="bar-stat" id="sHz">2000 Hz</span>
+    <span class="bar-sep"></span>
+    <button id="btnZoomOut" class="bb bb-ic" type="button" aria-label="Zoom out" title="Zoom out (−)">−</button>
+    <button id="btnZoomIn" class="bb bb-ic" type="button" aria-label="Zoom in" title="Zoom in (+)">+</button>
+  </nav>
 
-  <div class="tools">
-    <button id="btnReset" class="reset" type="button">RESET VEHICLE</button>
-    <div class="toggles">
-      <button id="btnMenu" class="tog" type="button" aria-controls="menu">MENU</button>
-      <button id="btnCam" class="tog" type="button">CAM<i id="camName">CHASE</i></button>
-      <button id="btnNodes" class="tog" type="button" aria-pressed="false">F-NODES</button>
-      <button id="btnSlow" class="tog" type="button" aria-pressed="false">SLOW-MO<i>×20</i></button>
-      <button id="btnLights" class="tog" type="button" aria-pressed="false">LIGHTS</button>
-      <button id="btnSettings" class="tog" type="button" aria-expanded="false" aria-controls="settings">SETTINGS</button>
-    </div>
-    <div class="zoom">
-      <button id="btnZoomIn" class="tog zbtn" type="button" aria-label="Zoom in">+</button>
-      <button id="btnZoomOut" class="tog zbtn" type="button" aria-label="Zoom out">−</button>
-    </div>
-    <section id="settings" class="settings" hidden aria-label="Settings">
-      <div class="set-head"><span>SETTINGS</span><button id="btnSetClose" class="set-x" type="button" aria-label="Close settings">×</button></div>
-      <div class="set-row">
-        <span class="set-lbl" id="lblDeform">DEFORMATION</span>
-        <div class="seg" role="radiogroup" aria-labelledby="lblDeform" data-set="deform">
-          <button type="button" role="radio" aria-checked="false" data-v="simple">SIMPLIFIED</button>
-          <button type="button" role="radio" aria-checked="false" data-v="normal">NORMAL</button>
-          <button type="button" role="radio" aria-checked="false" data-v="enhanced">ENHANCED</button>
-        </div>
+  <section id="phys" class="app phys" aria-label="Physics telemetry">
+    <button id="physHead" class="app-head" type="button" aria-expanded="true" aria-controls="physBody"><span>Physics</span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></button>
+    <div id="physBody" class="phys-body">
+      <dl class="stats">
+        <dt>Nodes</dt><dd id="sNodes">0</dd>
+        <dt>Beams</dt><dd id="sBeams">0</dd>
+        <dt>Substep</dt><dd>0.5 ms · 2000 Hz</dd>
+        <dt>Solver</dt><dd id="sSolver">Mass-spring</dd>
+        <dt>Step + skin</dt><dd id="sMs">0.0 + 0.0 ms</dd>
+        <dt>Broken beams</dt><dd id="sBroken">0</dd>
+        <dt>Deformed beams</dt><dd id="sDeformed">0</dd>
+        <dt>Active skin nodes</dt><dd id="sActive">0</dd>
+        <dt>Damage</dt><dd id="sDamage">0%</dd>
+      </dl>
+      <div class="dyn" aria-label="Tyre load share and body acceleration">
+        <div class="tyres" title="Tyre load share: front left, front right, rear left, rear right"><span><i id="tyre0"></i></span><span><i id="tyre1"></i></span><span><i id="tyre2"></i></span><span><i id="tyre3"></i></span></div>
+        <div class="dyn-txt"><span>Tyre load · g-force</span><b id="gMeter"> 0.00 lat   0.00 lon</b></div>
       </div>
-      <div class="set-row">
-        <span class="set-lbl" id="lblGfx">GRAPHICS</span>
-        <div class="seg" role="radiogroup" aria-labelledby="lblGfx" data-set="gfx">
-          <button type="button" role="radio" aria-checked="false" data-v="low">LOW</button>
-          <button type="button" role="radio" aria-checked="false" data-v="medium">MEDIUM</button>
-          <button type="button" role="radio" aria-checked="false" data-v="high">HIGH</button>
-          <button type="button" role="radio" aria-checked="false" data-v="ultra">ULTRA</button>
-        </div>
+    </div>
+  </section>
+
+  <ol id="feed" class="feed" aria-live="polite"></ol>
+
+  <section id="settings" class="app settings" hidden aria-label="Settings">
+    <div class="set-head"><span>Settings</span><button id="btnSetClose" class="set-x" type="button" aria-label="Close settings">×</button></div>
+    <div class="set-row">
+      <span class="set-lbl" id="lblDeform">Deformation</span>
+      <div class="seg" role="radiogroup" aria-labelledby="lblDeform" data-set="deform">
+        <button type="button" role="radio" aria-checked="false" data-v="simple">Simplified</button>
+        <button type="button" role="radio" aria-checked="false" data-v="normal">Normal</button>
+        <button type="button" role="radio" aria-checked="false" data-v="enhanced">Enhanced</button>
       </div>
-      <p class="set-note" id="setNote"></p>
-    </section>
+    </div>
+    <div class="set-row">
+      <span class="set-lbl" id="lblGfx">Graphics</span>
+      <div class="seg" role="radiogroup" aria-labelledby="lblGfx" data-set="gfx">
+        <button type="button" role="radio" aria-checked="false" data-v="low">Low</button>
+        <button type="button" role="radio" aria-checked="false" data-v="medium">Medium</button>
+        <button type="button" role="radio" aria-checked="false" data-v="high">High</button>
+        <button type="button" role="radio" aria-checked="false" data-v="ultra">Ultra</button>
+      </div>
+    </div>
+    <p class="set-note" id="setNote"></p>
+  </section>
+
+  <div class="app speedo" aria-label="Speedometer">
+    <div class="sp-main"><span id="spd">0</span><span class="sp-unit">km/h</span></div>
+    <div class="sp-row"><span id="gear">1</span><div class="rpm"><i id="rpmBar"></i></div><span id="rpm">800</span></div>
   </div>
 
-  <div class="gauge">
-    <div class="speed"><span id="spd">0</span><small>KM/H</small></div>
-    <div class="gear-row"><span id="gear">1</span><div class="rpm"><i id="rpmBar"></i></div><span id="rpm">800</span></div>
+  <div class="foot">
+    <p class="app keys" id="keys"><kbd>W</kbd> <kbd>S</kbd> throttle, brake (hold at a stop to reverse) · <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>R</kbd> reset · <kbd>C</kbd> camera · <kbd>L</kbd> lights · <kbd>T</kbd> slow motion · <kbd>N</kbd> node view · <kbd>+</kbd> <kbd>−</kbd> or wheel zoom · drag to look around · <kbd>Esc</kbd> menu</p>
     <div class="credit" id="credit">Vehicle model: “Gavril_D_ Beamng” by <a href="https://sketchfab.com/akhikavi7" target="_blank" rel="noopener">akhikavi7</a>, <a href="https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5" target="_blank" rel="noopener">Sketchfab</a>, CC-BY-4.0</div>
   </div>
-
-  <p class="keys">W/S or ↑/↓ throttle · brake (hold at a stop to reverse) · A/D or ←/→ steer · R reset · C camera · +/− or wheel zoom · L lights · N f-node view · T slow-mo · G settings · Esc menu</p>
 
   <div class="pad pad-steer">
     <button class="ctl steer" type="button" data-ctl="left" aria-label="Steer left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></button>
     <button class="ctl steer" type="button" data-ctl="right" aria-label="Steer right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 4 8 8-8 8"/></svg></button>
   </div>
   <div class="pad pad-pedals">
-    <button class="ctl paddle brake" type="button" data-ctl="brake" aria-label="Brake and reverse">BRAKE</button>
-    <button class="ctl paddle throttle" type="button" data-ctl="throttle" aria-label="Throttle">THROTTLE</button>
+    <button class="ctl paddle brake" type="button" data-ctl="brake" aria-label="Brake and reverse">Brake</button>
+    <button class="ctl paddle throttle" type="button" data-ctl="throttle" aria-label="Throttle">Throttle</button>
   </div>
 </div>
 
@@ -861,10 +880,7 @@ function physicsLib() {
       this.btype = new Uint8Array(NB); this.bpart = new Uint8Array(NB); this.bBreak = new Int32Array(NB);
       this.broken = new Uint8Array(NB);   // 0 intact, 1 snapped, 2 disabled (support beam of a detached part)
       this.bgroup = new Int16Array(NB).fill(-1); this.groups = []; this.groupNeed = []; this.groupHits = [];
-      // Tethered parts (the grille) can't come off: each bracket has a side, and once
-      // one side's bracket fails the other side's attachment beams are kept (bKeep 2: unbreakable and
-      // elastic), so the part hangs from that side. Their own lattice never tears (bKeep 1).
-      this.bKeep = new Uint8Array(NB); this.groupSide = []; this.groupPart = [];
+
       this.nodeYield = new Int32Array(NN).fill(-1e9);   // last step a beam at this node flowed plastically
       this.airQuads = [];
       this.nSE = 0; this.nSD = 0; this.sheetLive = [0, 0];
@@ -1168,7 +1184,7 @@ function physicsLib() {
       this.flexK = mF * fl.omega * fl.omega; this.flexC = 2 * fl.zeta * mF * fl.omega;
       if (this.nSE) this.sheetSprings(mF);
       this.snapshot = {
-        L0: this.L0o.slice(0, this.nBeams), keep: this.bKeep.slice(),
+        L0: this.L0o.slice(0, this.nBeams),
         sL0: this.nSE ? this.sL0o.slice() : null, sTh0: this.nSD ? this.sTh0o.slice() : null,
         wheels: this.wheels.map(w => Float64Array.from(w.w0)),
       };
@@ -1195,8 +1211,6 @@ function physicsLib() {
       this.dentEvents = 0; this.steps = 0;
       this.events.length = 0;
       this.groupHits = this.groups.map(() => 0);
-      this.bKeep.set(this.snapshot.keep);
-      for (const P of this.parts) P.looseSide = -1;
     }
 
     /* -------------------------------- one 0.5 ms substep -------------------------------- */
@@ -1303,14 +1317,6 @@ function physicsLib() {
     // A bracket (hinge, latch, bolt) that has lost enough of its beams lets go as a unit.
     breakGroup(g) {
       if (++this.groupHits[g] !== this.groupNeed[g]) return;
-      const P = this.parts[this.groupPart[g]], side = this.groupSide[g];
-      if (P && P.tethered && side >= 0) {
-        if (P.looseSide < 0) {
-          // the first bracket to go picks the loose side; every bracket on the other side now holds
-          P.looseSide = side;
-          for (let h = 0; h < this.groups.length; h++) if (this.groupPart[h] === P.id && this.groupSide[h] !== side) for (const j of this.groups[h]) this.bKeep[j] = 2;
-        } else if (side !== P.looseSide) return;
-      }
       for (const j of this.groups[g]) if (!this.broken[j]) { this.broken[j] = 1; this.bBreak[j] = this.steps; this.nBroken++; this.concentrate(j); }
     }
 
@@ -1322,7 +1328,7 @@ function physicsLib() {
     beamForces(C) {
       const pos = this.pos, vel = this.vel, frc = this.frc, inv = this.inv, ba = this.ba, bb = this.bb, L0 = this.L0, L0o = this.L0o;
       const bk = this.bk, bc = this.bc, kcap = this.bKcap, yT = this.bdef, yC = this.bdefC, Ep = this.bEp, scf = this.bScf, brT = this.bbrT, brC = this.bbrC, brP = this.bbrP;
-      const broken = this.broken, btype = this.btype, slack = this.bSlack, PL = VEHICLE.plastic, DENSE = VEHICLE.densify, HD = this.bHard, H2 = this.bH2, keep = this.bKeep;
+      const broken = this.broken, btype = this.btype, slack = this.bSlack, PL = VEHICLE.plastic, DENSE = VEHICLE.densify, HD = this.bHard, H2 = this.bH2;
       const iD = 1 / PL.D, iq = 1 / PL.q, st = this.steps, flowMark = 0.3 * DT, list = C.beams;
       let n = C.nb;
       for (let q = 0; q < n;) {
@@ -1346,14 +1352,14 @@ function physicsLib() {
           // fracture: stretched past the breaking strain from the factory length (lowered by plastic thinning,
           // raised by stress concentration at a torn edge), or crushed past the compression limit
           const thin = l0 > lo ? Math.max(PL.thinMin, 1 - PL.thin * (l0 - lo) / lo) : 1;
-          if ((strain * sc > brT[j] * thin || -strain > brC[j]) && !keep[j]) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
+          if (strain * sc > brT[j] * thin || -strain > brC[j]) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
           // plasticity: past the yield strain the rest length moves, so the beam keeps its new length. Work
           // hardening raises the yield force by `hard`; a member that has yielded also unloads along a stiffer
           // path (hard^2 (1 + eps_p / epsK), within what the substep allows), so a crushed member stores, and
           // springs back, only a fraction of the elastic strain a fresh one does.
           const hard = HD[j], h2 = H2[j];
           const e = (L - l0) / l0, ys = hard / h2;
-          if ((e > yT[j] * ys || (e < -yC[j] * ys && L > DENSE * lo)) && keep[j] !== 2) {
+          if (e > yT[j] * ys || (e < -yC[j] * ys && L > DENSE * lo)) {
             const y = (e > 0 ? yT[j] : yC[j]) * ys * (1 + Math.pow(Math.abs(vr) / lo * iD, iq));
             const old = l0;
             if (e > y) l0 = L / (1 + y);
@@ -1363,7 +1369,7 @@ function physicsLib() {
               Ep[j] += dEp; L0[j] = l0;
               HD[j] = 1 + PL.H * Math.log(1 + Ep[j] / PL.eps0); H2[j] = Math.min(HD[j] * HD[j] * (1 + Ep[j] / PL.epsK), kcap[j]);
               if (dEp > flowMark && Ep[j] > 0.08) this.nodeYield[ia] = this.nodeYield[ib] = this.lastYield = st;   // real crumpling, not creep
-              if (Math.abs(l0 - lo) * (l0 > lo ? sc : 1) > brP[j] * lo && !keep[j]) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
+              if (Math.abs(l0 - lo) * (l0 > lo ? sc : 1) > brP[j] * lo) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
             }
           }
           f = bk[j] * h2 * (L - l0);
@@ -2247,7 +2253,7 @@ function physicsLib() {
       this.contexts.push(ctx);
       P.ctx = ctx.id;
       // no push: the part leaves with exactly the momentum it had when its last bracket let go
-      this.events.push({ kind: 'detach', part: p, text: PART_LABELS[p] + ' DETACHED' });
+      this.events.push({ kind: 'detach', part: p, text: PART_LABELS[p].charAt(0) + PART_LABELS[p].slice(1).toLowerCase() + ' detached' });
     }
 
     checkSleep() {
@@ -2606,27 +2612,13 @@ function physicsLib() {
     }
     for (let p = 1; p < N_PARTS; p++) if (!sim.parts[p]) sim.parts[p] = { id: p, n0: sim.nNodes, n1: sim.nNodes, attach: [], support: [], detached: false, ctx: 0, dent: 0 };
     // brackets become break groups: a bracket fails after half its beams (a hood latch after its first)
-    const TETHERED = [P_GRILLE];
     for (let p = 1; p < N_PARTS; p++) {
       const map = new Map();
       for (const j of sim.parts[p].attach) {
         const k = bracketOf.get(j);
-        if (!map.has(k)) { map.set(k, sim.groups.length); sim.groups.push([]); sim.groupNeed.push(1); sim.groupSide.push(-1); sim.groupPart.push(p); }
+        if (!map.has(k)) { map.set(k, sim.groups.length); sim.groups.push([]); sim.groupNeed.push(1); }
         const g = map.get(k);
         sim.groups[g].push(j); sim.bgroup[j] = g;
-      }
-      // tethered parts: brackets left or right of the part's middle; the part's own lattice can't tear
-      if (TETHERED.includes(p) && sim.parts[p].n1 > sim.parts[p].n0) {
-        const P = sim.parts[p];
-        let cx = 0;
-        for (let i = P.n0; i < P.n1; i++) cx += R[i * 3] / (P.n1 - P.n0);
-        for (const [, g] of map) {
-          let x = 0;
-          for (const j of sim.groups[g]) { const own = sim.part[sim.ba[j]] === p ? sim.ba[j] : sim.bb[j]; x += R[own * 3] - cx; }
-          sim.groupSide[g] = x > 0 ? 1 : 0;
-        }
-        P.tethered = true;
-        for (let j = 0; j < sim.nBeams; j++) if (sim.part[sim.ba[j]] === p && sim.part[sim.bb[j]] === p) sim.bKeep[j] = 1;
       }
       for (const [k, g] of map) sim.groupNeed[g] = p === P_HOOD && k === 'latch' ? 1 : Math.ceil(sim.groups[g].length / 2);
       // edge tearing: attachment beams whose panel-side nodes coincide or share a lattice beam are neighbours
@@ -3560,10 +3552,10 @@ function physicsLib() {
       }
       vehicleState(sim, this.meta, st);
       this.ctrl.fwdSpeed = st.speed;
-      if (!Number.isFinite(st.cm[0] + st.cm[1] + st.cm[2]) || st.cm[1] < -25) { this.reset(); this.events.push({ kind: 'reset', text: 'SIMULATION RESET' }); return n; }
+      if (!Number.isFinite(st.cm[0] + st.cm[1] + st.cm[2]) || st.cm[1] < -25) { this.reset(); this.events.push({ kind: 'reset', text: 'Simulation reset' }); return n; }
       for (const e of sim.events) this.events.push(e);
       sim.events.length = 0;
-      if (sim.nBroken - this.lastBroken >= 8) { this.events.push({ kind: 'break', text: 'STRUCTURAL FAILURE · ' + (sim.nBroken - this.lastBroken) + ' BEAMS' }); this.lastBroken = sim.nBroken; }
+      if (sim.nBroken - this.lastBroken >= 8) { this.events.push({ kind: 'break', text: 'Structural failure · ' + (sim.nBroken - this.lastBroken) + ' beams' }); this.lastBroken = sim.nBroken; }
       if (n > 0) {
         // body-frame acceleration (g) for the HUD, smoothed
         const k = 1 / (n * DT * G), v = st.vel, pv = this.pv;
@@ -4040,7 +4032,6 @@ function detectPart(chain) {
   // on the visible face of a crushed front, crumple with it and never come off (they crack and go dark)
   if (/taillight[a-z]*[_\s.-]?(l|left)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_L;
   if (/taillight[a-z]*[_\s.-]?(r|right)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_R;
-  if (/grille/.test(chain)) return P_GRILLE;
   if (/door[a-z]*([_\s.-](l|left)|left)([_\s.\-\d]|$)|left[_\s]?door|(^|[^a-z])mirror([_\s.-](l|left)|left)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_L;
   if (/door[a-z]*([_\s.-](r|right)|right)([_\s.\-\d]|$)|right[_\s]?door|(^|[^a-z])mirror([_\s.-](r|right)|right)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_R;
   // front fenders (not the bed's fender flares)
@@ -5414,8 +5405,9 @@ function rampGeometry(c) {
   return g;
 }
 
-// A few percent of warm sunlight balance and a soft lens fall-off; no tint, fog or lifted blacks.
-const WarmBalanceShader = {
+// Final grade: neutral in the game (no tint, vignette or grain, like a simulator's plain output); the main
+// menu blends to its high-contrast black and white with a heavy vignette.
+const GradeShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uMenu: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
@@ -5423,17 +5415,14 @@ const WarmBalanceShader = {
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
       vec3 col = texture2D(tDiffuse, vUv).rgb;
-      col *= vec3(1.02, 1.0, 0.975);
       float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
-      col = mix(vec3(lum), col, 1.04);
       vec2 c = vUv - 0.5;
-      col *= mix(0.88, 1.0, smoothstep(0.95, 0.3, length(c * vec2(1.0, 0.85))));
       // main menu: black and white, contrast pulled up and the whole picture brought down a stop, with a
       // heavy vignette, so the white title reads over a bright daytime scene
       vec3 bw = vec3(clamp((lum - 0.45) * 1.4 + 0.32, 0.0, 1.0));
       bw *= mix(0.32, 1.0, smoothstep(1.05, 0.25, length(c * vec2(1.0, 0.82))));
       col = mix(col, bw, uMenu);
-      col += (hash(vUv * uRes + fract(uTime * 7.0) * 91.0) - 0.5) * 0.006;
+      col += (hash(vUv * uRes + fract(uTime * 7.0) * 91.0) - 0.5) * 0.006 * uMenu;   // a trace of grain on the menu only
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }`,
 };
@@ -5444,7 +5433,7 @@ const WarmBalanceShader = {
 class CameraRig {
   constructor(camera) {
     this.camera = camera; this.mode = 0; this.yaw = 0; this.pitch = 0.18; this.dist = 7.5; this.userYaw = 0; this.userPitch = 0; this.idle = 0;
-    this.pos = new THREE.Vector3(0, 3, -8); this.look = new THREE.Vector3(); this.names = ['CHASE', 'ORBIT', 'TRACKSIDE'];
+    this.pos = new THREE.Vector3(0, 3, -8); this.look = new THREE.Vector3(); this.names = ['Chase', 'Orbit', 'Trackside'];
     this.heading = 0; this.fovZoom = 1;
     this.target = new THREE.Vector3(); this.desired = new THREE.Vector3();
   }
@@ -5499,8 +5488,9 @@ function assignMaterial(m, mats) {
   return mat;
 }
 
-// The grille between the headlights is a bolt-on piece of its own (it can be knocked off): its triangles
-// are cut out of the fascia into a separate trim mesh.
+// The grille between the headlights is its own trim mesh, cut out of the fascia. It stays with the body,
+// skinned to the front's sheet metal, so it bends with a crushed front but never falls out and never opens
+// a view into the engine bay.
 function splitGrille(model) {
   const i = model.meshes.findIndex(m => /fascia/.test(m.name));
   if (i < 0 || model.meshes.some(m => /grille/.test(m.name))) return;
@@ -5510,7 +5500,7 @@ function splitGrille(model) {
     (Math.abs(cx) < 0.62 && cy > bb.min.y + 0.12 ? cut : keep).push(I[t], I[t + 1], I[t + 2]);
   }
   if (!cut.length || !keep.length) return;
-  model.meshes.splice(i + 1, 0, { name: 'pickup_grille', geom: subGeometry(f.geom, cut), part: P_GRILLE, cat: 'nosample', srcMat: f.srcMat, source: f.source });
+  model.meshes.splice(i + 1, 0, { name: 'pickup_grille', geom: subGeometry(f.geom, cut), part: P_CHASSIS, cat: 'nosample', srcMat: f.srcMat, source: f.source });
   f.geom = subGeometry(f.geom, keep);
 }
 // A geometry holding only the given triangles, with just the vertices they use.
@@ -5616,7 +5606,7 @@ async function main() {
   scene.traverse((o) => throughCascades(Array.isArray(o.material) ? o.material : (o.material ? [o.material] : [])));
   throughCascades(Object.values(mats));   // and those swapped in later (the cracked lens)
 
-  // post-processing: HDR render -> light bloom -> ACES tone map -> subtle warm balance -> FXAA (when the
+  // post-processing: HDR render -> light bloom -> ACES tone map -> grade (neutral, or the menu's) -> FXAA (when the
   // graphics preset renders without MSAA)
   const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 0 });
   const composer = new EffectComposer(renderer, rt);
@@ -5624,7 +5614,7 @@ async function main() {
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.2, 0.4, 0.95);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
-  const grade = new ShaderPass(WarmBalanceShader);
+  const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
   const fxaa = new ShaderPass(FXAAShader);
   composer.addPass(fxaa);
@@ -5852,13 +5842,13 @@ async function main() {
   let acc = 0, needFrame = false, snapNext = false;
   function doReset(silent) {
     acc = 0;
-    if (!silent) pushFeed('VEHICLE RESET');
+    if (!silent) pushFeed('Vehicle reset');
     return link.call('reset').then(() => { link.dropLatest(); view.reset(); fx.reset(); GRIME.uDirt.value = DIRT0; GRIME.uCrack.value = 0; if (lampsBroken) { lampsBroken = false; view.smashLamps(false); setLights(lightsOn); } needFrame = true; snapNext = true; });
   }
   function cycleCam() { rig.mode = (rig.mode + 1) % 3; rig.userYaw = rig.userPitch = 0; $('camName').textContent = rig.names[rig.mode]; }
   function toggleNodes() { const on = !view.debug; view.setDebug(on); needFrame = true; $('btnNodes').setAttribute('aria-pressed', String(on)); }
   function toggleSlow() { timeScale = timeScale === 1 ? SLOWMO : 1; $('btnSlow').setAttribute('aria-pressed', String(timeScale !== 1)); }
-  function toggleLights() { setLights(!lightsOn); pushFeed(lightsOn ? 'HEADLIGHTS ON' : 'HEADLIGHTS OFF', false); }
+  function toggleLights() { setLights(!lightsOn); pushFeed(lightsOn ? 'Headlights on' : 'Headlights off', false); }
   $('btnReset').addEventListener('click', () => doReset());
   $('btnCam').addEventListener('click', cycleCam);
   $('btnNodes').addEventListener('click', toggleNodes);
@@ -5871,7 +5861,7 @@ async function main() {
   const panel = $('settings');
   const showSettings = (on) => {
     panel.hidden = !on; $('btnSettings').setAttribute('aria-expanded', String(on));
-    panel.querySelector('.set-head span').textContent = menuOpen ? 'Options' : 'SETTINGS';
+    panel.querySelector('.set-head span').textContent = menuOpen ? 'Options' : 'Settings';
     menuEl.classList.toggle('dimmed', !levelsEl.hidden || (menuOpen && on));
   };
   const syncSettingsUI = () => {
@@ -6020,8 +6010,15 @@ async function main() {
 
   $('sNodes').textContent = summary.nNodes + ' / ' + summary.maxNodes;
   $('sBeams').textContent = summary.nBeams + ' / ' + summary.maxBeams;
-  $('sSolver').textContent = 'MASS-SPRING · ' + (link.mode === 'worker' ? 'WORKER' : 'MAIN THREAD');
-  $('statLine').textContent = summary.nNodes + ' NODES · ' + summary.nBeams + ' BEAMS · ' + Math.round(1 / DT) + ' Hz MASS-SPRING';
+  $('sSolver').textContent = 'Mass-spring · ' + (link.mode === 'worker' ? 'worker' : 'main thread');
+  $('statLine').textContent = summary.nNodes + ' nodes · ' + summary.nBeams + ' beams';
+  // the physics app folds away; remembered in this browser (closed by default on small screens)
+  const phys = $('phys'), physHead = $('physHead');
+  const setPhys = (open) => { phys.classList.toggle('closed', !open); physHead.setAttribute('aria-expanded', String(open)); };
+  let physOpen = innerWidth > 560 && innerHeight > 520;
+  try { const v = localStorage.getItem('beamsweb.physOpen'); if (v !== null) physOpen = v === '1'; } catch (_) { /* not remembered */ }
+  setPhys(physOpen);
+  physHead.addEventListener('click', () => { physOpen = !physOpen; setPhys(physOpen); try { localStorage.setItem('beamsweb.physOpen', physOpen ? '1' : '0'); } catch (_) { /* not remembered */ } });
   const tyreBars = [0, 1, 2, 3].map(i => $('tyre' + i));
 
   // first frame before anything is drawn
@@ -6130,7 +6127,7 @@ async function main() {
         tyreBars[i].style.height = Math.min(100, 200 * stats.loads[i] / tot).toFixed(0) + '%';
         tyreBars[i].parentNode.classList.toggle('slide', stats.slips[i] < 0);
       }
-      $('gMeter').textContent = (stats.gLat >= 0 ? ' ' : '') + stats.gLat.toFixed(2) + ' g LAT · ' + (stats.gLon >= 0 ? ' ' : '') + stats.gLon.toFixed(2) + ' g LON';
+      $('gMeter').textContent = (stats.gLat >= 0 ? ' ' : '') + stats.gLat.toFixed(2) + ' lat  ' + (stats.gLon >= 0 ? ' ' : '') + stats.gLon.toFixed(2) + ' lon';
     }
     requestAnimationFrame(frame);
   }
@@ -6138,7 +6135,7 @@ async function main() {
   setLoader('Ready', 1);
   if (params.get('menu') !== '0') { openMenu(); menuK = 1; park(); }   // ?menu=0 starts straight in the game
   $('loader').classList.add('done');
-  pushFeed(Math.round(1 / DT) + ' Hz MASS-SPRING ENGINE ONLINE · ' + (link.mode === 'worker' ? 'PHYSICS WORKER' : 'MAIN THREAD'));
+  setTimeout(() => $('keys').classList.add('gone'), 20000);   // the controls hint steps aside after a while
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 }
 
