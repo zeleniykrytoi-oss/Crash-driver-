@@ -861,6 +861,10 @@ function physicsLib() {
       this.btype = new Uint8Array(NB); this.bpart = new Uint8Array(NB); this.bBreak = new Int32Array(NB);
       this.broken = new Uint8Array(NB);   // 0 intact, 1 snapped, 2 disabled (support beam of a detached part)
       this.bgroup = new Int16Array(NB).fill(-1); this.groups = []; this.groupNeed = []; this.groupHits = [];
+      // Tethered parts (the front bumper, the headlights) can't come off: each bracket has a side, and once
+      // one side's bracket fails the other side's attachment beams are kept (bKeep 2: unbreakable and
+      // elastic), so the part hangs from that side. Their own lattice never tears (bKeep 1).
+      this.bKeep = new Uint8Array(NB); this.groupSide = []; this.groupPart = [];
       this.nodeYield = new Int32Array(NN).fill(-1e9);   // last step a beam at this node flowed plastically
       this.airQuads = [];
       this.nSE = 0; this.nSD = 0; this.sheetLive = [0, 0];
@@ -1164,7 +1168,7 @@ function physicsLib() {
       this.flexK = mF * fl.omega * fl.omega; this.flexC = 2 * fl.zeta * mF * fl.omega;
       if (this.nSE) this.sheetSprings(mF);
       this.snapshot = {
-        L0: this.L0o.slice(0, this.nBeams),
+        L0: this.L0o.slice(0, this.nBeams), keep: this.bKeep.slice(),
         sL0: this.nSE ? this.sL0o.slice() : null, sTh0: this.nSD ? this.sTh0o.slice() : null,
         wheels: this.wheels.map(w => Float64Array.from(w.w0)),
       };
@@ -1191,6 +1195,8 @@ function physicsLib() {
       this.dentEvents = 0; this.steps = 0;
       this.events.length = 0;
       this.groupHits = this.groups.map(() => 0);
+      this.bKeep.set(this.snapshot.keep);
+      for (const P of this.parts) P.looseSide = -1;
     }
 
     /* -------------------------------- one 0.5 ms substep -------------------------------- */
@@ -1297,6 +1303,14 @@ function physicsLib() {
     // A bracket (hinge, latch, bolt) that has lost enough of its beams lets go as a unit.
     breakGroup(g) {
       if (++this.groupHits[g] !== this.groupNeed[g]) return;
+      const P = this.parts[this.groupPart[g]], side = this.groupSide[g];
+      if (P && P.tethered && side >= 0) {
+        if (P.looseSide < 0) {
+          // the first bracket to go picks the loose side; every bracket on the other side now holds
+          P.looseSide = side;
+          for (let h = 0; h < this.groups.length; h++) if (this.groupPart[h] === P.id && this.groupSide[h] !== side) for (const j of this.groups[h]) this.bKeep[j] = 2;
+        } else if (side !== P.looseSide) return;
+      }
       for (const j of this.groups[g]) if (!this.broken[j]) { this.broken[j] = 1; this.bBreak[j] = this.steps; this.nBroken++; this.concentrate(j); }
     }
 
@@ -1308,7 +1322,7 @@ function physicsLib() {
     beamForces(C) {
       const pos = this.pos, vel = this.vel, frc = this.frc, inv = this.inv, ba = this.ba, bb = this.bb, L0 = this.L0, L0o = this.L0o;
       const bk = this.bk, bc = this.bc, kcap = this.bKcap, yT = this.bdef, yC = this.bdefC, Ep = this.bEp, scf = this.bScf, brT = this.bbrT, brC = this.bbrC, brP = this.bbrP;
-      const broken = this.broken, btype = this.btype, slack = this.bSlack, PL = VEHICLE.plastic, DENSE = VEHICLE.densify, HD = this.bHard, H2 = this.bH2;
+      const broken = this.broken, btype = this.btype, slack = this.bSlack, PL = VEHICLE.plastic, DENSE = VEHICLE.densify, HD = this.bHard, H2 = this.bH2, keep = this.bKeep;
       const iD = 1 / PL.D, iq = 1 / PL.q, st = this.steps, flowMark = 0.3 * DT, list = C.beams;
       let n = C.nb;
       for (let q = 0; q < n;) {
@@ -1332,14 +1346,14 @@ function physicsLib() {
           // fracture: stretched past the breaking strain from the factory length (lowered by plastic thinning,
           // raised by stress concentration at a torn edge), or crushed past the compression limit
           const thin = l0 > lo ? Math.max(PL.thinMin, 1 - PL.thin * (l0 - lo) / lo) : 1;
-          if (strain * sc > brT[j] * thin || -strain > brC[j]) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
+          if ((strain * sc > brT[j] * thin || -strain > brC[j]) && !keep[j]) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
           // plasticity: past the yield strain the rest length moves, so the beam keeps its new length. Work
           // hardening raises the yield force by `hard`; a member that has yielded also unloads along a stiffer
           // path (hard^2 (1 + eps_p / epsK), within what the substep allows), so a crushed member stores, and
           // springs back, only a fraction of the elastic strain a fresh one does.
           const hard = HD[j], h2 = H2[j];
           const e = (L - l0) / l0, ys = hard / h2;
-          if (e > yT[j] * ys || (e < -yC[j] * ys && L > DENSE * lo)) {
+          if ((e > yT[j] * ys || (e < -yC[j] * ys && L > DENSE * lo)) && keep[j] !== 2) {
             const y = (e > 0 ? yT[j] : yC[j]) * ys * (1 + Math.pow(Math.abs(vr) / lo * iD, iq));
             const old = l0;
             if (e > y) l0 = L / (1 + y);
@@ -1349,7 +1363,7 @@ function physicsLib() {
               Ep[j] += dEp; L0[j] = l0;
               HD[j] = 1 + PL.H * Math.log(1 + Ep[j] / PL.eps0); H2[j] = Math.min(HD[j] * HD[j] * (1 + Ep[j] / PL.epsK), kcap[j]);
               if (dEp > flowMark && Ep[j] > 0.08) this.nodeYield[ia] = this.nodeYield[ib] = this.lastYield = st;   // real crumpling, not creep
-              if (Math.abs(l0 - lo) * (l0 > lo ? sc : 1) > brP[j] * lo) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
+              if (Math.abs(l0 - lo) * (l0 > lo ? sc : 1) > brP[j] * lo && !keep[j]) { this.snap(j); list[q] = list[--n]; list[n] = j; continue; }
             }
           }
           f = bk[j] * h2 * (L - l0);
@@ -2592,13 +2606,27 @@ function physicsLib() {
     }
     for (let p = 1; p < N_PARTS; p++) if (!sim.parts[p]) sim.parts[p] = { id: p, n0: sim.nNodes, n1: sim.nNodes, attach: [], support: [], detached: false, ctx: 0, dent: 0 };
     // brackets become break groups: a bracket fails after half its beams (a hood latch after its first)
+    const TETHERED = [P_BUMPER_F, P_HEADLIGHT_L, P_HEADLIGHT_R];
     for (let p = 1; p < N_PARTS; p++) {
       const map = new Map();
       for (const j of sim.parts[p].attach) {
         const k = bracketOf.get(j);
-        if (!map.has(k)) { map.set(k, sim.groups.length); sim.groups.push([]); sim.groupNeed.push(1); }
+        if (!map.has(k)) { map.set(k, sim.groups.length); sim.groups.push([]); sim.groupNeed.push(1); sim.groupSide.push(-1); sim.groupPart.push(p); }
         const g = map.get(k);
         sim.groups[g].push(j); sim.bgroup[j] = g;
+      }
+      // tethered parts: brackets left or right of the part's middle; the part's own lattice can't tear
+      if (TETHERED.includes(p) && sim.parts[p].n1 > sim.parts[p].n0) {
+        const P = sim.parts[p];
+        let cx = 0;
+        for (let i = P.n0; i < P.n1; i++) cx += R[i * 3] / (P.n1 - P.n0);
+        for (const [, g] of map) {
+          let x = 0;
+          for (const j of sim.groups[g]) { const own = sim.part[sim.ba[j]] === p ? sim.ba[j] : sim.bb[j]; x += R[own * 3] - cx; }
+          sim.groupSide[g] = x > 0 ? 1 : 0;
+        }
+        P.tethered = true;
+        for (let j = 0; j < sim.nBeams; j++) if (sim.part[sim.ba[j]] === p && sim.part[sim.bb[j]] === p) sim.bKeep[j] = 1;
       }
       for (const [k, g] of map) sim.groupNeed[g] = p === P_HOOD && k === 'latch' ? 1 : Math.ceil(sim.groups[g].length / 2);
       // edge tearing: attachment beams whose panel-side nodes coincide or share a lattice beam are neighbours

@@ -6,7 +6,7 @@ A soft-body vehicle crash simulator in a single HTML file, styled after the 2013
 - 45 volume cells;
 - a sheet-metal skin of 5574 stretch springs and 3458 dihedral bending springs.
 
-In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate, headlights, grille and taillights hang from their hinges, bolts and clips or tear off when their brackets fail; an offset hit leaves the front bumper dangling from one end.
+In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate, headlights, grille and taillights hang from their hinges, bolts and clips or tear off when their brackets fail. The front bumper and the headlights never come off: at most one side tears loose and hangs, and the other side stays as it was.
 
 The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area is a white gridmap under a blue sky with clouds, ringed by pale dunes, with ruled grey blocks, a steel post, a suspension test course, a drag strip, a skid pad and palm islands.
 
@@ -233,9 +233,14 @@ Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, 
 | Bumpers | 4 × 2 × 2 | four middle bolts and two end brackets |
 | Headlights, grille, taillights | 2 × 2 × 2 box fitted to the part | left and right plastic clips at the face toward the cab |
 
-The headlights, grille and taillights are small housings on plastic clips that let go early. A 50 km/h wall hit knocks the grille out. A harder or offset hit takes the headlights too, and a knocked-out headlight goes dark. A nose-first landing off a ramp at 70 km/h can knock off the front bumper or a headlight.
+The grille and taillights are small housings on plastic clips that let go early: a 50 km/h wall hit knocks the grille out.
 
-**The front bumper.** Its four middle bolts shear early, and the two end brackets are stronger and hold longest. In a straight hit the bumper is pushed in and stays on. In an offset or angled hit the bolts and the near end tear, and the bumper hangs from its far end with its other end on the ground. The rear bumper keeps even, stronger bolts. The tailgate swings on its hinges once its latches tear and comes off in a hard rear hit.
+**Tethered parts: the front bumper and the headlights.** These never come off. Each of their brackets belongs to the left or the right side of the part. The first bracket to fail picks the loose side, and from then on every bracket on the other side holds: its remaining beams can no longer break and stay elastic, so that side keeps its shape. The part's own lattice can't tear either. The part can only hang from one side, never fly off.
+
+- **Front bumper:** its four middle bolts shear early and the two end brackets hold longest. In a straight hit the bumper is pushed in and stays on. In an offset or angled hit one side's bolts and end tear, and the bumper hangs from the other end with its loose end on the ground. The rear bumper keeps even, stronger bolts and can still come off.
+- **Headlights:** each hangs on a left and a right clip. A hard hit can pop one clip, and the lamp tilts out on the other. A smashed headlight stays dark.
+
+Across straight hits at 50 to 110 km/h and angled hits at 50 to 140 km/h, the bumper and both headlights stayed on the truck every time. The tailgate swings on its hinges once its latches tear and comes off in a hard rear hit.
 
 - **Bracket failure:** a bracket lets go as a unit after losing half its beams (a hood latch after its first). Failures stay local, so a door whose upper hinge and latch tear off swings and hangs on its lower hinge.
 - **Load sharing:** each snapped beam concentrates stress in its bracket neighbours (mechanic 7). A moderate hit leaves a part hanging; a severe one tears it free as one panel.
