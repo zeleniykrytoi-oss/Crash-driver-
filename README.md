@@ -1,14 +1,14 @@
-# Beam.Web
+# Beams.Web
 
 A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
-- 865 beams: structural, shear (diagonal) and support;
-- 38 volume cells;
-- a sheet-metal skin of 5839 stretch springs and 3675 dihedral bending springs.
+- 1060 beams: structural, shear (diagonal) and support;
+- 46 volume cells;
+- a sheet-metal skin of 5592 stretch springs and 3524 dihedral bending springs.
 
-In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors and front fenders hang from their hinges and bolts or tear off when their brackets fail.
+In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate, headlights, grille, radiator and taillights hang from their hinges, bolts and clips or tear off when their brackets fail.
 
-The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area has a steel post, barriers, speed bumps, containers, a drag strip and a skid pad.
+The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area has a steel post, a small-overlap block, containers, a suspension test course, a drag strip and a skid pad.
 
 The tyres use a contact-patch friction model with slip ratio, slip angle and static/kinetic friction, on coil-over suspension with asymmetric dampers and anti-roll bars. The drivetrain is a full-size V8 pickup's: 0–100 km/h in 8 s and a 178 km/h limiter.
 
@@ -30,7 +30,7 @@ python3 -m http.server 8000
 - `?model=path/to/vehicle.glb` loads another model (`.gltf` works too).
 - `?worker=0` runs the solver on the main thread instead of the worker. The page also falls back to this on its own if workers are unavailable.
 - `?tune={...}` deep-merges a JSON object into the vehicle constants (`VEHICLE`) before the truck is built, for example `?tune={"plastic":{"H":0.5}}`.
-- `?time=day|evening|night` and `?gfx=low|medium|high|ultra` override the settings panel for that visit.
+- `?time=day|evening|night`, `?gfx=low|medium|high|ultra` and `?deform=simple|normal|enhanced` override the menu's choices for that visit.
 - `?menu=0` skips the main menu and starts straight in the game.
 
 ## Main menu
@@ -38,13 +38,13 @@ python3 -m http.server 8000
 The game opens on a title screen in the style of an early-2010s simulator alpha.
 
 - **Background:** a live view of the test area in black and white, with the contrast pulled up and a heavy vignette. On the title screen the truck waits in the yard behind the crash wall, between the wall's shadowed back and the container stacks, and the camera drifts slowly down the yard.
-- **Title:** "Beam.Web" in large white type at the upper left, with an orange dot, and "Alpha · Work in Progress" in orange beneath it.
-- **Lower right:** the Beam.Web mark (an orange node and two steel nodes joined by beams, one soft-body cell) with a blue wordmark, and plain desktop buttons: Play, Options and Exit. When a session is in progress, Resume comes first.
+- **Title:** "Beams.Web" in large white type at the upper left, with an orange dot.
+- **Lower right:** the Beams.Web mark with a blue wordmark, and plain desktop buttons: Play, Options and Exit. When a session is in progress, Resume comes first. The mark is a soft-body spring element: an orange node joined to two square steel nodes, one by a beam and one by a coil spring, with a beam bracing the pair.
 
 What the buttons do:
 
 - **Play** opens a Choose Level window over the dimmed menu. It shows a large preview of GridMap and three thumbnails, one each for day, evening and night. The previews are rendered from the live scene in colour the first time the window opens. Picking a thumbnail sets the time of day, and **Go!** starts the level with a fresh truck at the start line. Arrow keys move between the thumbnails, and a double-click on one starts it.
-- **Options** opens the settings (time of day and graphics) as a desktop window.
+- **Options** opens the settings (deformation and graphics) as a desktop window.
 - **Exit** closes the game to a black screen. A click or a key brings the menu back.
 
 In the game, **Esc** or the **MENU** button opens the menu and pauses the physics. **Resume** carries on where you left off. **Esc** also closes any open window and, from the pause menu, resumes.
@@ -64,7 +64,7 @@ The windows and buttons are drawn in a plain desktop style (Segoe UI, light grey
 | Headlights on / off | L | LIGHTS |
 | f-node debug view | N | F-NODES |
 | Slow motion: 20× slower (×0.05), still whole 0.5 ms substeps | T | SLOW-MO |
-| Settings: time of day and graphics | G (Esc closes) | SETTINGS |
+| Settings: deformation and graphics | G (Esc closes) | SETTINGS |
 | Main menu (pauses) | Esc | MENU |
 | Orbit camera | drag on the view | drag on the view |
 
@@ -79,12 +79,22 @@ The test area, seen from the spawn (+x is to the left):
 | Steel post, 0.4 m square | right of the wall | narrow-object hits |
 | Short concrete block, 6 m wide and 1.6 m tall | right of the wall | small-overlap hits |
 | Shipping containers, stacked two high | behind the wall | a backdrop to hit |
-| Corridor of red-and-white concrete blocks with six speed bumps | 40 m left | suspension and precision driving |
+| Suspension test course: an asphalt lane with four speed humps, a twist section, a washboard and two kerbs, plus a 15° ramp beside it for one wheel | 44 m left, from 30 m behind the spawn to the wall's end | suspension travel, articulation and damping |
 | Asphalt drag strip, 2 km, with the distance painted every 100 m | 60 m left, starting 900 m behind the spawn | acceleration and top speed |
 | Asphalt skid pad, 30 m radius, with painted circles | 95 m left, 45 m behind | cornering and drifts |
-| Warehouses (solid) and two ridgelines | on the horizon | — |
+| Two ridgelines | on the horizon | — |
 
-The floor is still a gridmap, but worn: broad pale and dark patches, a few oil stains and old rubber streaks, so it doesn't read as a sterile repeat.
+The suspension course, driven toward the wall end:
+
+| Section | What it is | What it shows |
+| --- | --- | --- |
+| BUMPS | four 10 cm speed humps across the lane, 6 m apart | bump and rebound damping, pitch |
+| TWIST | six 16 cm humps, each under one wheel track, alternating sides 3.5 m apart | axles articulating against each other, body roll and twist |
+| WASHBOARD | 18 ridges of 3.5 cm, 55 cm apart | high-frequency damping |
+| KERBS | a 12 cm kerb across the lane, then a 20 cm kerb under the left wheels | sharp edges, a one-sided hit |
+| RTI 15° | a 4 m ramp, 1.1 m wide, beside the lane | how far one wheel can climb before another lifts |
+
+The humps are smooth raised-cosine profiles in the physics (their own collider type, with the slope's normal), not boxes, so the tyres roll over them. Each section is named on the floor.
 
 The HUD shows:
 - the solver rate and load (step time plus skinning time per frame, on the worker). When the device can't keep up with real time, the rate turns red with the playback factor, for example `×0.62`;
@@ -135,7 +145,7 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 - **Rigid blocks:** 8 corner nodes each for the engine and the gearbox.
 - **Hubs:** 4, one per wheel centre.
 - **Tread probes:** 256, a fixed 2 × 32 ring per wheel.
-- **Flexnodes:** 4028 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
+- **Flexnodes:** 3968 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
 
 **Beams.** Each beam is a spring-damper along its axis: F = k·(L − L0) + c·v<sub>rel</sub>, with k = E/L0 and c set by the family's damping ratio. There are three kinds:
 
@@ -173,7 +183,7 @@ An earlier version pushed the whole depth out every step and moved the block as 
 - **Awake flexnodes:** each hangs on its sheet target with a spring-damper (520 rad/s, half critical damping), and the reaction goes back to the structural nodes it blends. The tie is firm within the surface but only 12 % as stiff along the surface normal, so the sheet springs can buckle a squeezed panel out of its plane.
 - **Sheet mesh:** the panel meshes are clustered into a coarse triangle mesh over the flexnodes. Each of its edges is a stretch spring, which yields plastically and tears past 60 % stretch. Each edge shared by two triangles is a dihedral bending spring (mechanic 1 below). A 27 g flexnode can't carry a very stiff sheet at the substep, so each spring is capped at its share of its nodes' stable frequency. A crushed triangle folding nearly flat makes a hinge's stiffness grow like 1/height², so each hinge is held at four times its rest stiffness; without that cap, skin flexnodes were fired off at impact as giant stretched sheets.
 - **Dents:** deviation past about 1 cm becomes a permanent rest-space offset. Sleeping surface neighbours within 24 cm take a smoothly falling share of it, so the patch sets together as one bowl or crease.
-- **Sleeping:** a flexnode that has settled, or has been awake for 0.2 s, bakes its dent and goes back to sleep. While only the ground is near, a sleeping flexnode found clear of it is next tested once it could have come down to the 2.5 cm margin, at its structure's sink rate plus 3 m/s. Sleeping flexnodes are kinematic and cost nothing. At most 500 flexnodes are woken by crumpling at once; contacts always wake them. The wake test runs every second substep (1 kHz), which is enough because its 2.5 cm margin covers 1 ms of travel at crash speed. A flexnode clearly out of reach of the ground and every obstacle (its distance from its dominant structural node is bounded) is skipped without computing its target.
+- **Sleeping:** a flexnode that has settled, or has been awake for 0.2 s, bakes its dent and goes back to sleep. While only the ground is near, a sleeping flexnode found clear of it is next tested once it could have come down to the 2.5 cm margin, at its structure's sink rate plus 3 m/s. Sleeping flexnodes are kinematic and cost nothing. At most 500 flexnodes (the DEFORMATION setting: 0 on SIMPLIFIED, 1100 on ENHANCED) are woken by crumpling at once; contacts always wake them, except on SIMPLIFIED. The wake test runs every second substep (1 kHz), which is enough because its 2.5 cm margin covers 1 ms of travel at crash speed. A flexnode clearly out of reach of the ground and every obstacle (its distance from its dominant structural node is bounded) is skipped without computing its target.
 
 ## Metal deformation mechanics
 
@@ -210,14 +220,19 @@ RESET VEHICLE repairs both.
 
 ## Detaching parts
 
-Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood and the left and right front fenders. Each hangs on named brackets of attachment beams:
+Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood, the left and right front fenders, the tailgate, the left and right headlights, the radiator and the left and right taillights. The grille is cut out of the fascia (the triangles between the headlights) into a part of its own. Each part hangs on named brackets of attachment beams:
 
-| Part | Brackets |
-| --- | --- |
-| Doors | upper hinge, lower hinge, latch |
-| Hood | left hinge, right hinge, latch |
-| Front fenders | front bolts, two top bolts, rear bolts at the door pillar |
-| Bumpers | one per bolt |
+| Part | Lattice | Brackets |
+| --- | --- | --- |
+| Doors | 3 × 3 × 2 | upper hinge, lower hinge, latch |
+| Hood | 3 × 5 × 2 | left hinge, right hinge, latch |
+| Front fenders | 4 × 2 × 2 | front bolts, two top bolts, rear bolts at the door pillar |
+| Tailgate | 3 × 2 × 2 | two hinges below, two latches above |
+| Bumpers | 4 × 2 × 2 | one per bolt |
+| Headlights, grille, taillights | 2 × 2 × 2 box fitted to the part | left and right plastic clips at the face toward the cab |
+| Radiator | 2 × 2 × 2 box | left and right bolts to the core support |
+
+The headlights, grille and taillights are small housings on plastic clips that let go early; the radiator, at 9 kg, is bolted and holds a little longer. A jump off either ramp leaves them all in place. A 50 km/h wall hit knocks the grille and radiator out. A harder or offset hit takes the headlights too, and a knocked-out headlight goes dark. The tailgate swings on its hinges once its latches tear and comes off in a hard rear hit.
 
 - **Bracket failure:** a bracket lets go as a unit after losing half its beams (a hood latch after its first). Failures stay local, so a door whose upper hinge and latch tear off swings and hangs on its lower hinge.
 - **Load sharing:** each snapped beam concentrates stress in its bracket neighbours (mechanic 7). A moderate hit leaves a part hanging; a severe one tears it free as one panel.
@@ -249,6 +264,13 @@ A frontal hit therefore folds the hood up into a ridge with two flat halves, lik
 
 Laterally and fore-aft the hub is held by a stiff link that bends plastically in crashes, up to 38 cm, so a hard frontal hit shoves a front wheel back into the door.
 
+**Visible linkage.** The whole suspension moves, not just the wheels. Each frame the worker measures each front hub's travel relative to where it would sit fixed to the frame, and the rear axle's rigid pose.
+
+- **Front (independent):** each vertex of an upper or lower arm, tie rod or half-shaft follows its wheel's travel in proportion to how far outboard it sits. The inner pivot stays on the frame and the knuckle end rides with the wheel. The coil-overs follow by height: the foot rides on the lower arm and the top stays at the tower. The tie rods also slide with the steering rack.
+- **Rear (solid axle):** the axle housing follows the line between the rear hubs. Each leaf spring bows with it: its middle rides on the axle and its eyes stay on the hangers. The shocks stretch between the axle and the frame.
+
+On the twist course the arms tilt, the springs compress and the leafs flex as the truck articulates.
+
 **Tyres.**
 - **Normal force:** the probe ring measures how far the tyre is compressed against the world, which gives the radial force.
 - **Friction:** friction acts at a single contact patch per wheel. The patch deflects with the slip velocity and relaxes over a relaxation length while rolling. That gives slip-ratio and slip-angle forces at speed, and true static friction at a standstill: the truck holds still on the 10° ramp with the brake on.
@@ -273,9 +295,17 @@ Measured on the bench: 0–100 km/h in 8.0 s (0–60 mph in 7.6 s), 178 km/h on 
 
 ## Settings
 
-The SETTINGS button (or G) opens a panel with two choices. They are remembered in this browser.
+The SETTINGS button (or G), or Options in the main menu, opens a panel with two choices. They are remembered in this browser.
 
-**Time of day:**
+**Deformation:**
+
+| Setting | Free sheet metal | What changes | Cost in a crash |
+| --- | --- | --- | --- |
+| SIMPLIFIED | none | the panels ride the beam structure; it still crushes, folds and tears parts off, but there are no local dents | the cheapest, about 0.6× NORMAL |
+| NORMAL (default) | up to 500 skin nodes at once | free sheet metal where the truck is hit, dents that set and spread | 1× |
+| ENHANCED | up to 1100 skin nodes | dents form more easily (flexnode yield ×0.7) and spread further (share 0.5), pleats stand 25 % deeper, twice the normals budget | about 1.5× NORMAL |
+
+**Time of day** is chosen in the main menu's Choose Level window (Play), one thumbnail per time:
 
 | Time | Sky | Light |
 | --- | --- | --- |
@@ -289,12 +319,12 @@ The truck's lights switch on by themselves in the evening and at night. LIGHTS (
 
 **Graphics:**
 
-| Preset | Resolution | Sun shadows | Anti-aliasing | Skin detail (awake flexnodes, normals) | Smoke / spark particles | Extras |
-| --- | --- | --- | --- | --- | --- | --- |
-| LOW | ¾ | off | FXAA | 150, 8000 triangles | 220 / 90 | no bloom, two floodlights |
-| MEDIUM | 1× | 1024 px | FXAA | 300, 14,000 triangles | 600 / 220 | bloom |
-| HIGH | up to 1.5× | 2048 px | 4× MSAA | 500, 20,000 triangles | 1200 / 450 | bloom |
-| ULTRA | up to 2× | 4096 px | 8× MSAA | 800, 30,000 triangles | 2400 / 900 | bloom, headlight shadows |
+| Preset | Resolution | Sun shadows | Anti-aliasing | Smoke / spark particles | Extras |
+| --- | --- | --- | --- | --- | --- |
+| LOW | ¾ | off | FXAA | 220 / 90 | no bloom, two floodlights |
+| MEDIUM | 1× | 1024 px | FXAA | 600 / 220 | bloom |
+| HIGH | up to 1.5× | 2048 px | 4× MSAA | 1200 / 450 | bloom |
+| ULTRA | up to 2× | 4096 px | 8× MSAA | 2400 / 900 | bloom, headlight shadows |
 
 Each preset also scales how densely the effects emit (0.4× on LOW up to 1.6× on ULTRA).
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Beam.Web</title>
+<title>Beams.Web</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Share+Tech+Mono&family=Ubuntu:wght@400;500&display=swap">
@@ -26,7 +26,7 @@
   --hud-halo: 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 255, 255, 0.55);
   --font-display: 'Saira Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
   --font-data: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-  --font-brand: 'Ubuntu', 'Segoe UI', system-ui, sans-serif;          /* the Beam.Web title and wordmark */
+  --font-brand: 'Ubuntu', 'Segoe UI', system-ui, sans-serif;          /* the Beams.Web title and wordmark */
   --font-ui: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;         /* menu buttons and dialogs: plain desktop UI */
   --brand-orange: #f7941d;
   --edge: 16px;
@@ -172,12 +172,11 @@ body.in-menu #hud > :not(.tools), body.in-menu .tools > :not(#settings) { displa
 .mn-title { position: absolute; left: max(calc(var(--edge) + var(--safe-l)), 10vw); top: max(calc(var(--edge) + var(--safe-t)), 15vh); margin: 0; font-weight: 500; line-height: 1; }
 .mn-name { display: block; font-size: clamp(54px, 9.6vw, 150px); letter-spacing: -0.025em; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.45); }
 .mn-name b { font-weight: 500; color: var(--brand-orange); }
-.mn-sub { display: block; margin: 0.1em 0 0 2.7em; font-size: clamp(19px, 2.7vw, 42px); letter-spacing: -0.005em; color: var(--brand-orange); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55); }
 .mn-mini { position: absolute; left: calc(var(--edge) + var(--safe-l) + 8px); bottom: calc(12px + var(--safe-b)); display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 500; color: rgba(255, 255, 255, 0.34); pointer-events: none; }
 .mn-mini svg { width: 26px; height: 20px; opacity: 0.5; filter: grayscale(1); }
 .mn-ver { font-family: var(--font-ui); font-size: 11px; font-weight: 400; color: rgba(255, 255, 255, 0.28); margin-left: 4px; }
 .mn-dock { position: absolute; right: max(calc(var(--edge) + var(--safe-r)), 3.4vw); bottom: max(calc(12px + var(--safe-b)), 2.4vh); display: flex; flex-direction: column; align-items: flex-end; }
-.mn-lockup { display: flex; align-items: flex-end; gap: 0.1em; font-size: clamp(38px, 5.4vw, 84px); margin: 0 0.02em -0.2em 0; pointer-events: none; }
+.mn-lockup { display: flex; align-items: flex-end; gap: 0.1em; font-size: clamp(36px, 5vw, 78px); margin: 0 0.02em -0.2em 0; pointer-events: none; }
 .mn-mark { width: 1.3em; height: 0.98em; margin-bottom: 0.3em; filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.55)); }
 .mn-word { font-weight: 500; letter-spacing: -0.02em; line-height: 1.12; color: transparent; background: linear-gradient(180deg, #8cc2ff 0%, #3d8ef0 46%, #1559c0 54%, #2f78dc 100%); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.6)); }
 .mn-buttons { position: relative; display: flex; gap: clamp(6px, 0.8vw, 12px); }
@@ -235,7 +234,6 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
 @media (max-width: 720px) {
   .mn-title { top: max(calc(var(--edge) + var(--safe-t)), 11vh); }
   .mn-name { font-size: clamp(48px, 15vw, 96px); }
-  .mn-sub { font-size: clamp(17px, 4.6vw, 28px); margin-left: 1.6em; }
   .mn-mini { display: none; }
   .mn-dock { left: calc(var(--edge) + var(--safe-l)); align-items: stretch; }
   .mn-lockup { align-self: flex-end; font-size: clamp(32px, 9vw, 52px); }
@@ -271,7 +269,7 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
 
 <div id="hud">
   <header class="brand">
-    <div class="brand-title">BEAM<span>.WEB</span></div>
+    <div class="brand-title">BEAMS<span>.WEB</span></div>
     <div class="brand-sub">Mass-spring soft-body simulator · 2000&nbsp;Hz · physics worker</div>
     <dl class="stats" aria-label="Physics telemetry">
       <dt>NODES</dt><dd id="sNodes">0</dd>
@@ -310,11 +308,11 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
     <section id="settings" class="settings" hidden aria-label="Settings">
       <div class="set-head"><span>SETTINGS</span><button id="btnSetClose" class="set-x" type="button" aria-label="Close settings">×</button></div>
       <div class="set-row">
-        <span class="set-lbl" id="lblTime">TIME OF DAY</span>
-        <div class="seg" role="radiogroup" aria-labelledby="lblTime" data-set="time">
-          <button type="button" role="radio" aria-checked="false" data-v="day">DAY</button>
-          <button type="button" role="radio" aria-checked="false" data-v="evening">EVENING</button>
-          <button type="button" role="radio" aria-checked="false" data-v="night">NIGHT</button>
+        <span class="set-lbl" id="lblDeform">DEFORMATION</span>
+        <div class="seg" role="radiogroup" aria-labelledby="lblDeform" data-set="deform">
+          <button type="button" role="radio" aria-checked="false" data-v="simple">SIMPLIFIED</button>
+          <button type="button" role="radio" aria-checked="false" data-v="normal">NORMAL</button>
+          <button type="button" role="radio" aria-checked="false" data-v="enhanced">ENHANCED</button>
         </div>
       </div>
       <div class="set-row">
@@ -350,10 +348,10 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
 
 <main id="menu" aria-label="Main menu">
   <div class="mn-shade"></div>
-  <h1 class="mn-title"><span class="mn-name">Beam<b>.</b>Web</span><span class="mn-sub">Alpha · Work in Progress</span></h1>
-  <div class="mn-mini" aria-hidden="true"><svg viewBox="0 0 64 48"><use href="#bwMark"/></svg><span>Beam.Web</span><span class="mn-ver">soft-body physics · 2000 Hz</span></div>
+  <h1 class="mn-title"><span class="mn-name">Beams<b>.</b>Web</span></h1>
+  <div class="mn-mini" aria-hidden="true"><svg viewBox="0 0 64 48"><use href="#bwMark"/></svg><span>Beams.Web</span><span class="mn-ver">soft-body physics · 2000 Hz</span></div>
   <div class="mn-dock">
-    <div class="mn-lockup" aria-hidden="true"><svg class="mn-mark" viewBox="0 0 64 48"><use href="#bwMark"/></svg><span class="mn-word">Beam.Web</span></div>
+    <div class="mn-lockup" aria-hidden="true"><svg class="mn-mark" viewBox="0 0 64 48"><use href="#bwMark"/></svg><span class="mn-word">Beams.Web</span></div>
     <nav class="mn-buttons" aria-label="Main menu">
       <button id="mnResume" class="mn-btn" type="button" hidden>Resume</button>
       <button id="mnPlay" class="mn-btn" type="button" aria-haspopup="dialog">Play</button>
@@ -382,28 +380,32 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
   </section>
 </main>
 
-<div id="bye" role="dialog" aria-label="Beam.Web has exited">
+<div id="bye" role="dialog" aria-label="Beams.Web has exited">
   <svg viewBox="0 0 64 48" aria-hidden="true"><use href="#bwMark"/></svg>
-  <p class="bye-t">Beam.Web has exited.</p>
+  <p class="bye-t">Beams.Web has exited.</p>
   <p class="bye-s">Click or press any key to return to the menu.</p>
 </div>
 
-<!-- the Beam.Web mark: an orange node and two steel nodes joined by beams, one soft-body cell -->
+<!-- the Beams.Web mark: an orange node on a coil spring to a steel node, with a beam bracing the pair, a
+     soft-body spring element -->
 <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
   <defs>
     <radialGradient id="bwBall" cx="0.36" cy="0.3" r="0.78"><stop offset="0" stop-color="#ffe2ad"/><stop offset="0.32" stop-color="#fca53c"/><stop offset="0.78" stop-color="#e3700e"/><stop offset="1" stop-color="#9a4804"/></radialGradient>
     <radialGradient id="bwNode" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="#c8cdd2"/><stop offset="1" stop-color="#7a8188"/></radialGradient>
     <symbol id="bwMark" viewBox="0 0 64 48">
-      <path d="M18 30 52 8M18 30l33 11M52 8l-1 33" fill="none" stroke="#b9bfc6" stroke-width="2.6" stroke-linecap="round"/>
-      <circle cx="52" cy="8" r="5.2" fill="url(#bwNode)" stroke="#59606a" stroke-width="0.8"/>
-      <circle cx="51" cy="41" r="4.4" fill="url(#bwNode)" stroke="#59606a" stroke-width="0.8"/>
-      <circle cx="18" cy="30" r="13.5" fill="url(#bwBall)"/>
+      <path d="M26 19 52 9" fill="none" stroke="#b9bfc6" stroke-width="3" stroke-linecap="round"/>
+      <path d="M27 32h3l3.4-8 4.4 16 4.4-16 4.4 16 3.4-8h2" fill="none" stroke="#d3d8dd" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M54 13 54 28" fill="none" stroke="#9aa1a9" stroke-width="2.4" stroke-linecap="round"/>
+      <rect x="47.5" y="2.5" width="13" height="13" rx="3" fill="url(#bwNode)" stroke="#59606a" stroke-width="0.9"/>
+      <rect x="48" y="25.5" width="12" height="12" rx="3" fill="url(#bwNode)" stroke="#59606a" stroke-width="0.9"/>
+      <circle cx="15.5" cy="27" r="12.5" fill="url(#bwBall)"/>
+      <ellipse cx="11.5" cy="21.5" rx="4.2" ry="3" fill="#fff" opacity="0.32"/>
     </symbol>
   </defs>
 </svg>
 
 <div id="loader" role="status">
-  <div class="ld-title"><svg viewBox="0 0 64 48" aria-hidden="true"><use href="#bwMark"/></svg><span>Beam<b>.</b>Web</span></div>
+  <div class="ld-title"><svg viewBox="0 0 64 48" aria-hidden="true"><use href="#bwMark"/></svg><span>Beams<b>.</b>Web</span></div>
   <div id="ldText">Loading three.js…</div>
   <div class="ld-bar"><i id="ldBar"></i></div>
 </div>
@@ -432,21 +434,23 @@ function physicsLib() {
   /* ------------------------------------ constants ------------------------------------ */
   const DT = 0.0005, DT2 = DT * DT;  // fixed physics substep: 0.5 ms = 2000 Hz, independent of the render rate
   const MAX_NODES = 4500;            // f-node budget: structure + rigid blocks + hubs + tread probes + flexnodes
-  const MAX_BEAMS = 900;             // beams, including the engine / gearbox lattices
+  const MAX_BEAMS = 1150;            // beams, including the engine / gearbox lattices
   const MAX_STEPS = 120;             // substeps per render frame: a slow device gets slow motion, never a bigger step
   const stepsIn = (sec) => Math.max(1, Math.round(sec / DT));   // a duration as a number of substeps
   const G = 9.81;
 
   const NODE_STRUCT = 0, NODE_HUB = 1, NODE_TREAD = 2, NODE_FLEX = 3, NODE_BLOCK = 4;
   const BEAM_STRUCT = 0, BEAM_ATTACH = 1, BEAM_SUPPORT = 2, BEAM_RIGID = 3, BEAM_MOUNT = 4, BEAM_SHEAR = 5;
-  const P_CHASSIS = 0, P_BUMPER_F = 1, P_BUMPER_R = 2, P_DOOR_L = 3, P_DOOR_R = 4, P_HOOD = 5, P_FENDER_L = 6, P_FENDER_R = 7, N_PARTS = 8;
-  const PART_LABELS = ['CHASSIS', 'FRONT BUMPER', 'REAR BUMPER', 'LEFT DOOR', 'RIGHT DOOR', 'HOOD', 'LEFT FENDER', 'RIGHT FENDER'];
+  const P_CHASSIS = 0, P_BUMPER_F = 1, P_BUMPER_R = 2, P_DOOR_L = 3, P_DOOR_R = 4, P_HOOD = 5, P_FENDER_L = 6, P_FENDER_R = 7;
+  const P_HEADLIGHT_L = 8, P_HEADLIGHT_R = 9, P_GRILLE = 10, P_RADIATOR = 11, P_TAILGATE = 12, P_TAILLIGHT_L = 13, P_TAILLIGHT_R = 14, N_PARTS = 15;
+  const PART_LABELS = ['CHASSIS', 'FRONT BUMPER', 'REAR BUMPER', 'LEFT DOOR', 'RIGHT DOOR', 'HOOD', 'LEFT FENDER', 'RIGHT FENDER',
+    'LEFT HEADLIGHT', 'RIGHT HEADLIGHT', 'GRILLE', 'RADIATOR', 'TAILGATE', 'LEFT TAILLIGHT', 'RIGHT TAILLIGHT'];
 
   const GROUND_MU = 0.55;            // sheet steel sliding on concrete (body, bumpers, detached parts)
 
   const VEHICLE = {
     totalMass: 1950, hubMass: 42, engineMass: 230, gearboxMass: 95,
-    partMass: [0, 22, 20, 26, 26, 20, 13, 13],
+    partMass: [0, 22, 20, 26, 26, 20, 13, 13, 3, 3, 3, 9, 20, 1.5, 1.5],
     flexMassTotal: 108,
     stationMerge: 0.22, stationMaxGap: 0.62, crumpleGap: 0.42,
     wheel: { I: 1.9, kT: 42000, cT: 260, rays: 32, rowFrac: 0.36 },
@@ -509,6 +513,11 @@ function physicsLib() {
       fender:     { E: 5.0e4, yield: 0.02, zeta: 0.15 },            // thin sheet over the wheel arch: crumples readily
       attachFender: { E: 5.5e4, yield: 0.035, brP: 0.08, brk: 0.25, brC: 0.5, zeta: 0.25 },    // the bolts along its front and top edges
       attachFenderRear: { E: 7.0e4, yield: 0.035, brP: 0.2, brk: 0.35, brC: 0.8, zeta: 0.25 },  // at the door pillar: holds longest
+      trim:       { E: 4.0e4, zeta: 0.2 },                           // headlight, grille, radiator and taillight housings
+      clip:       { E: 4.5e4, yield: 0.035, brP: 0.13, brk: 0.3, brC: 0.45, zeta: 0.25 },   // their plastic clips and brackets: let go early
+      radMount:   { E: 7.0e4, yield: 0.035, brP: 0.16, brk: 0.4, brC: 0.6, zeta: 0.3 },     // the radiator's bolts to the core support
+      tailgate:   { E: 6.0e4, zeta: 0.35 },
+      attachTailgate: { E: 8.0e4, yield: 0.035, brP: 0.22, brk: 0.4, brC: 0.6, zeta: 0.4 },   // hinges below, latches above
       bumper:     { E: 5.5e4, zeta: 0.35 },
       attach:     { E: 5.5e4, yield: 0.035, brP: 0.18, brC: 0.4, zeta: 0.3 },
       attachHood: { E: 6.0e4, yield: 0.035, brP: 0.2, brC: 0.55, zeta: 0.25 },
@@ -530,6 +539,7 @@ function physicsLib() {
       hood:    { K: 1.0e6, Py: 8.0e4, floor: 0.35, ceil: 1.8 },   // flat panel cells on light nodes: soft enough for the substep
       door:    { K: 1.2e6, Py: 6.0e4, floor: 0.4, ceil: 1.5 },
       bumper:  { K: 4.0e6, Py: 6.0e4, floor: 0.4, ceil: 1.5 },
+      trim:    { K: 4.0e5, Py: 4.0e4, floor: 0.4, ceil: 1.5 },
     },
     densify: 0.18,   // crushed below 18 % of its length a beam is packed metal: no further plastic flow
   };
@@ -706,7 +716,7 @@ function physicsLib() {
     constructor(cell = 4) { this.cols = []; this.defs = []; this.maxY = 0; this.cell = cell; this.grid = new Map(); this.stamp = new Uint32Array(0); this.tick = 0; }
     static fromDefs(defs) {
       const w = new World();
-      for (const d of defs) { if (d.type === 0) w.addBox(...d.args); else w.addRamp(...d.args); }
+      for (const d of defs) { if (d.type === 0) w.addBox(...d.args); else if (d.type === 1) w.addRamp(...d.args); else w.addHump(...d.args); }
       return w;
     }
     addBox(x0, x1, height, z0, z1, mu, style = 'concrete') {   // style only picks the look on the page
@@ -719,6 +729,12 @@ function physicsLib() {
       const a = deg * Math.PI / 180, h = len * Math.tan(a);
       this.add({ type: 1, x0: cx - width / 2, x1: cx + width / 2, z0, z1: z0 + len, h, ta: Math.tan(a), ca: Math.cos(a), sa: Math.sin(a), mu,
         minx: cx - width / 2, maxx: cx + width / 2, minz: z0, maxz: z0 + len, maxy: h, deg, len, width, cx });
+    }
+    // Smooth hump across x from z0 over len metres, height h: a raised-cosine profile (a speed hump, a
+    // washboard ridge, or half of a twist course when it spans one wheel track).
+    addHump(x0, x1, z0, len, h, mu) {
+      this.defs.push({ type: 2, args: [x0, x1, z0, len, h, mu] });
+      this.add({ type: 2, x0, x1, z0, z1: z0 + len, h, len, k: 2 * Math.PI / len, mu, minx: x0, maxx: x1, minz: z0, maxz: z0 + len, maxy: h });
     }
     add(c) {
       const ci = this.cols.length, s = this.cell;
@@ -769,6 +785,11 @@ function physicsLib() {
           t = z - c.z0; if (t < d) { d = t; nx = 0; ny = 0; nz = -1; }
           t = c.z1 - z; if (t < d) { d = t; nx = 0; ny = 0; nz = 1; }
           t = c.h - y; if (t < d) { d = t; nx = 0; ny = 1; nz = 0; }
+        } else if (c.type === 2) {
+          const u = (z - c.z0) * c.k, top = c.h * 0.5 * (1 - Math.cos(u));
+          if (y > top) continue;
+          const sl = c.h * 0.5 * c.k * Math.sin(u), inv = 1 / Math.sqrt(1 + sl * sl);   // the profile's slope
+          d = (top - y) * inv; nx = 0; ny = inv; nz = -sl * inv;
         } else {
           const top = (z - c.z0) * c.ta;
           if (y > top) continue;
@@ -793,6 +814,7 @@ function physicsLib() {
         const c = this.cols[list[q]];
         if (x < c.minx - m || x > c.maxx + m || z < c.minz - m || z > c.maxz + m || y > c.maxy + m) continue;
         if (c.type === 0) return true;
+        if (c.type === 2) { if (y < c.h * 0.5 * (1 - Math.cos((Math.min(c.z1, Math.max(c.z0, z)) - c.z0) * c.k)) + m) return true; continue; }
         if (y < (z - c.z0) * c.ta + m / c.ca) return true;
       }
       return false;
@@ -1496,6 +1518,7 @@ function physicsLib() {
     // Wake flexnodes: a cluster wakes its flexnodes only when its bounding box nears the ground or an obstacle
     // (those inside a contact margin), or when the structure under it is crumpling.
     wakeFlex() {
+      if (this.flexOff) return;   // simplified deformation: the skin rides the structure
       const pos = this.pos, N = this.edN, W = this.edW, active = this.fActive, world = this.world;
       const cls = this.clusters, T = this._t;
       const crashing = this.steps - this.lastYield < CRUMPLE;
@@ -2292,6 +2315,7 @@ function physicsLib() {
     for (let p = 1; p < N_PARTS; p++) {
       partV[p] = collect(m => m.part === p && m.cat === 'panel');                    // fit lattices to the skin, not mirrors/glass
       if (!partV[p].length) partV[p] = collect(m => m.part === p && m.cat !== 'rigid');
+      if (!partV[p].length) partV[p] = collect(m => m.part === p);
     }
     const partBox = partV.map(v => (v ? boxOf(v) : null));
 
@@ -2539,6 +2563,28 @@ function physicsLib() {
       attach(p, Bm.id(0, 1, 1), 2, BF.attach, 'end0');
       attach(p, Bm.id(3, 1, 1), 2, BF.attach, 'end3');
     }
+    // Bolt-on pieces: the headlights, grille and radiator at the front, the taillights at the back. Each is
+    // a small 2 x 2 x 2 box lattice fitted to its meshes, clipped to the structure at its back face by two
+    // brackets of plastic clips that give early, so a frontal hit knocks them loose or off.
+    const box8 = (p, back, fam = BF.clip) => {
+      const b = partBox[p];
+      if (!b) return null;
+      const lo = b.min.slice(), hi = b.max.slice();
+      for (let k = 0; k < 3; k++) { const m = (lo[k] + hi[k]) / 2, h = Math.max((hi[k] - lo[k]) / 2 - 0.008, 0.03); lo[k] = m - h; hi[k] = m + h; }
+      const L = lattice(p, 2, 2, 2, (i, j, k) => [lerp(lo[0], hi[0], i), lerp(lo[1], hi[1], j), lerp(lo[2], hi[2], k)], BF.trim, null, VF.trim);
+      const kb = back > 0 ? 1 : 0;   // the face toward the cab
+      for (const i of [0, 1]) for (const j of [0, 1]) attach(p, L.id(i, j, kb), 2, fam, i ? 'clipR' : 'clipL');
+      return L;
+    };
+    for (const p of [P_HEADLIGHT_L, P_HEADLIGHT_R, P_GRILLE]) box8(p, -1);
+    box8(P_RADIATOR, -1, BF.radMount);
+    for (const p of [P_TAILLIGHT_L, P_TAILLIGHT_R]) box8(p, 1);
+    // the tailgate: a 3 x 2 x 2 lattice across the back of the bed, on two hinges below and two latches above
+    const tg = partBox[P_TAILGATE];
+    if (tg) {
+      const T = lattice(P_TAILGATE, 3, 2, 2, (i, j, k) => [lerp(tg.max[0] - 0.05, tg.min[0] + 0.05, i / 2), lerp(tg.min[1] + 0.05, tg.max[1] - 0.04, j), lerp(tg.min[2] + 0.015, Math.max(tg.max[2] - 0.015, tg.min[2] + 0.07), k)], BF.tailgate, null, VF.door);
+      for (const i of [0, 2]) for (const j of [0, 1]) attach(P_TAILGATE, T.id(i, j, 1), 2, BF.attachTailgate, (j ? 'latch' : 'hinge') + (i ? 'R' : 'L'));
+    }
     for (let p = 1; p < N_PARTS; p++) if (!sim.parts[p]) sim.parts[p] = { id: p, n0: sim.nNodes, n1: sim.nNodes, attach: [], support: [], detached: false, ctx: 0, dent: 0 };
     // brackets become break groups: a bracket fails after half its beams (a hood latch after its first)
     for (let p = 1; p < N_PARTS; p++) {
@@ -2687,7 +2733,7 @@ function physicsLib() {
       return A;
     });
     const Atot = areas.reduce((a, b) => a + b, 0);
-    const counts = areas.map((A, p) => (A > 0 ? Math.max(p === 0 ? 0 : 60, Math.round(flexBudget * A / Atot)) : 0));
+    const counts = areas.map((A, p) => (A > 0 ? Math.max(p === 0 ? 0 : (p >= P_HEADLIGHT_L ? 30 : 60), Math.round(flexBudget * A / Atot)) : 0));
     counts[0] += flexBudget - counts.reduce((a, b) => a + b, 0);
     // every structural node gets a rotation frame, shape-matched over itself and its beam neighbours
     const adj = new Map();
@@ -2715,7 +2761,7 @@ function physicsLib() {
     sim.fStart = sim.nNodes;
     for (let p = 0; p < N_PARTS; p++) {
       sim.fp[p] = { yield: p === P_BUMPER_F || p === P_BUMPER_R ? 0.015 : (p === 0 ? 0.012 : (p >= P_FENDER_L ? 0.008 : 0.01)), maxP: 0.3 };
-      sim.fp[p].y2 = sim.fp[p].yield * sim.fp[p].yield;
+      sim.fp[p].y2 = sim.fp[p].yield * sim.fp[p].yield; sim.fp[p].yield0 = sim.fp[p].yield;
       if (!counts[p]) continue;
       const smp = sampleSurface(partTris[p], counts[p], rng), pts = smp.pos;
       const P = sim.parts[p];
@@ -3050,13 +3096,14 @@ function physicsLib() {
       // radiator, front suspension and other engine-bay parts sit in the crumple zone: skin them to the
       // structure so a crushed bay pushes them back instead of leaving rigid parts poking through the metal
       const inBay = m.cat === 'rigid' && m.part === P_CHASSIS && !m.spinAxis && c[2] > this.meta.cowlZ - 0.05;
-      if ((m.cat === 'panel' || m.cat === 'nosample' || inBay) && hasFlex) {
+      const rearSusp = /leaf_r|shock_r/.test(m.name) && sim.wheels.length === 4;
+      if ((m.cat === 'panel' || m.cat === 'nosample' || inBay || rearSusp) && hasFlex) {
         const K = 4, fid = new Int32Array(nv * K), phi = new Float32Array(nv * K), off = new Float32Array(nv * K * 3);
         const tmp = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]], R = sim.rest, fs = sim.fStart, Nr = m.N;
         const uses = new Uint8Array(sim.nFlex);
         for (let v = 0; v < nv; v++) {
           const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
-          if (inBay) this.nearestFlex(m.part, x, y, z, K + 1, tmp, 0, 0, 0);
+          if (inBay || rearSusp) this.nearestFlex(m.part, x, y, z, K + 1, tmp, 0, 0, 0);
           else this.nearestFlex(m.part, x, y, z, K + 1, tmp, Nr[v * 3], Nr[v * 3 + 1], Nr[v * 3 + 2]);
           // weights fade to zero at the fifth-nearest flexnode, so neighbouring vertices never jump between sets
           const dmax = tmp[K][1] + 1e-6;
@@ -3076,7 +3123,7 @@ function physicsLib() {
         }
         this.skins.push({ fid, phi, off, restP: P, restN: Nr, refN: new Float32Array(nv * 3), nrm: new Float32Array(nv * 3), index, index0: index.slice(),
           rest2, torn: new Uint8Array(nt), dented: false, nv, frame: 0, nrmFrame: -1, nrmValid: false, panel: m.cat === 'panel', part: m.part, name: m.name, meshIndex, uses, item, pw: null, pb: null, pt: null, pz: null,
-          fl: Int32Array.from(uses.reduce((a, u, f) => (u && a.push(f), a), [])), rigid: false });
+          fl: Int32Array.from(uses.reduce((a, u, f) => (u && a.push(f), a), [])), rigid: false, susp: this.suspWeights(m, P, nv) });
         return item;
       }
       if (m.cat === 'axle' && sim.wheels.length === 4) {
@@ -3093,6 +3140,68 @@ function physicsLib() {
       const fid = sim.addFrame([...new Set([...tet.n, ...near])]);
       this.rigids.push({ kind: 'tet', n: tet.n, w: tet.w, fid, c, spinAxis: m.spinAxis || null, item });
       return item;
+    }
+
+    // Suspension linkage, so the whole suspension works and not just the wheels. Front (independent):
+    // each vertex of an arm, tie rod or half-shaft follows its wheel's travel by how far outboard it sits
+    // (inner pivot 0, knuckle 1); a coil-over by how low it sits (its foot rides on the lower arm); the tie
+    // rods also slide with the steering rack. Rear (solid axle): a leaf spring follows the axle at its
+    // middle and the frame at its eyes; a shock follows the axle at its foot and the frame at its top.
+    suspWeights(m, P, nv) {
+      const front = /upperarm|lowerarm|tierod|halfshaft|coilover/.test(m.name), rear = /leaf_r|shock_r/.test(m.name);
+      if (!front && !rear) return null;
+      const W = this.sim.wheels, R = this.sim.rest, w = new Float32Array(nv), wh = new Int8Array(nv).fill(-1);
+      const sideOf = (x) => W.findIndex(q => q.front === front && q.left === (x > 0));
+      const lo = {}, hi = {};   // per side: extent across (front arms), or up (coil-overs, shocks), or along (leafs)
+      const coord = (v) => (/coilover|shock_r/.test(m.name) ? P[v * 3 + 1] : (/leaf_r/.test(m.name) ? Math.abs(P[v * 3 + 2] - this.rearZ()) : Math.abs(P[v * 3])));
+      for (let v = 0; v < nv; v++) { const sd = P[v * 3] > 0 ? 1 : 0, q = coord(v); lo[sd] = Math.min(lo[sd] ?? 1e9, q); hi[sd] = Math.max(hi[sd] ?? -1e9, q); }
+      for (let v = 0; v < nv; v++) {
+        const sd = P[v * 3] > 0 ? 1 : 0, t = (coord(v) - lo[sd]) / Math.max(hi[sd] - lo[sd], 1e-3);
+        wh[v] = sideOf(P[v * 3]);
+        if (/coilover/.test(m.name)) w[v] = 0.65 * (1 - t);
+        else if (/shock_r/.test(m.name)) w[v] = 1 - t;
+        else if (/leaf_r/.test(m.name)) w[v] = 1 - t * t;          // the leaf bows: stiff in the middle, the eyes stay on the hangers
+        else w[v] = t;
+      }
+      return { front, w, wh, rack: /tierod/.test(m.name) };
+    }
+    rearZ() { const W = this.sim.wheels.filter(q => !q.front); return W.reduce((a, q) => a + this.sim.rest[q.hub * 3 + 2], 0) / Math.max(W.length, 1); }
+
+    // Each front hub's offset from where it would sit fixed to the frame, the steering rack's travel, and the
+    // rear axle's rigid transform, for the suspension linkage above.
+    suspState() {
+      const sim = this.sim, pos = sim.pos, W = sim.wheels, D = this._sd || (this._sd = new Float64Array(W.length * 3));
+      let steer = 0, ns = 0;
+      for (let i = 0; i < W.length; i++) {
+        const w = W[i], a = w.anc, h = w.hub * 3;
+        let tx = 0, ty = 0, tz = 0;
+        for (let q = 0; q < 4; q++) { const j = a[q] * 3, ww = w.w[q]; tx += ww * pos[j]; ty += ww * pos[j + 1]; tz += ww * pos[j + 2]; }
+        D[i * 3] = pos[h] - tx; D[i * 3 + 1] = pos[h + 1] - ty; D[i * 3 + 2] = pos[h + 2] - tz;
+        if (w.steerable) { steer += w.steer; ns++; }
+      }
+      const fl = W.find(w => w.front && w.left), k = ns ? -0.15 * steer / ns : 0;   // ~15 cm steering arm: full lock moves the rack ~7 cm
+      this._rack = fl ? [fl.M[0] * k, fl.M[1] * k, fl.M[2] * k] : [0, 0, 0];
+      this._ax = this.axleFrame();
+    }
+
+    // Rear solid axle: rotation and translation that carry its rest pose onto the line between the hubs.
+    axleFrame() {
+      if (!this.axleRef) {
+        const W = this.sim.wheels, rl = W.find(w => !w.front && w.left), rr = W.find(w => !w.front && !w.left);
+        this.axleRef = rl && rr ? { hl: rl.hub, hr: rr.hub, wl: rl } : null;
+      }
+      const a = this.axleRef;
+      if (!a) return null;
+      const sim = this.sim, pos = sim.pos, R = sim.rest, hl = a.hl * 3, hr = a.hr * 3, m = this._axm || (this._axm = new Float64Array(9));
+      let Xx = pos[hl] - pos[hr], Xy = pos[hl + 1] - pos[hr + 1], Xz = pos[hl + 2] - pos[hr + 2];
+      let l = Math.sqrt(Xx * Xx + Xy * Xy + Xz * Xz) || 1; Xx /= l; Xy /= l; Xz /= l;
+      let Ux = a.wl.U[0], Uy = a.wl.U[1], Uz = a.wl.U[2];
+      let Zx = Xy * Uz - Xz * Uy, Zy = Xz * Ux - Xx * Uz, Zz = Xx * Uy - Xy * Ux;
+      l = Math.sqrt(Zx * Zx + Zy * Zy + Zz * Zz) || 1; Zx /= l; Zy /= l; Zz /= l;
+      Ux = Zy * Xz - Zz * Xy; Uy = Zz * Xx - Zx * Xz; Uz = Zx * Xy - Zy * Xx;
+      m[0] = Xx; m[1] = Ux; m[2] = Zx; m[3] = Xy; m[4] = Uy; m[5] = Zy; m[6] = Xz; m[7] = Uz; m[8] = Zz;
+      return { m, cx: (R[hl] + R[hr]) / 2, cy: (R[hl + 1] + R[hr + 1]) / 2, cz: (R[hl + 2] + R[hr + 2]) / 2,
+        mx: (pos[hl] + pos[hr]) / 2, my: (pos[hl + 1] + pos[hr + 1]) / 2, mz: (pos[hl + 2] + pos[hr + 2]) / 2 };
     }
 
     reset() { for (const s of this.skins) { s.dented = false; s.frame = 0; s.nrmValid = false; s.index.set(s.index0); s.torn.fill(0); } this.tears.length = 0; this.frontCrush = 0; }
@@ -3207,9 +3316,11 @@ function physicsLib() {
         TT[f * 3 + 1] = pos[b + 1] - (FR[t + 3] * x + FR[t + 4] * y + FR[t + 5] * z);
         TT[f * 3 + 2] = pos[b + 2] - (FR[t + 6] * x + FR[t + 7] * y + FR[t + 8] * z);
       }
-      const pleating = this.bayCompression(), Rb = this.pRb, PA = PLEAT_GAIN * PLEAT / 4;
+      const pleating = this.bayCompression(), Rb = this.pRb, PA = (this.pleatGain || PLEAT_GAIN) * PLEAT / 4;
       let nrmBudget = this.normalBudget || NORMAL_BUDGET;
       this.frames = (this.frames || 0) + 1;
+      this.suspState();
+      const SD = this._sd, RK = this._rack, AX = this._ax;
       // start the normals budget at a different panel each frame, so every dented panel gets its turn
       const S = this.skins, start = this.frames % S.length;
       for (let k = 0; k < S.length; k++) {
@@ -3221,7 +3332,8 @@ function physicsLib() {
         // all its vertices (and the page uploads nothing). It stays skinned while it is pleated or any of its
         // flexnodes is awake or dented, and while a flexnode sits more than 7 mm off the fit (16 mm to leave):
         // structure that has bent, or flexes hard under braking and cornering.
-        if (!plW && this.rigidFit(s, out, s.item.offset)) continue;
+        if (!plW && !s.susp && this.rigidFit(s, out, s.item.offset)) continue;
+        const SU = s.susp;
         out[s.item.offset] = 0;
         if (plW) s.dented = true;   // pleated panels need real normals: the shading is what makes the folds read
         const recompute = s.dented;
@@ -3235,6 +3347,16 @@ function physicsLib() {
           const vx = restP[v3], vy = restP[v3 + 1], vz = restP[v3 + 2], n0x = restN[v3], n0y = restN[v3 + 1], n0z = restN[v3 + 2];
           let px = tx + m0 * vx + m1 * vy + m2 * vz, py = ty + m3 * vx + m4 * vy + m5 * vz, pz = tz + m6 * vx + m7 * vy + m8 * vz;
           let nx = m0 * n0x + m1 * n0y + m2 * n0z, ny = m3 * n0x + m4 * n0y + m5 * n0z, nz = m6 * n0x + m7 * n0y + m8 * n0z;
+          if (SU) {
+            const wv = SU.w[v], q = SU.wh[v];
+            if (SU.front) {
+              if (q >= 0) { px += wv * SD[q * 3]; py += wv * SD[q * 3 + 1]; pz += wv * SD[q * 3 + 2]; }
+              if (SU.rack) { px += RK[0]; py += RK[1]; pz += RK[2]; }
+            } else if (AX) {
+              const A = AX.m, ox = vx - AX.cx, oy = vy - AX.cy, oz = vz - AX.cz;
+              px += wv * (AX.mx + A[0] * ox + A[1] * oy + A[2] * oz - px); py += wv * (AX.my + A[3] * ox + A[4] * oy + A[5] * oz - py); pz += wv * (AX.mz + A[6] * ox + A[7] * oy + A[8] * oz - pz);
+            }
+          }
           const l = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
           nx *= l; ny *= l; nz *= l;
           if (plW && plW[v] > 0) {
@@ -3282,19 +3404,10 @@ function physicsLib() {
         }
         this.writeMatrix(out, r.item.offset, m, x - (m[0] * cx + m[1] * cy + m[2] * cz), y - (m[3] * cx + m[4] * cy + m[5] * cz), z - (m[6] * cx + m[7] * cy + m[8] * cz));
       }
-      for (const a of this.axles) {
-        // rear solid axle, leaf springs and dampers follow the line between the two rear hubs
-        const R = sim.rest, hl = a.hl * 3, hr = a.hr * 3, m = this._r9;
-        let Xx = pos[hl] - pos[hr], Xy = pos[hl + 1] - pos[hr + 1], Xz = pos[hl + 2] - pos[hr + 2];
-        let l = Math.sqrt(Xx * Xx + Xy * Xy + Xz * Xz) || 1; Xx /= l; Xy /= l; Xz /= l;
-        let Ux = a.wl.U[0], Uy = a.wl.U[1], Uz = a.wl.U[2];
-        let Zx = Xy * Uz - Xz * Uy, Zy = Xz * Ux - Xx * Uz, Zz = Xx * Uy - Xy * Ux;
-        l = Math.sqrt(Zx * Zx + Zy * Zy + Zz * Zz) || 1; Zx /= l; Zy /= l; Zz /= l;
-        Ux = Zy * Xz - Zz * Xy; Uy = Zz * Xx - Zx * Xz; Uz = Zx * Xy - Zy * Xx;
-        m[0] = Xx; m[1] = Ux; m[2] = Zx; m[3] = Xy; m[4] = Uy; m[5] = Zy; m[6] = Xz; m[7] = Uz; m[8] = Zz;
-        const cx = (R[hl] + R[hr]) / 2, cy = (R[hl + 1] + R[hr + 1]) / 2, cz = (R[hl + 2] + R[hr + 2]) / 2;
-        const mx = (pos[hl] + pos[hr]) / 2, my = (pos[hl + 1] + pos[hr + 1]) / 2, mz = (pos[hl + 2] + pos[hr + 2]) / 2;
-        this.writeMatrix(out, a.item.offset, m, mx - (m[0] * cx + m[1] * cy + m[2] * cz), my - (m[3] * cx + m[4] * cy + m[5] * cz), mz - (m[6] * cx + m[7] * cy + m[8] * cz));
+      // the rear solid axle (its leafs and shocks are skinned between it and the frame, above)
+      if (AX) for (const a of this.axles) {
+        const m = AX.m;
+        this.writeMatrix(out, a.item.offset, m, AX.mx - (m[0] * AX.cx + m[1] * AX.cy + m[2] * AX.cz), AX.my - (m[3] * AX.cx + m[4] * AX.cy + m[5] * AX.cz), AX.mz - (m[6] * AX.cx + m[7] * AX.cy + m[8] * AX.cz));
       }
     }
 
@@ -3504,7 +3617,7 @@ function physicsLib() {
       if (op === 'run') return this.run(a);
       if (op === 'probe') return this.probe();
       if (op === 'bench') return this.bench(a.frames || 30);
-      if (op === 'detail') { this.sim.sheetBudget = a.sheet | 0 || SHEET_BUDGET; this.binder.normalBudget = a.normals | 0 || NORMAL_BUDGET; return true; }
+      if (op === 'detail') return this.detail(a);
       if (op === 'energy') return this.energy();
       throw new Error('unknown command ' + op);
     }
@@ -3564,6 +3677,20 @@ function physicsLib() {
       const t2 = performance.now();
       for (let k = 0; k < frames; k++) this.sim.syncVisualState();
       return { stepMsPerFrame: +(tStep / frames).toFixed(2), packMs: +(tPack / frames).toFixed(2), syncMs: +((performance.now() - t2) / frames).toFixed(2), active: this.sim.nActive };
+    }
+
+    // Deformation detail (the settings' DEFORMATION): 'simple' keeps every flexnode riding the structure,
+    // 'normal' is the default, 'enhanced' lets more of the skin go free, dents form more easily (flexnode
+    // yield x0.7) and spread further (share 0.5), and the pleats stand deeper.
+    detail(a) {
+      const sim = this.sim, m = a.mode || 'normal';
+      sim.sheetBudget = a.sheet === undefined ? SHEET_BUDGET : a.sheet | 0;
+      this.binder.normalBudget = a.normals | 0 || NORMAL_BUDGET;
+      sim.flexOff = m === 'simple';
+      VEHICLE.flex.share = m === 'enhanced' ? 0.5 : 0.35;
+      for (const f of sim.fp) { f.yield = f.yield0 * (m === 'enhanced' ? 0.7 : 1); f.y2 = f.yield * f.yield; }
+      this.binder.pleatGain = m === 'enhanced' ? 1.75 : PLEAT_GAIN;
+      return true;
     }
 
     // Energy of the structure (J), for tests: kinetic, its share spinning about the centre of mass, the share
@@ -3706,7 +3833,8 @@ function physicsLib() {
 
   return { DT, MAX_NODES, MAX_BEAMS, MAX_STEPS, STATS, NODE_STRUCT, NODE_HUB, NODE_TREAD, NODE_FLEX, NODE_BLOCK,
     BEAM_STRUCT, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, FX_SCRAPE, FX_SNAP, FX_IMPACT, P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD,
-    P_FENDER_L, P_FENDER_R, N_PARTS, PART_LABELS, VEHICLE, TYRE, World, SimCore, mulberry32 };
+    P_FENDER_L, P_FENDER_R, P_HEADLIGHT_L, P_HEADLIGHT_R, P_GRILLE, P_RADIATOR, P_TAILGATE, P_TAILLIGHT_L, P_TAILLIGHT_R,
+    N_PARTS, PART_LABELS, VEHICLE, TYRE, World, SimCore, mulberry32 };
 }
 
 /* =========================================================================================
@@ -3745,9 +3873,10 @@ function workerMain(LIB) {
 
 const PHYS = physicsLib();   // this thread's copy: constants, the World for the scene, and the fallback core
 const { DT, MAX_STEPS, NODE_FLEX, NODE_TREAD, NODE_HUB, NODE_BLOCK, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, FX_SCRAPE, FX_SNAP, FX_IMPACT,
-  P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, P_FENDER_L, P_FENDER_R, mulberry32 } = PHYS;
+  P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, P_FENDER_L, P_FENDER_R, P_HEADLIGHT_L, P_HEADLIGHT_R, P_GRILLE, P_RADIATOR, P_TAILGATE, P_TAILLIGHT_L, P_TAILLIGHT_R, mulberry32 } = PHYS;
 const DIRT0 = 0.35;   // a working truck's everyday road dirt, before it has driven anywhere
-const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a, 0xffe45f, 0xffe45f];
+const COURSE = { x: -44, half: 3.6, z0: -30, z1: 58 };   // the suspension test course's lane (centre x, half width, start and end)
+const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a, 0xffe45f, 0xffe45f, 0xffffff, 0xffffff, 0xc9a0ff, 0x7fd4c9, 0x5fe0ff, 0xff7a6a, 0xff7a6a];
 const BATCH_MS = 45;   // a batch of substeps stops early past this much time, so a heavy moment can't hold a frame back
 
 class PhysicsLink {
@@ -3873,6 +4002,13 @@ function meshNameChain(o) {
 
 function detectPart(chain) {
   if (/hood|bonnet/.test(chain)) return P_HOOD;
+  if (/tailgate/.test(chain)) return P_TAILGATE;
+  if (/(headlight|signal)[a-z]*[_\s.-]?(l|left)([_\s.\-\d]|$)/.test(chain)) return P_HEADLIGHT_L;
+  if (/(headlight|signal)[a-z]*[_\s.-]?(r|right)([_\s.\-\d]|$)/.test(chain)) return P_HEADLIGHT_R;
+  if (/taillight[a-z]*[_\s.-]?(l|left)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_L;
+  if (/taillight[a-z]*[_\s.-]?(r|right)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_R;
+  if (/radiator/.test(chain) && !/radtube/.test(chain)) return P_RADIATOR;
+  if (/grille/.test(chain)) return P_GRILLE;
   if (/door[a-z]*([_\s.-](l|left)|left)([_\s.\-\d]|$)|left[_\s]?door|(^|[^a-z])mirror([_\s.-](l|left)|left)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_L;
   if (/door[a-z]*([_\s.-](r|right)|right)([_\s.\-\d]|$)|right[_\s]?door|(^|[^a-z])mirror([_\s.-](r|right)|right)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_R;
   // front fenders (not the bed's fender flares)
@@ -4177,6 +4313,7 @@ function makeMaterials(envMap) {
 
 function pickMaterial(m, mats) {
   const mn = ((m.srcMat && m.srcMat.name) || '').toLowerCase(), n = m.name;
+  if (/grille/.test(n)) return mats.trim;
   if (/headlightglass|headlight[_\s.-]?lens/.test(n)) return mats.lens;
   if (/windshield/.test(n)) return mats.windshield;
   if (/glass/.test(mn) || /glass|backlight/.test(n)) return mats.glass;
@@ -4230,21 +4367,6 @@ function latheX(prof, S, radialOffset) {
 }
 
 // Reorder an indexed geometry's triangles into two material groups: pred(centroid) false -> 0, true -> 1.
-function splitTriangles(geom, pred) {
-  const I = geom.index.array, P = geom.attributes.position.array, a = [], b = [];
-  for (let t = 0; t < I.length; t += 3) {
-    const i0 = I[t] * 3, i1 = I[t + 1] * 3, i2 = I[t + 2] * 3;
-    const cx = (P[i0] + P[i1] + P[i2]) / 3, cy = (P[i0 + 1] + P[i1 + 1] + P[i2 + 1]) / 3, cz = (P[i0 + 2] + P[i1 + 2] + P[i2 + 2]) / 3;
-    (pred(cx, cy, cz) ? b : a).push(I[t], I[t + 1], I[t + 2]);
-  }
-  const idx = new Uint32Array(I.length);
-  idx.set(a, 0); idx.set(b, a.length);
-  geom.setIndex(new THREE.BufferAttribute(idx, 1));
-  geom.clearGroups();
-  geom.addGroup(0, a.length, 0);
-  geom.addGroup(a.length, b.length, 1);
-}
-
 // Front-facing planar UVs (x, y) at `scale` repeats per metre.
 function planarUV(geom, scale) {
   const P = geom.attributes.position.array, n = P.length / 3, uv = new Float32Array(n * 2);
@@ -4894,28 +5016,6 @@ function buildEnvironment(scene, renderer, world) {
   gridTex.repeat.set(600, 600);
   gridTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const groundMat = new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.82, metalness: 0, envMap: env, envMapIntensity: 0.35 });
-  // years of use: broad pale and dark patches, oil stains and rubber streaks over the tiles (world-space
-  // noise, 1 unit = one 4 m texture repeat), so the floor doesn't read as a sterile repeat
-  groundMat.userData.grimePatch = (sh) => {
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>
-        float gH2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        float gN2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gH2(i), gH2(i + vec2(1, 0)), f.x), mix(gH2(i + vec2(0, 1)), gH2(i + vec2(1, 1)), f.x), f.y); }`)
-      .replace('#include <map_fragment>', `#include <map_fragment>
-        #ifdef USE_MAP
-          vec2 gp = vMapUv;
-          float wear = gN2(gp * 0.07) * 0.6 + gN2(gp * 0.23) * 0.3 + gN2(gp * 1.1) * 0.1;
-          float oil = smoothstep(0.88, 0.96, gN2(gp * 0.45 + 13.0)) * smoothstep(0.4, 0.7, gN2(gp * 0.06 + 9.0)) * 0.35;
-          float skid = smoothstep(0.62, 0.95, gN2(vec2(gp.x * 2.6, gp.y * 0.12) + 41.0)) * smoothstep(0.65, 0.85, gN2(gp * 0.05 + 3.0)) * 0.3;
-          diffuseColor.rgb *= (0.9 + 0.16 * wear) * (1.0 - oil) * (1.0 - skid);
-        #endif`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        #ifdef USE_MAP
-          roughnessFactor = mix(roughnessFactor, 0.45, oil);
-        #endif`);
-  };
-  groundMat.onBeforeCompile = groundMat.userData.grimePatch;
-  groundMat.customProgramCacheKey = () => 'groundwear';
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -4947,6 +5047,20 @@ function buildEnvironment(scene, renderer, world) {
   decal(strip, 10, 2000, 60, 0);
   const label = (text, color, w = 256, h = 128, size = 92) => canvasTexture(w, h, (ctx) => { ctx.fillStyle = color; ctx.font = `bold ${size}px Arial, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, w / 2, h / 2 + 4); });
   for (let k = 0; k <= 18; k++) { const t = label(k ? k * 100 + '' : 'START', 'rgba(240,240,232,0.92)', 256, 128, k ? 92 : 64); decal(t, 5, 2.5, 60, -900 + k * 100, { alpha: true, lift: 1, rot: Math.PI }); }
+  // the suspension course's lane: asphalt with white edges and a dashed yellow centre line, its sections
+  // named on the floor
+  const lane = canvasTexture(256, 512, (ctx, w, h) => {
+    asphalt(ctx, w, h);
+    ctx.fillStyle = 'rgba(235,235,228,0.9)'; ctx.fillRect(6, 0, 7, h); ctx.fillRect(w - 13, 0, 7, h);
+    ctx.fillStyle = 'rgba(230,190,60,0.9)'; ctx.fillRect(w / 2 - 3, 0, 6, h * 0.5);
+  });
+  const laneLen = COURSE.z1 - COURSE.z0;
+  lane.repeat.set(1, laneLen / 8);
+  decal(lane, COURSE.half * 2 + 0.6, laneLen, COURSE.x, (COURSE.z0 + COURSE.z1) / 2);
+  for (const [text, z, size] of [['SUSPENSION TEST', -27, 50], ['BUMPS', -24, 80], ['TWIST', 2.5, 80], ['WASHBOARD', 28, 66], ['KERBS', 43, 80]]) {
+    decal(label(text, 'rgba(240,240,232,0.92)', 512, 128, size), 5.6, 1.4, COURSE.x, z, { alpha: true, lift: 1, rot: Math.PI });
+  }
+  decal(label('RTI 15°', 'rgba(240,240,232,0.92)', 256, 128, 70), 2.6, 1.3, COURSE.x + 8.2, -1.6, { alpha: true, lift: 1, rot: Math.PI });
   // a skid pad for cornering and drifts: a 30 m asphalt disc with painted circles
   const pad = canvasTexture(1024, 1024, (ctx, w, h) => {
     asphalt(ctx, w, h);
@@ -4964,16 +5078,6 @@ function buildEnvironment(scene, renderer, world) {
   decal(runup, 18, 40, 0, 27, { alpha: true, rot: Math.PI });
   const box = canvasTexture(256, 256, (ctx, w, h) => { ctx.strokeStyle = 'rgba(240,240,232,0.9)'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, w - 12, h - 12); ctx.setLineDash([18, 14]); ctx.beginPath(); ctx.moveTo(w / 2, 20); ctx.lineTo(w / 2, h - 20); ctx.stroke(); });
   decal(box, 3.4, 7, 0, 0, { alpha: true });
-  // rubber laid down by earlier runs: dark arcs near the spawn and the wall
-  const marks = canvasTexture(1024, 1024, (ctx, w, h) => {
-    for (let i = 0; i < 9; i++) {
-      const cx = rng() * w, cy = rng() * h, r = 200 + rng() * 500, a0 = rng() * 6.28, a1 = a0 + 0.4 + rng() * 0.9, g = 18 + rng() * 10;
-      ctx.lineWidth = 9 + rng() * 5;
-      for (const off of [0, g]) { ctx.strokeStyle = `rgba(18,18,18,${0.18 + rng() * 0.22})`; ctx.beginPath(); ctx.arc(cx, cy, r + off, a0, a1); ctx.stroke(); }
-    }
-  });
-  decal(marks, 70, 70, 0, 20, { alpha: true, lift: 1 });
-  decal(marks, 60, 60, -95, -45, { alpha: true, lift: 1, rot: 1.3 });
 
   // two ragged ridgelines on the horizon, the far one paler in the haze
   const ridge = (R, hMin, hMax, color, seed) => {
@@ -5022,19 +5126,11 @@ function buildEnvironment(scene, renderer, world) {
     for (let i = 0; i < 40; i++) { ctx.fillStyle = `rgba(90,52,28,${0.05 + rng() * 0.12})`; ctx.fillRect(rng() * w, h * (0.6 + rng() * 0.4), 2 + rng() * 6, 10 + rng() * 40); }   // rust runs
   });
   const liveries = ['#8e2f22', '#2e5a86', '#3f6b45', '#9a9488', '#b46a1f'].map(c => corrugated(c, 'rgba(0,0,0,0.35)'));
-  const cladding = corrugated('#c9cdd0', 'rgba(60,64,68,0.5)');
-  const stripes = canvasTexture(256, 64, (ctx, w, h) => {   // red-and-white barrier paint over concrete
-    for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#e9e4da' : '#b8261c'; ctx.fillRect(i * w / 4, 0, w / 4, h); }
-    speckle(ctx, w, h, 3000, 0.18, rng);
-  });
   const steel = new THREE.MeshStandardMaterial({ color: 0xd8b13a, roughness: 0.45, metalness: 0.6, envMap: env, envMapIntensity: 0.5 });
   const mat = (map, o = {}) => new THREE.MeshStandardMaterial({ map, roughness: 0.9, envMap: env, envMapIntensity: 0.3, ...o });
-  const blocks = [], bumps = [];
   for (const c of world.cols) {
     if (c.type !== 0) continue;
     const wx = c.x1 - c.x0, wz = c.z1 - c.z0, cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
-    if (c.style === 'block') { blocks.push(c); continue; }
-    if (c.style === 'bump') { bumps.push(c); continue; }
     if (/^container/.test(c.style)) {
       for (let k = 0; k * 2.6 < c.h - 0.01; k++) {
         const t = liveries[Math.floor(Math.abs(cx * 7 + cz * 3 + k * 5)) % liveries.length].clone(); t.needsUpdate = true; t.repeat.set(wx / 3, 1);
@@ -5047,7 +5143,7 @@ function buildEnvironment(scene, renderer, world) {
     }
     let m;
     if (c.style === 'pole') m = steel;
-    else if (c.style === 'warehouse') { const t = cladding.clone(); t.needsUpdate = true; t.repeat.set(wx / 6, 1); m = mat(t, { roughness: 0.55, metalness: 0.45 }); }
+    else if (c.style === 'kerb') { const t = hazardTex.clone(); t.needsUpdate = true; t.repeat.set(Math.max(1, wx / 1.5), 1); m = mat(t, { roughness: 0.75 }); }
     else { const t = concrete.clone(); t.needsUpdate = true; t.repeat.set(wx / 2.4, c.h / 2.4); m = mat(t, { roughness: 0.93 }); }
     const wall = new THREE.Mesh(new THREE.BoxGeometry(wx, c.h, wz), m);
     wall.position.set(cx, c.h / 2, cz);
@@ -5060,18 +5156,36 @@ function buildEnvironment(scene, renderer, world) {
       scene.add(band);
     }
   }
-  // the barrier blocks and speed bumps are many: one instanced draw each
-  const place = (list, geo, material) => {
-    if (!list.length) return;
-    const im = new THREE.InstancedMesh(geo, material, list.length), m4 = new THREE.Matrix4();
-    list.forEach((c, i) => im.setMatrixAt(i, m4.makeScale(c.x1 - c.x0, c.h, c.z1 - c.z0).setPosition((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2)));
-    im.castShadow = im.receiveShadow = true;
-    scene.add(im);
+  // humps: a raised-cosine strip across the lane with closed ends, merged into one draw per finish (the
+  // tall ones dark with a yellow crest band, the washboard plain dark)
+  const humpTex = canvasTexture(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#4a4c4f'; ctx.fillRect(0, 0, w, h); speckle(ctx, w, h, 9000, 0.2, rng);
+    ctx.fillStyle = '#e2b13c'; for (let x = 0; x < w; x += 64) ctx.fillRect(x + 8, h * 0.42, 40, h * 0.16);
+  });
+  const washTex = canvasTexture(128, 128, (ctx, w, h) => { ctx.fillStyle = '#4a4c4f'; ctx.fillRect(0, 0, w, h); speckle(ctx, w, h, 3000, 0.2, rng); });
+  const humpGeo = (list) => {
+    const P = [], U = [], I = [];
+    for (const c of list) {
+      const n = c.len > 1 ? 16 : 6, b = P.length / 3, prof = (k) => c.h * 0.5 * (1 - Math.cos(2 * Math.PI * k / n));
+      for (let k = 0; k <= n; k++) { const z = c.z0 + c.len * k / n, y = prof(k); P.push(c.x0, y, z, c.x1, y, z); U.push(0, k / n, (c.x1 - c.x0), k / n); }
+      for (let k = 0; k < n; k++) { const a = b + 2 * k; I.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+      for (const x of [c.x0, c.x1]) {   // the two ends, closed down to the floor
+        const e = P.length / 3;
+        for (let k = 0; k <= n; k++) { const z = c.z0 + c.len * k / n; P.push(x, 0, z, x, prof(k), z); U.push(k / n, 0, k / n, prof(k)); }
+        for (let k = 0; k < n; k++) { const a = e + 2 * k; if (x === c.x0) I.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); else I.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setIndex(I); g.computeVertexNormals();
+    return g;
   };
-  const stripesZ = stripes.clone(); stripesZ.needsUpdate = true;
-  place(blocks, new THREE.BoxGeometry(1, 1, 1), mat(stripesZ, { roughness: 0.85 }));
-  const bumpTex = hazardTex.clone(); bumpTex.needsUpdate = true; bumpTex.repeat.set(4, 1);
-  place(bumps, new THREE.BoxGeometry(1, 1, 1), mat(bumpTex, { roughness: 0.75 }));
+  const humps = world.cols.filter(c => c.type === 2);
+  for (const [list, tex] of [[humps.filter(c => c.h >= 0.08), humpTex], [humps.filter(c => c.h < 0.08), washTex]]) {
+    if (!list.length) continue;
+    const hm = new THREE.Mesh(humpGeo(list), mat(tex, { roughness: 0.85 }));
+    hm.castShadow = hm.receiveShadow = true;
+    scene.add(hm);
+  }
 
   // stunt ramps: concrete deck and flanks, a hazard band on the vertical drop
   const hazard = hazardTex;
@@ -5218,15 +5332,38 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 // Pick each mesh's material and prepare its geometry (grille split, radiator UVs) before the physics
 // thread sees it: the split reorders the index buffer the worker uses for normals.
 function assignMaterial(m, mats) {
-  let mat = pickMaterial(m, mats);
-  if (/fascia/.test(m.name) && mat === mats.paint) {
-    // the grille between the headlights is its own trim piece, not body paint
-    const bb = m.geom.boundingBox;
-    splitTriangles(m.geom, (x, y) => Math.abs(x) < 0.62 && y > bb.min.y + 0.12);
-    mat = [mats.paint, mats.trim];
-  }
+  const mat = pickMaterial(m, mats);
   if (mat === mats.radiator) planarUV(m.geom, 7);
   return mat;
+}
+
+// The grille between the headlights is a bolt-on piece of its own (it can be knocked off): its triangles
+// are cut out of the fascia into a separate trim mesh.
+function splitGrille(model) {
+  const i = model.meshes.findIndex(m => /fascia/.test(m.name));
+  if (i < 0 || model.meshes.some(m => /grille/.test(m.name))) return;
+  const f = model.meshes[i], bb = f.geom.boundingBox, I = f.geom.index.array, P = f.geom.attributes.position.array, keep = [], cut = [];
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3, cx = (P[a] + P[b] + P[c]) / 3, cy = (P[a + 1] + P[b + 1] + P[c + 1]) / 3;
+    (Math.abs(cx) < 0.62 && cy > bb.min.y + 0.12 ? cut : keep).push(I[t], I[t + 1], I[t + 2]);
+  }
+  if (!cut.length || !keep.length) return;
+  model.meshes.splice(i + 1, 0, { name: 'pickup_grille', geom: subGeometry(f.geom, cut), part: P_GRILLE, cat: 'nosample', srcMat: f.srcMat, source: f.source });
+  f.geom = subGeometry(f.geom, keep);
+}
+// A geometry holding only the given triangles, with just the vertices they use.
+function subGeometry(geom, tris) {
+  const map = new Map(), names = Object.keys(geom.attributes), src = names.map(n => geom.attributes[n]), dst = names.map(() => []), idx = new Uint32Array(tris.length);
+  for (let k = 0; k < tris.length; k++) {
+    let v = map.get(tris[k]);
+    if (v === undefined) { v = map.size; map.set(tris[k], v); src.forEach((a, q) => { for (let c = 0; c < a.itemSize; c++) dst[q].push(a.array[tris[k] * a.itemSize + c]); }); }
+    idx[k] = v;
+  }
+  const g = new THREE.BufferGeometry();
+  names.forEach((n, q) => g.setAttribute(n, new THREE.BufferAttribute(new Float32Array(dst[q]), src[q].itemSize)));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeBoundingBox();
+  return g;
 }
 
 async function main() {
@@ -5254,11 +5391,16 @@ async function main() {
   world.addBox(26, 32, 1.6, 46, 48.5, 0.6, 'offset');
   // shipping containers stacked two high behind the wall
   for (const [x0, z0, n] of [[-24.4, 56, 2], [-12.2, 56, 2], [0, 56, 1], [12.2, 56, 2], [-6, 61, 1]]) world.addBox(x0, x0 + 12.2, 2.6 * n, z0, z0 + 2.44, 0.5, 'container' + n);
-  // a corridor of red-and-white concrete blocks on the left, with speed bumps across it
-  for (let z = -22; z < 40; z += 3.4) for (const x0 of [-48.6, -39.4]) world.addBox(x0, x0 + 0.6, 0.8, z, z + 3, 0.6, 'block');
-  for (const z of [-12, -4, 4, 12, 20, 28]) world.addBox(-48, -39.4, 0.09, z, z + 0.5, 0.8, 'bump');
-  // warehouses far off, so the horizon isn't empty (solid, if you drive that far)
-  for (const [x0, x1, h, z0, z1] of [[-270, -190, 12, 300, 360], [140, 230, 10, 380, 450], [-430, -360, 16, -160, -60], [300, 390, 14, -330, -250], [-120, -40, 9, -520, -470]]) world.addBox(x0, x1, h, z0, z1, 0.5, 'warehouse');
+  // the suspension test course, 40 m to the left, driven toward the wall end: four speed humps, a twist
+  // section of humps under one wheel track at a time (the axles articulate against each other), a
+  // washboard, and kerbs; beside it a 15-degree ramp for one wheel (articulation)
+  const CX = COURSE.x, HW = COURSE.half;
+  for (const z of [-20, -14, -8, -2]) world.addHump(CX - HW, CX + HW, z, 1.2, 0.1, 0.8);
+  for (let k = 0; k < 6; k++) world.addHump(k % 2 ? CX - HW : CX, k % 2 ? CX : CX + HW, 6 + 3.5 * k, 2.8, 0.16, 0.8);
+  for (let k = 0; k < 18; k++) world.addHump(CX - HW, CX + HW, 31 + 0.55 * k, 0.55, 0.035, 0.8);
+  world.addBox(CX - HW, CX + HW, 0.12, 46, 49, 0.8, 'kerb');
+  world.addBox(CX, CX + HW, 0.2, 52, 55, 0.8, 'kerb');
+  world.addRamp(CX + 8.2, 0, 4, 1.1, 15, 0.8);
   const envr = buildEnvironment(scene, renderer, world);
   // the sun: cascaded shadow maps, the nearest cascade drawn tight around the car for crisp contact shadows
   const csm = new CSM({
@@ -5277,6 +5419,7 @@ async function main() {
   const model = prepareVehicleModel(src.root, src.source);
   if (src.source !== 'gltf') $('credit').textContent = 'Procedural placeholder truck (no GLTF found at ' + MODEL_URL + ')';
   const mats = makeMaterials(envr.env);
+  splitGrille(model);
   for (const m of model.meshes) m.mat = assignMaterial(m, mats);
   let tune = null;
   try { tune = params.get('tune') ? JSON.parse(params.get('tune')) : null; } catch (_) { tune = null; }
@@ -5358,14 +5501,22 @@ async function main() {
   };
   // Graphics presets: render resolution, sun shadows and their map size, anti-aliasing (MSAA, or FXAA
   // without it), bloom, how many floodlights render, and shadows from the headlight beams.
+  // Deformation: SIMPLIFIED leaves the panels riding the beam structure (no free sheet metal, the cheapest
+  // in a crash); NORMAL simulates up to 500 skin nodes at once; ENHANCED up to 1100, with dents that form
+  // more easily and spread wider, deeper accordion pleats and twice the normals budget.
+  const DEFORM = {
+    simple: { sheet: 0, normals: 6000, label: 'Simplified: panels follow the beam structure; the cheapest in a crash.' },
+    normal: { sheet: 500, normals: 20000, label: 'Normal: free sheet metal where it is hit, up to 500 skin nodes at once.' },
+    enhanced: { sheet: 1100, normals: 40000, label: 'Enhanced: up to 1100 skin nodes, finer and wider dents, deeper pleats; heavier in a crash.' },
+  };
   const GFX = {
-    low: { pr: 0.75, shadows: false, size: 512, msaa: 0, bloom: false, floods: 2, beamShadows: false, sheet: 150, normals: 8000, smoke: 220, sparks: 90, fx: 0.4,
-      label: '¾ resolution · no shadows · FXAA · light skin detail · 220 smoke / 90 spark particles' },
-    medium: { pr: 1.0, shadows: true, size: 1024, msaa: 0, bloom: true, floods: 5, beamShadows: false, sheet: 300, normals: 14000, smoke: 600, sparks: 220, fx: 0.7,
+    low: { pr: 0.75, shadows: false, size: 512, msaa: 0, bloom: false, floods: 2, beamShadows: false, smoke: 220, sparks: 90, fx: 0.4,
+      label: '¾ resolution · no shadows · FXAA · 220 smoke / 90 spark particles' },
+    medium: { pr: 1.0, shadows: true, size: 1024, msaa: 0, bloom: true, floods: 5, beamShadows: false, smoke: 600, sparks: 220, fx: 0.7,
       label: '1× resolution · 1024 px shadows · FXAA · bloom · 600 smoke / 220 spark particles' },
-    high: { pr: 1.5, shadows: true, size: 2048, msaa: 4, bloom: true, floods: 5, beamShadows: false, sheet: 500, normals: 20000, smoke: 1200, sparks: 450, fx: 1,
+    high: { pr: 1.5, shadows: true, size: 2048, msaa: 4, bloom: true, floods: 5, beamShadows: false, smoke: 1200, sparks: 450, fx: 1,
       label: 'up to 1.5× resolution · 2048 px shadows · 4× MSAA · bloom · 1200 smoke / 450 spark particles' },
-    ultra: { pr: 2.0, shadows: true, size: 4096, msaa: 8, bloom: true, floods: 5, beamShadows: true, sheet: 800, normals: 30000, smoke: 2400, sparks: 900, fx: 1.6,
+    ultra: { pr: 2.0, shadows: true, size: 4096, msaa: 8, bloom: true, floods: 5, beamShadows: true, smoke: 2400, sparks: 900, fx: 1.6,
       label: 'up to 2× resolution · 4096 px shadows · 8× MSAA · bloom · headlight shadows · 2400 smoke / 900 spark particles' },
   };
   const envCache = { day: envr.env };
@@ -5374,12 +5525,14 @@ async function main() {
     scene.traverse((o) => { for (const mt of (Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []))) out.add(mt); });
     return [...out];
   };
-  const settings = { time: 'day', gfx: coarse ? 'medium' : 'high' };
+  const settings = { time: 'day', gfx: coarse ? 'medium' : 'high', deform: 'normal' };
   try { Object.assign(settings, JSON.parse(localStorage.getItem('crashDriver.settings') || '{}')); } catch (_) { /* storage may be unavailable */ }
   if (TIMES[params.get('time')]) settings.time = params.get('time');
   if (GFX[params.get('gfx')]) settings.gfx = params.get('gfx');
   if (!TIMES[settings.time]) settings.time = 'day';
   if (!GFX[settings.gfx]) settings.gfx = 'high';
+  if (DEFORM[params.get('deform')]) settings.deform = params.get('deform');
+  if (!DEFORM[settings.deform]) settings.deform = 'normal';
   let lampLevel = 0, beamLevel = 0, lightsOn = false, lampsBroken = false;
 
   function applyTime(name) {
@@ -5437,12 +5590,14 @@ async function main() {
     fxaa.enabled = samples === 0;
     bloom.enabled = G.bloom;
     if (shadowsChanged) for (const mt of litMaterials()) mt.needsUpdate = true;
-    link.call('detail', { sheet: G.sheet, normals: G.normals });   // lighter skin detail on weaker presets
     fx.setBudget(G.smoke, G.sparks, G.fx);
     updateLights();
     resize();
     needFrame = true;
   }
+
+  // Deformation detail, a physics setting: how much of the sheet metal is simulated on its own.
+  function applyDeform(name) { const D = DEFORM[name]; link.call('detail', { sheet: D.sheet, normals: D.normals, mode: name }); }
 
   // --- main menu state (the menu itself is wired up below, after the settings panel)
   const menuEl = $('menu'), levelsEl = $('levels');
@@ -5556,12 +5711,12 @@ async function main() {
   };
   const syncSettingsUI = () => {
     for (const grp of panel.querySelectorAll('.seg')) for (const b of grp.children) b.setAttribute('aria-checked', String(settings[grp.dataset.set] === b.dataset.v));
-    $('setNote').textContent = settings.gfx.toUpperCase() + ': ' + GFX[settings.gfx].label + '.';
+    $('setNote').textContent = DEFORM[settings.deform].label + ' Graphics: ' + GFX[settings.gfx].label + '.';
   };
   const choose = (key, v) => {
     if (settings[key] === v) return;
     settings[key] = v;
-    if (key === 'time') applyTime(v); else applyGfx(v);
+    if (key === 'time') applyTime(v); else if (key === 'deform') applyDeform(v); else applyGfx(v);
     try { localStorage.setItem('crashDriver.settings', JSON.stringify(settings)); } catch (_) { /* not remembered */ }
     syncSettingsUI();
   };
@@ -5569,15 +5724,16 @@ async function main() {
   $('btnSettings').addEventListener('click', () => showSettings(panel.hidden));
   $('btnSetClose').addEventListener('click', () => showSettings(false));
   applyGfx(settings.gfx);
+  applyDeform(settings.deform);
   applyTime(settings.time);
   syncSettingsUI();
 
   // --- main menu: title screen over a desaturated live view, Choose Level, Options, Exit. Physics is
   // paused while it is up; Esc or MENU opens it in a session, and Resume carries on where it left off.
   const LEVEL = {
-    day: { label: 'Day', desc: 'A concrete test bench in full sun: crash wall, ramps, a steel post, a barrier corridor with speed bumps, a 2 km drag strip and a skid pad.' },
+    day: { label: 'Day', desc: 'A concrete test bench in full sun: crash wall, ramps, a steel post, a suspension test course (bumps, twist, washboard, kerbs, an articulation ramp), a 2 km drag strip and a skid pad.' },
     evening: { label: 'Evening', desc: 'The same bench in low evening sun: long shadows and warm light, with the floodlights coming on.' },
-    night: { label: 'Night', desc: 'After dark under five floodlights. Headlights on; the bench lights the run-up to the wall.' },
+    night: { label: 'Night', desc: 'After dark under five floodlights. Headlights on; the floodlights light the run-up to the wall.' },
   };
   const thumbs = [...levelsEl.querySelectorAll('.lv-thumb')];
   let previews = null, pick = settings.time, menuT = 0, menuK = 0;
@@ -5748,7 +5904,7 @@ async function main() {
       readFrame(f);
       stepsWindow += f[8];   // substeps the physics thread actually ran (it may stop a batch early)
       // a front crushed 15 cm smashes the headlights; past ~20 cm the windshield starts to crack, more the harder the hit
-      if (!lampsBroken && f[41] > 0.15) { lampsBroken = true; view.smashLamps(true); setLights(lightsOn); }
+      if (!lampsBroken && (f[41] > 0.15 || (f[25] & ((1 << P_HEADLIGHT_L) | (1 << P_HEADLIGHT_R))))) { lampsBroken = true; view.smashLamps(true); setLights(lightsOn); }
       const crack = Math.min(1, Math.max(0, (f[41] - 0.2) / 0.22));
       if (crack > GRIME.uCrack.value) { if (GRIME.uCrack.value === 0) GRIME.uCrackC.value.set((Math.random() - 0.5) * 0.8, 1.27 + Math.random() * 0.08); GRIME.uCrack.value = crack; }
       // road dirt builds up with distance (dirty after ~5 km), faster while the tyres spin
