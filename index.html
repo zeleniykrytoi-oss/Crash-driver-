@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Crash Driver</title>
+<title>Beam.Web</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Share+Tech+Mono&family=Ubuntu:wght@400;500&display=swap">
 <style>
 /* Layout: full-bleed WebGL canvas; HUD pinned to the four screen corners inside the safe-area insets.
    One deliberate look over a bright daylight scene: dark ink with a light halo for free-standing text,
@@ -26,6 +26,9 @@
   --hud-halo: 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 255, 255, 0.55);
   --font-display: 'Saira Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
   --font-data: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-brand: 'Ubuntu', 'Segoe UI', system-ui, sans-serif;          /* the Beam.Web title and wordmark */
+  --font-ui: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;         /* menu buttons and dialogs: plain desktop UI */
+  --brand-orange: #f7941d;
   --edge: 16px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
@@ -45,7 +48,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 /* --- top-left: brand + live physics telemetry --- */
 .brand { position: absolute; top: calc(var(--edge) + var(--safe-t)); left: calc(var(--edge) + var(--safe-l)); }
 .brand-title { font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.04em; line-height: 0.9; color: var(--hud-ink); text-shadow: var(--hud-halo); }
-.brand-title span { color: var(--accent); margin-left: 0.18em; }
+.brand-title span { color: var(--accent); margin-left: 0.04em; }
 .brand-sub { font-family: var(--font-data); font-size: 11px; letter-spacing: 0.08em; color: var(--hud-muted); text-shadow: var(--hud-halo); margin-top: 4px; text-transform: uppercase; }
 .stats { margin-top: 10px; display: grid; grid-template-columns: auto auto; column-gap: 12px; row-gap: 1px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px; font-family: var(--font-data); font-size: 11.5px; font-variant-numeric: tabular-nums; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); width: max-content; }
 .stats dt { color: var(--muted); letter-spacing: 0.08em; }
@@ -147,14 +150,114 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 }
 
 /* --- loader --- */
-#loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 60%, #2b1f0e 0%, var(--bg) 70%); transition: opacity 0.7s; z-index: 5; padding-inline: 16px; text-align: center; }
+#loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 55%, #2a2a2a 0%, #050505 75%); transition: opacity 0.7s; z-index: 8; padding-inline: 16px; text-align: center; }
 #loader.done { opacity: 0; pointer-events: none; }
-.ld-title { font-weight: 800; font-style: italic; font-size: 44px; letter-spacing: 0.05em; color: var(--ink); text-shadow: 0 0 30px rgba(255, 150, 40, 0.5); }
-.ld-title span { color: var(--accent); margin-left: 0.18em; }
+.ld-title { display: flex; align-items: center; gap: 12px; font-family: var(--font-brand); font-weight: 500; font-size: 46px; letter-spacing: -0.01em; color: #fff; }
+.ld-title b { font-weight: 500; color: var(--brand-orange); }
+.ld-title svg { width: 58px; height: 44px; }
 #ldText { font-family: var(--font-data); font-size: 13px; color: var(--muted); letter-spacing: 0.06em; min-height: 1.4em; }
 .ld-bar { width: min(320px, 70vw); height: 4px; background: rgba(255, 220, 160, 0.14); }
 .ld-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
-@media (prefers-reduced-motion: reduce) { .feed li, #loader, .ld-bar i, .ctl, .tyres span i { transition: none; } }
+
+/* --- main menu: a desaturated live view of the test bench under a vignette (the grade shader does the
+   grey), the title at the upper left, the lockup and plain desktop buttons at the lower right. Dialogs
+   are plain desktop windows. Shown at start and on Esc / MENU; the HUD steps aside meanwhile. --- */
+#menu { position: fixed; inset: 0; z-index: 4; display: none; font-family: var(--font-brand); color: #fff; }
+body.in-menu #menu { display: block; }
+body.in-menu #hud { z-index: 6; }   /* only the settings panel shows, as the Options window */
+body.in-menu #hud > :not(.tools), body.in-menu .tools > :not(#settings) { display: none !important; }
+.mn-shade { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 75% at 58% 50%, transparent 45%, rgba(0, 0, 0, 0.5) 80%, rgba(0, 0, 0, 0.9) 100%),
+              linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 32%, transparent 58%); }
+.mn-title { position: absolute; left: max(calc(var(--edge) + var(--safe-l)), 10vw); top: max(calc(var(--edge) + var(--safe-t)), 15vh); margin: 0; font-weight: 500; line-height: 1; }
+.mn-name { display: block; font-size: clamp(54px, 9.6vw, 150px); letter-spacing: -0.025em; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.45); }
+.mn-name b { font-weight: 500; color: var(--brand-orange); }
+.mn-sub { display: block; margin: 0.1em 0 0 2.7em; font-size: clamp(19px, 2.7vw, 42px); letter-spacing: -0.005em; color: var(--brand-orange); text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55); }
+.mn-mini { position: absolute; left: calc(var(--edge) + var(--safe-l) + 8px); bottom: calc(12px + var(--safe-b)); display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 500; color: rgba(255, 255, 255, 0.34); pointer-events: none; }
+.mn-mini svg { width: 26px; height: 20px; opacity: 0.5; filter: grayscale(1); }
+.mn-ver { font-family: var(--font-ui); font-size: 11px; font-weight: 400; color: rgba(255, 255, 255, 0.28); margin-left: 4px; }
+.mn-dock { position: absolute; right: max(calc(var(--edge) + var(--safe-r)), 3.4vw); bottom: max(calc(12px + var(--safe-b)), 2.4vh); display: flex; flex-direction: column; align-items: flex-end; }
+.mn-lockup { display: flex; align-items: flex-end; gap: 0.1em; font-size: clamp(38px, 5.4vw, 84px); margin: 0 0.02em -0.2em 0; pointer-events: none; }
+.mn-mark { width: 1.3em; height: 0.98em; margin-bottom: 0.3em; filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.55)); }
+.mn-word { font-weight: 500; letter-spacing: -0.02em; line-height: 1.12; color: transparent; background: linear-gradient(180deg, #8cc2ff 0%, #3d8ef0 46%, #1559c0 54%, #2f78dc 100%); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.6)); }
+.mn-buttons { position: relative; display: flex; gap: clamp(6px, 0.8vw, 12px); }
+.mn-btn { font-family: var(--font-ui); font-size: 13px; color: #1b1b1b; min-width: clamp(100px, 8.4vw, 136px); height: 32px; padding: 0 16px; cursor: pointer;
+  background: linear-gradient(#fbfbfb, #ececec 49%, #dcdcdc 51%, #e6e6e6); border: 1px solid #707070; border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8), 0 3px 14px rgba(0, 0, 0, 0.5); }
+.mn-btn:hover { background: linear-gradient(#f4faff, #e1effc 49%, #c6e2fc 51%, #bcdffd); border-color: #3c7fb1; }
+.mn-btn:active { background: linear-gradient(#dbecfb, #c4e1fb 49%, #a9d3f8 51%, #b5daf8); border-color: #2c628b; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3); }
+.mn-btn:focus-visible { outline: 1px dotted #111; outline-offset: -5px; }
+.mn-btn[hidden] { display: none; }
+.mn-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+#menu.dimmed .mn-dim { opacity: 1; pointer-events: auto; }
+/* a plain desktop window: white title bar, light grey body, a hard edge and a soft drop shadow */
+.win { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100vw - 2 * var(--edge))); max-height: calc(100vh - 2 * var(--edge)); overflow: auto; box-sizing: border-box;
+  background: #f0f0f0; color: #1b1b1b; border: 1px solid #6b6b6b; box-shadow: inset 0 0 0 1px #fff, 0 18px 60px rgba(0, 0, 0, 0.65); font-family: var(--font-ui); font-size: 12px; }
+.win[hidden] { display: none; }
+.win-bar { display: flex; align-items: center; justify-content: space-between; height: 26px; padding-left: 8px; background: linear-gradient(#fefefe, #e8e8e8); border-bottom: 1px solid #cacaca; font-size: 12px; }
+.win-x { width: 34px; height: 24px; border: 0; background: transparent; color: #333; font: 16px/1 var(--font-ui); cursor: pointer; }
+.win-x:hover { background: #e04343; color: #fff; }
+.win-x:focus-visible { outline: 1px dotted #111; outline-offset: -3px; }
+.lv-body { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 8px 14px; padding: 8px; }
+.lv-preview { grid-column: 1; grid-row: 1; display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #8f9397; }
+.lv-thumbs { grid-column: 1; grid-row: 2; display: flex; gap: 6px; }
+.lv-thumb { flex: 0 0 23%; aspect-ratio: 4 / 3; padding: 0; border: 2px solid transparent; outline: 1px solid #b5b5b5; background: #8f9397 center / cover no-repeat; cursor: pointer; }
+.lv-thumb:hover { outline-color: #3c7fb1; }
+.lv-thumb[aria-checked="true"] { border-color: #fff; outline: 2px solid #3d8ee0; }
+.lv-thumb:focus-visible { outline: 2px dotted #111; }
+.lv-info { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; }
+.lv-name { margin: 0; font-size: 19px; font-weight: 400; }
+.lv-var { margin: 1px 0 10px; color: #666; font-size: 11.5px; }
+.lv-dl { margin: 0; font-size: 11.5px; color: #333; }
+.lv-desc { margin: 2px 0 12px; font-size: 11.5px; line-height: 1.45; color: #333; }
+.lv-go { margin-top: auto; min-width: 0; width: 100%; height: 30px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8); }
+/* Options: the settings panel, drawn as a desktop window while the menu is up */
+body.in-menu .settings { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 2 * var(--edge))); max-width: none; padding: 0;
+  background: #f0f0f0; color: #1b1b1b; border: 1px solid #6b6b6b; border-radius: 0; box-shadow: inset 0 0 0 1px #fff, 0 18px 60px rgba(0, 0, 0, 0.65); backdrop-filter: none; -webkit-backdrop-filter: none; font-family: var(--font-ui); }
+body.in-menu .set-head { height: 26px; padding-left: 8px; background: linear-gradient(#fefefe, #e8e8e8); border-bottom: 1px solid #cacaca; font-weight: 400; font-size: 12px; letter-spacing: 0; color: #1b1b1b; }
+body.in-menu #hud .set-x { width: 34px; height: 24px; padding: 0; color: #333; font: 16px/1 var(--font-ui); }
+body.in-menu #hud .set-x:hover { background: #e04343; color: #fff; }
+body.in-menu .set-row { margin: 12px 12px 0; }
+body.in-menu .set-lbl { font-family: var(--font-ui); font-size: 12px; letter-spacing: 0; color: #1b1b1b; text-transform: lowercase; }
+body.in-menu .set-lbl::first-letter { text-transform: uppercase; }
+body.in-menu #hud .seg button { font-family: var(--font-ui); font-weight: 400; font-size: 12px; letter-spacing: 0; color: #1b1b1b; text-transform: lowercase; padding: 7px 4px;
+  background: linear-gradient(#fbfbfb, #ececec 49%, #dcdcdc 51%, #e6e6e6); border: 1px solid #8a8a8a; border-radius: 3px; }
+body.in-menu #hud .seg button::first-letter { text-transform: uppercase; }
+body.in-menu #hud .seg button:hover { border-color: #3c7fb1; }
+body.in-menu #hud .seg button[aria-checked="true"] { background: linear-gradient(#e6f2fc, #cfe6fa); border-color: #3c7fb1; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18); color: #000; }
+body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); font-size: 11px; color: #555; letter-spacing: 0; }
+/* Exit: the game closes to black; a click or key brings the menu back */
+#bye { position: fixed; inset: 0; z-index: 7; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px; background: #000; text-align: center; font-family: var(--font-brand); }
+#bye.on { display: flex; }
+#bye svg { width: 64px; height: 48px; margin-bottom: 8px; opacity: 0.85; }
+.bye-t { margin: 0; font-size: 22px; font-weight: 500; color: rgba(255, 255, 255, 0.85); }
+.bye-s { margin: 0; font-family: var(--font-ui); font-size: 13px; color: rgba(255, 255, 255, 0.45); }
+@media (max-width: 720px) {
+  .mn-title { top: max(calc(var(--edge) + var(--safe-t)), 11vh); }
+  .mn-name { font-size: clamp(48px, 15vw, 96px); }
+  .mn-sub { font-size: clamp(17px, 4.6vw, 28px); margin-left: 1.6em; }
+  .mn-mini { display: none; }
+  .mn-dock { left: calc(var(--edge) + var(--safe-l)); align-items: stretch; }
+  .mn-lockup { align-self: flex-end; font-size: clamp(32px, 9vw, 52px); }
+  .mn-buttons { gap: 8px; }
+  .mn-btn { flex: 1 1 0; min-width: 0; height: 44px; font-size: 14px; padding: 0 8px; }
+}
+@media (max-width: 560px) {
+  .lv-body { grid-template-columns: minmax(0, 1fr); }
+  .lv-info { grid-column: 1; grid-row: 3; }
+  .lv-go { height: 40px; margin-top: 4px; }
+}
+@media (pointer: coarse) {   /* finger-sized targets on touch screens */
+  .mn-btn { height: 42px; font-size: 14px; }
+  .win-bar, body.in-menu .set-head { height: 34px; }
+  .win-x, body.in-menu #hud .set-x { width: 46px; height: 32px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  .mn-title { top: max(calc(var(--edge) + var(--safe-t)), 8vh); }
+  .mn-name { font-size: clamp(44px, 9vw, 80px); }
+  .lv-body { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .feed li, #loader, .ld-bar i, .ctl, .tyres span i, .mn-dim { transition: none; } }
 </style>
 <script type="importmap">
 { "imports": {
@@ -168,7 +271,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 
 <div id="hud">
   <header class="brand">
-    <div class="brand-title">CRASH<span>DRIVER</span></div>
+    <div class="brand-title">BEAM<span>.WEB</span></div>
     <div class="brand-sub">Mass-spring soft-body simulator · 2000&nbsp;Hz · physics worker</div>
     <dl class="stats" aria-label="Physics telemetry">
       <dt>NODES</dt><dd id="sNodes">0</dd>
@@ -193,6 +296,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
   <div class="tools">
     <button id="btnReset" class="reset" type="button">RESET VEHICLE</button>
     <div class="toggles">
+      <button id="btnMenu" class="tog" type="button" aria-controls="menu">MENU</button>
       <button id="btnCam" class="tog" type="button">CAM<i id="camName">CHASE</i></button>
       <button id="btnNodes" class="tog" type="button" aria-pressed="false">F-NODES</button>
       <button id="btnSlow" class="tog" type="button" aria-pressed="false">SLOW-MO<i>×20</i></button>
@@ -232,7 +336,7 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
     <div class="credit" id="credit">Vehicle model: “Gavril_D_ Beamng” by <a href="https://sketchfab.com/akhikavi7" target="_blank" rel="noopener">akhikavi7</a>, <a href="https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5" target="_blank" rel="noopener">Sketchfab</a>, CC-BY-4.0</div>
   </div>
 
-  <p class="keys">W/S or ↑/↓ throttle · brake (hold at a stop to reverse) · A/D or ←/→ steer · R reset · C camera · +/− or wheel zoom · L lights · N f-node view · T slow-mo · G settings</p>
+  <p class="keys">W/S or ↑/↓ throttle · brake (hold at a stop to reverse) · A/D or ←/→ steer · R reset · C camera · +/− or wheel zoom · L lights · N f-node view · T slow-mo · G settings · Esc menu</p>
 
   <div class="pad pad-steer">
     <button class="ctl steer" type="button" data-ctl="left" aria-label="Steer left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></button>
@@ -244,8 +348,62 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
   </div>
 </div>
 
+<main id="menu" aria-label="Main menu">
+  <div class="mn-shade"></div>
+  <h1 class="mn-title"><span class="mn-name">Beam<b>.</b>Web</span><span class="mn-sub">Alpha · Work in Progress</span></h1>
+  <div class="mn-mini" aria-hidden="true"><svg viewBox="0 0 64 48"><use href="#bwMark"/></svg><span>Beam.Web</span><span class="mn-ver">soft-body physics · 2000 Hz</span></div>
+  <div class="mn-dock">
+    <div class="mn-lockup" aria-hidden="true"><svg class="mn-mark" viewBox="0 0 64 48"><use href="#bwMark"/></svg><span class="mn-word">Beam.Web</span></div>
+    <nav class="mn-buttons" aria-label="Main menu">
+      <button id="mnResume" class="mn-btn" type="button" hidden>Resume</button>
+      <button id="mnPlay" class="mn-btn" type="button" aria-haspopup="dialog">Play</button>
+      <button id="mnOptions" class="mn-btn" type="button" aria-haspopup="dialog">Options</button>
+      <button id="mnExit" class="mn-btn" type="button">Exit</button>
+    </nav>
+  </div>
+  <div class="mn-dim"></div>
+  <section id="levels" class="win" role="dialog" aria-modal="true" aria-labelledby="lvCap" hidden>
+    <div class="win-bar"><span id="lvCap">Choose Level</span><button id="lvClose" class="win-x" type="button" aria-label="Close">×</button></div>
+    <div class="lv-body">
+      <img id="lvPreview" class="lv-preview" alt="">
+      <div class="lv-thumbs" role="radiogroup" aria-label="Time of day">
+        <button class="lv-thumb" type="button" role="radio" aria-checked="false" data-v="day" aria-label="Day" title="Day"></button>
+        <button class="lv-thumb" type="button" role="radio" aria-checked="false" data-v="evening" aria-label="Evening" title="Evening"></button>
+        <button class="lv-thumb" type="button" role="radio" aria-checked="false" data-v="night" aria-label="Night" title="Night"></button>
+      </div>
+      <div class="lv-info">
+        <h2 class="lv-name">GridMap</h2>
+        <p class="lv-var" id="lvVar">Day</p>
+        <p class="lv-dl">Description:</p>
+        <p class="lv-desc" id="lvDesc"></p>
+        <button id="lvGo" class="mn-btn lv-go" type="button">Go!</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="bye" role="dialog" aria-label="Beam.Web has exited">
+  <svg viewBox="0 0 64 48" aria-hidden="true"><use href="#bwMark"/></svg>
+  <p class="bye-t">Beam.Web has exited.</p>
+  <p class="bye-s">Click or press any key to return to the menu.</p>
+</div>
+
+<!-- the Beam.Web mark: an orange node and two steel nodes joined by beams, one soft-body cell -->
+<svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="bwBall" cx="0.36" cy="0.3" r="0.78"><stop offset="0" stop-color="#ffe2ad"/><stop offset="0.32" stop-color="#fca53c"/><stop offset="0.78" stop-color="#e3700e"/><stop offset="1" stop-color="#9a4804"/></radialGradient>
+    <radialGradient id="bwNode" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="#c8cdd2"/><stop offset="1" stop-color="#7a8188"/></radialGradient>
+    <symbol id="bwMark" viewBox="0 0 64 48">
+      <path d="M18 30 52 8M18 30l33 11M52 8l-1 33" fill="none" stroke="#b9bfc6" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="52" cy="8" r="5.2" fill="url(#bwNode)" stroke="#59606a" stroke-width="0.8"/>
+      <circle cx="51" cy="41" r="4.4" fill="url(#bwNode)" stroke="#59606a" stroke-width="0.8"/>
+      <circle cx="18" cy="30" r="13.5" fill="url(#bwBall)"/>
+    </symbol>
+  </defs>
+</svg>
+
 <div id="loader" role="status">
-  <div class="ld-title">CRASH<span>DRIVER</span></div>
+  <div class="ld-title"><svg viewBox="0 0 64 48" aria-hidden="true"><use href="#bwMark"/></svg><span>Beam<b>.</b>Web</span></div>
   <div id="ldText">Loading three.js…</div>
   <div class="ld-bar"><i id="ldBar"></i></div>
 </div>
@@ -4982,10 +5140,10 @@ function rampGeometry(c) {
 
 // A few percent of warm sunlight balance and a soft lens fall-off; no tint, fog or lifted blacks.
 const WarmBalanceShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uMenu: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime, uMenu; uniform vec2 uRes; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
       vec3 col = texture2D(tDiffuse, vUv).rgb;
@@ -4994,6 +5152,11 @@ const WarmBalanceShader = {
       col = mix(vec3(lum), col, 1.04);
       vec2 c = vUv - 0.5;
       col *= mix(0.88, 1.0, smoothstep(0.95, 0.3, length(c * vec2(1.0, 0.85))));
+      // main menu: black and white, contrast pulled up and the whole picture brought down a stop, with a
+      // heavy vignette, so the white title reads over a bright daytime scene
+      vec3 bw = vec3(clamp((lum - 0.45) * 1.4 + 0.32, 0.0, 1.0));
+      bw *= mix(0.32, 1.0, smoothstep(1.05, 0.25, length(c * vec2(1.0, 0.82))));
+      col = mix(col, bw, uMenu);
       col += (hash(vUv * uRes + fract(uTime * 7.0) * 91.0) - 0.5) * 0.006;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }`,
@@ -5281,10 +5444,17 @@ async function main() {
     needFrame = true;
   }
 
+  // --- main menu state (the menu itself is wired up below, after the settings panel)
+  const menuEl = $('menu'), levelsEl = $('levels');
+  let menuOpen = false, inSession = false, byeOn = false, hzReset = false;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   // --- input
   const keys = new Set(), touch = { left: false, right: false, throttle: false, brake: false };
   const KEYMAP = { KeyW: 'throttle', ArrowUp: 'throttle', KeyS: 'brake', ArrowDown: 'brake', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' };
   window.addEventListener('keydown', (e) => {
+    if (byeOn) { e.preventDefault(); if (!e.repeat) leaveBye(); return; }
+    if (menuOpen) { if (!e.repeat) menuKey(e); return; }   // no driving while the menu is up
     if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); e.preventDefault(); }
     if (e.repeat) return;
     if (e.code === 'KeyR') doReset();
@@ -5295,7 +5465,7 @@ async function main() {
     if (e.code === 'KeyL') toggleLights();
     if (e.code === 'Equal' || e.code === 'NumpadAdd') rig.zoom(0.88);
     if (e.code === 'Minus' || e.code === 'NumpadSubtract') rig.zoom(1.14);
-    if (e.code === 'Escape') showSettings(false);
+    if (e.code === 'Escape') { if (!panel.hidden) showSettings(false); else openMenu(); }
   });
   window.addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
   window.addEventListener('blur', () => { keys.clear(); for (const k in touch) touch[k] = false; document.querySelectorAll('.ctl.on').forEach(b => b.classList.remove('on')); });
@@ -5379,7 +5549,11 @@ async function main() {
 
   // settings panel: time of day and graphics, remembered in this browser
   const panel = $('settings');
-  const showSettings = (on) => { panel.hidden = !on; $('btnSettings').setAttribute('aria-expanded', String(on)); };
+  const showSettings = (on) => {
+    panel.hidden = !on; $('btnSettings').setAttribute('aria-expanded', String(on));
+    panel.querySelector('.set-head span').textContent = menuOpen ? 'Options' : 'SETTINGS';
+    menuEl.classList.toggle('dimmed', !levelsEl.hidden || (menuOpen && on));
+  };
   const syncSettingsUI = () => {
     for (const grp of panel.querySelectorAll('.seg')) for (const b of grp.children) b.setAttribute('aria-checked', String(settings[grp.dataset.set] === b.dataset.v));
     $('setNote').textContent = settings.gfx.toUpperCase() + ': ' + GFX[settings.gfx].label + '.';
@@ -5398,12 +5572,129 @@ async function main() {
   applyTime(settings.time);
   syncSettingsUI();
 
+  // --- main menu: title screen over a desaturated live view, Choose Level, Options, Exit. Physics is
+  // paused while it is up; Esc or MENU opens it in a session, and Resume carries on where it left off.
+  const LEVEL = {
+    day: { label: 'Day', desc: 'A concrete test bench in full sun: crash wall, ramps, a steel post, a barrier corridor with speed bumps, a 2 km drag strip and a skid pad.' },
+    evening: { label: 'Evening', desc: 'The same bench in low evening sun: long shadows and warm light, with the floodlights coming on.' },
+    night: { label: 'Night', desc: 'After dark under five floodlights. Headlights on; the bench lights the run-up to the wall.' },
+  };
+  const thumbs = [...levelsEl.querySelectorAll('.lv-thumb')];
+  let previews = null, pick = settings.time, menuT = 0, menuK = 0;
+  // stills of the level at each time of day, rendered from the live scene in colour at 4:3 (the drawing
+  // buffer is resized for it and restored before the page paints, so it looks the same on a phone)
+  function capturePreviews() {
+    const out = {}, was = settings.time, g = grade.uniforms.uMenu, k = g.value, pr = renderer.getPixelRatio(), W = 480 / pr, H = 360 / pr;
+    g.value = 0;
+    renderer.setSize(W, H, false); composer.setSize(W, H); camera.aspect = 4 / 3;
+    for (const t of Object.keys(LEVEL)) {
+      applyTime(t);
+      camera.position.set(-27, 15, -14); camera.lookAt(0, 0, 27); camera.fov = 50; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      csm.updateFrustums(); csm.update(); envr.sky.position.copy(camera.position);
+      composer.render();
+      const c = document.createElement('canvas');
+      c.width = 480; c.height = 360;
+      c.getContext('2d').drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, 480, 360);
+      out[t] = c.toDataURL('image/jpeg', 0.86);
+    }
+    applyTime(was); g.value = k; resize();
+    return out;
+  }
+  function showPick() {
+    for (const b of thumbs) b.setAttribute('aria-checked', String(b.dataset.v === pick));
+    $('lvPreview').src = previews[pick]; $('lvPreview').alt = 'GridMap, ' + LEVEL[pick].label;
+    $('lvVar').textContent = LEVEL[pick].label + ' · test bench'; $('lvDesc').textContent = LEVEL[pick].desc;
+  }
+  function openLevels() {
+    if (!previews) { previews = capturePreviews(); for (const b of thumbs) b.style.backgroundImage = 'url(' + previews[b.dataset.v] + ')'; }
+    pick = settings.time; showSettings(false);
+    levelsEl.hidden = false; menuEl.classList.add('dimmed'); showPick();
+    $('lvGo').focus({ preventScroll: true });
+  }
+  function closeLevels() { levelsEl.hidden = true; menuEl.classList.remove('dimmed'); $('mnPlay').focus({ preventScroll: true }); }
+  function openMenu() {
+    if (menuOpen) return;
+    menuOpen = true; document.body.classList.add('in-menu');
+    keys.clear(); for (const k in touch) touch[k] = false; document.querySelectorAll('.ctl.on').forEach(b => b.classList.remove('on'));
+    showSettings(false); $('mnResume').hidden = !inSession; menuT = 0; needFrame = true;
+    $(inSession ? 'mnResume' : 'mnPlay').focus({ preventScroll: true });
+  }
+  function closeMenu() {
+    menuOpen = false; inSession = true; document.body.classList.remove('in-menu'); hzReset = true;
+    levelsEl.hidden = true; showSettings(false); rig.snap(state); needFrame = true;
+    canvas.focus({ preventScroll: true });
+  }
+  // Go!: the chosen time of day, a fresh truck if this isn't the first run, and drive
+  function go() {
+    if (pick !== settings.time) choose('time', pick);
+    closeMenu();
+    parked = false;
+    doReset(true);   // to the start line, as new
+  }
+  function exitGame() { levelsEl.hidden = true; showSettings(false); byeOn = true; $('bye').classList.add('on'); }
+  function leaveBye() {
+    byeOn = false; $('bye').classList.remove('on'); menuEl.classList.remove('dimmed');
+    inSession = false; $('mnResume').hidden = true; doReset(true).then(park); $('mnPlay').focus({ preventScroll: true });
+  }
+  function menuKey(e) {
+    if (e.code === 'Escape') {
+      e.preventDefault();
+      if (!panel.hidden) { showSettings(false); $('mnOptions').focus({ preventScroll: true }); } else if (!levelsEl.hidden) closeLevels(); else if (inSession) closeMenu();
+    } else if (!levelsEl.hidden && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+      e.preventDefault();
+      const i = thumbs.findIndex(b => b.dataset.v === pick), j = (i + (e.code === 'ArrowRight' ? 1 : thumbs.length - 1)) % thumbs.length;
+      pick = thumbs[j].dataset.v; showPick(); thumbs[j].focus({ preventScroll: true });
+    }
+  }
+  // the menu's camera: low behind the truck's right rear quarter, looking past it at the bench, drifting
+  // slowly round; the truck sits right of centre, clear of the title
+  // On the title screen the truck waits in the yard behind the crash wall, between the wall's shadowed back
+  // and the container stacks, and the camera looks down the yard (Go! brings it back to the start). In a
+  // session the camera finds the truck wherever it is, from its front quarter.
+  const YARD = { x: -5.5, z: 52.7, yaw: -1.17, eye: [-15, 1.75, 51.6], at: [12, 2.4, 54.2], fov: 46 };
+  const SHOT = { f: 6.5, l: 5.0, h: 0.8, af: -2, al: -2.5, ah: 0.6, fov: 42, sway: 0.8 };   // in the truck's frame
+  let parked = false;
+  function park() {
+    parked = true;
+    return link.call('place', { x: YARD.x, z: YARD.z, yaw: YARD.yaw }).then(() => { link.dropLatest(); needFrame = true; });
+  }
+  function menuCam(dt) {
+    menuT += dt;
+    if (parked) {
+      const Y = YARD, s = Math.sin(menuT * 0.05);
+      camera.position.set(Y.eye[0] + 2.2 * s, Y.eye[1] + 0.15 * Math.sin(menuT * 0.07), Y.eye[2] + 0.5 * Math.sin(menuT * 0.037));
+      camera.lookAt(Y.at[0], Y.at[1], Y.at[2] - 0.8 * s);
+      camera.fov = Y.fov; camera.updateProjectionMatrix();
+      return;
+    }
+    const c = state.cm, f = state.fwd, l = state.left, s = Math.sin(menuT * 0.06), S = SHOT, wide = camera.aspect > 1.1;
+    const cf = S.f + 0.8 * Math.sin(menuT * 0.045), cl = S.l - S.sway * s;
+    camera.position.set(c.x + f.x * cf + l.x * cl, Math.max(0.5, c.y + S.h + 0.2 * Math.sin(menuT * 0.08)), c.z + f.z * cf + l.z * cl);
+    const al = wide ? S.al + 0.4 * s : S.al * 0.15;
+    camera.lookAt(c.x + f.x * S.af + l.x * al, c.y + S.ah, c.z + f.z * S.af + l.z * al);
+    camera.fov = S.fov; camera.updateProjectionMatrix();
+  }
+  $('btnMenu').addEventListener('click', openMenu);
+  $('mnResume').addEventListener('click', closeMenu);
+  $('mnPlay').addEventListener('click', openLevels);
+  $('mnOptions').addEventListener('click', () => { levelsEl.hidden = true; showSettings(true); panel.querySelector('.seg button[aria-checked="true"]').focus({ preventScroll: true }); });
+  $('mnExit').addEventListener('click', exitGame);
+  $('lvClose').addEventListener('click', closeLevels);
+  $('lvGo').addEventListener('click', go);
+  for (const b of thumbs) {
+    b.addEventListener('click', () => { pick = b.dataset.v; showPick(); });
+    b.addEventListener('dblclick', go);
+  }
+  menuEl.querySelector('.mn-dim').addEventListener('click', () => { if (!levelsEl.hidden) closeLevels(); else showSettings(false); });
+  $('bye').addEventListener('pointerdown', leaveBye);
+
   // console / automation hook: hook.call(op, args) runs commands inside the physics thread
   const hook = window.__crashDriver = {
     link, summary, view, rig, renderer, composer, scene, camera, csm, state, stats, settings, fx, grime: GRIME, mode: link.mode, paused: false,
     call: (op, args) => link.call(op, args),
     reset: () => doReset(true),
     refresh: () => { needFrame = true; },
+    menu: { open: () => openMenu(), close: () => closeMenu(), levels: () => openLevels(), shot: SHOT, yard: YARD, get isOpen() { return menuOpen; } },
   };
 
   $('sNodes').textContent = summary.nNodes + ' / ' + summary.maxNodes;
@@ -5440,13 +5731,14 @@ async function main() {
     // measured from the last batches), so a slower device keeps real time at a lower frame rate. Only a
     // backlog beyond that is dropped: a moment too heavy even for that (an impact on a slow device) plays as
     // smooth slow motion, never as a slideshow of huge catch-up batches.
-    if (hook.paused) acc = 0; else acc += dtF * timeScale;
+    if (hook.paused || menuOpen) acc = 0; else acc += dtF * timeScale;
     const cap = Math.max(8, Math.min(MAX_STEPS, Math.floor(stats.stepRate * Math.max(12, 40 - stats.packMs))));
     if (!link.busy) {
       let n = Math.floor(acc / DT + 1e-9);
       if (n > cap) { n = cap; acc = 0; } else acc -= n * DT;
       if (n > 0 || needFrame) { link.step(n, input, view.debug); needFrame = false; }
     } else if (acc > cap * DT) acc = cap * DT;
+    if (hzReset) { hzReset = false; hz = 1 / DT; stepsWindow = 0; stepsT = 0; }   // the menu's paused frames don't count
     stepsT += dtF;
     if (stepsT >= 0.5) { hz = stepsWindow / stepsT; stepsWindow = 0; stepsT = 0; }
 
@@ -5472,7 +5764,9 @@ async function main() {
       link.events.length = 0;
     }
 
-    rig.update(state, dtF);
+    if (menuOpen) menuCam(dtF); else rig.update(state, dtF);
+    menuK = reduceMotion ? (menuOpen ? 1 : 0) : menuK + ((menuOpen ? 1 : 0) - menuK) * Math.min(1, dtF * 5);
+    grade.uniforms.uMenu.value = menuK;
     if (beamLevel > 0) {
       for (let s = 0; s < 2; s++) {
         const b = beams[s];
@@ -5521,6 +5815,7 @@ async function main() {
   }
 
   setLoader('Ready', 1);
+  if (params.get('menu') !== '0') { openMenu(); menuK = 1; park(); }   // ?menu=0 starts straight in the game
   $('loader').classList.add('done');
   pushFeed(Math.round(1 / DT) + ' Hz MASS-SPRING ENGINE ONLINE · ' + (link.mode === 'worker' ? 'PHYSICS WORKER' : 'MAIN THREAD'));
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });

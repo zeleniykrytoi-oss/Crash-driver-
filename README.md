@@ -1,4 +1,4 @@
-# Crash Driver
+# Beam.Web
 
 A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
@@ -31,6 +31,25 @@ python3 -m http.server 8000
 - `?worker=0` runs the solver on the main thread instead of the worker. The page also falls back to this on its own if workers are unavailable.
 - `?tune={...}` deep-merges a JSON object into the vehicle constants (`VEHICLE`) before the truck is built, for example `?tune={"plastic":{"H":0.5}}`.
 - `?time=day|evening|night` and `?gfx=low|medium|high|ultra` override the settings panel for that visit.
+- `?menu=0` skips the main menu and starts straight in the game.
+
+## Main menu
+
+The game opens on a title screen in the style of an early-2010s simulator alpha.
+
+- **Background:** a live view of the test area in black and white, with the contrast pulled up and a heavy vignette. On the title screen the truck waits in the yard behind the crash wall, between the wall's shadowed back and the container stacks, and the camera drifts slowly down the yard.
+- **Title:** "Beam.Web" in large white type at the upper left, with an orange dot, and "Alpha · Work in Progress" in orange beneath it.
+- **Lower right:** the Beam.Web mark (an orange node and two steel nodes joined by beams, one soft-body cell) with a blue wordmark, and plain desktop buttons: Play, Options and Exit. When a session is in progress, Resume comes first.
+
+What the buttons do:
+
+- **Play** opens a Choose Level window over the dimmed menu. It shows a large preview of GridMap and three thumbnails, one each for day, evening and night. The previews are rendered from the live scene in colour the first time the window opens. Picking a thumbnail sets the time of day, and **Go!** starts the level with a fresh truck at the start line. Arrow keys move between the thumbnails, and a double-click on one starts it.
+- **Options** opens the settings (time of day and graphics) as a desktop window.
+- **Exit** closes the game to a black screen. A click or a key brings the menu back.
+
+In the game, **Esc** or the **MENU** button opens the menu and pauses the physics. **Resume** carries on where you left off. **Esc** also closes any open window and, from the pause menu, resumes.
+
+The windows and buttons are drawn in a plain desktop style (Segoe UI, light grey, white title bars). The title and wordmark use Ubuntu. On a phone the buttons fill the width of the screen and the Choose Level window stacks its preview, thumbnails and description.
 
 ## Controls
 
@@ -46,6 +65,7 @@ python3 -m http.server 8000
 | f-node debug view | N | F-NODES |
 | Slow motion: 20× slower (×0.05), still whole 0.5 ms substeps | T | SLOW-MO |
 | Settings: time of day and graphics | G (Esc closes) | SETTINGS |
+| Main menu (pauses) | Esc | MENU |
 | Orbit camera | drag on the view | drag on the view |
 
 The chase camera holds the truck's heading closely, so a hard turn doesn't show the truck from the side as if it slid. Its lens widens a little with speed.
