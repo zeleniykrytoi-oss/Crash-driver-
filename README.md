@@ -2,11 +2,13 @@
 
 A soft-body vehicle crash simulator in a single HTML file, styled after the 2013-era BeamNG.drive tech demos. Like BeamNG, the pickup truck is a classic mass-spring-damper network: 4500 nodes integrated explicitly at 2000 Hz (0.5 ms substeps) in a dedicated Web Worker. It has:
 
-- 749 beams: structural, shear (diagonal) and support;
-- 30 volume cells;
-- a sheet-metal skin of 5780 stretch springs and 3643 dihedral bending springs.
+- 865 beams: structural, shear (diagonal) and support;
+- 38 volume cells;
+- a sheet-metal skin of 5839 stretch springs and 3675 dihedral bending springs.
 
-In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood and doors hang from their hinges or tear off when their brackets fail.
+In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors and front fenders hang from their hinges and bolts or tear off when their brackets fail.
+
+The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area has a steel post, barriers, speed bumps, containers, a drag strip and a skid pad.
 
 The tyres use a contact-patch friction model with slip ratio, slip angle and static/kinetic friction, on coil-over suspension with asymmetric dampers and anti-roll bars. The drivetrain is a full-size V8 pickup's: 0–100 km/h in 8 s and a 178 km/h limiter.
 
@@ -48,7 +50,21 @@ python3 -m http.server 8000
 
 The chase camera holds the truck's heading closely, so a hard turn doesn't show the truck from the side as if it slid. Its lens widens a little with speed.
 
-The test bench has a concrete wall 45 m straight ahead of the spawn, a 10° ramp on the left lane and a 22° ramp on the right lane.
+The test area, seen from the spawn (+x is to the left):
+
+| Feature | Where | For |
+| --- | --- | --- |
+| Concrete wall, 18 m wide and 5 m tall | 45 m straight ahead; yellow lines on the run-up mark the distance every 5 m | full-width frontal hits |
+| Ramps of 10° and 22° | either side of the run-up | jumps and rollovers |
+| Steel post, 0.4 m square | right of the wall | narrow-object hits |
+| Short concrete block, 6 m wide and 1.6 m tall | right of the wall | small-overlap hits |
+| Shipping containers, stacked two high | behind the wall | a backdrop to hit |
+| Corridor of red-and-white concrete blocks with six speed bumps | 40 m left | suspension and precision driving |
+| Asphalt drag strip, 2 km, with the distance painted every 100 m | 60 m left, starting 900 m behind the spawn | acceleration and top speed |
+| Asphalt skid pad, 30 m radius, with painted circles | 95 m left, 45 m behind | cornering and drifts |
+| Warehouses (solid) and two ridgelines | on the horizon | — |
+
+The floor is still a gridmap, but worn: broad pale and dark patches, a few oil stains and old rubber streaks, so it doesn't read as a sterile repeat.
 
 The HUD shows:
 - the solver rate and load (step time plus skinning time per frame, on the worker). When the device can't keep up with real time, the rate turns red with the playback factor, for example `×0.62`;
@@ -99,7 +115,7 @@ That buffer holds stats, node positions, beam states, wheel matrices and probe d
 - **Rigid blocks:** 8 corner nodes each for the engine and the gearbox.
 - **Hubs:** 4, one per wheel centre.
 - **Tread probes:** 256, a fixed 2 × 32 ring per wheel.
-- **Flexnodes:** 4060 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
+- **Flexnodes:** 4028 surface samples of the panels, which fill the matrix to exactly 4500 nodes.
 
 **Beams.** Each beam is a spring-damper along its axis: F = k·(L − L0) + c·v<sub>rel</sub>, with k = E/L0 and c set by the family's damping ratio. There are three kinds:
 
@@ -128,6 +144,8 @@ An earlier version pushed the whole depth out every step and moved the block as 
 
 **Contacts.** Contacts are position-based. A node is projected out along the contact normal, then Coulomb friction acts on that step's tangential displacement: static while it is within μ times the normal correction, kinetic sliding beyond that. Only the penetration created by this step's own approach may turn into velocity, and only that fresh penetration sets the friction limit. Anything deeper is eased out without launching the body or gluing it to a wall.
 
+**Beams against obstacles.** A post narrower than the node spacing would slip between the nodes and meet only the skin. The skin's ties then sprang the truck back off it, at two-thirds of its impact speed. So each structural beam crossing a box is tested too. Its point nearest the box's vertical axis is pushed back out, inelastically like the engine-block contact: only the depth this step added, at most 2 cm, through the face it came in by. Points within 15 % of a beam's ends are left to that node's own contact. There a light node at the far end would take the whole correction magnified and be fired off. The test costs nothing away from obstacles.
+
 **Flexnodes (the skin sheet).** Every flexnode follows a smooth blend of the 6 nearest structural nodes of its part (embedded deformation):
 
 - **Node rotations:** each structural node carries its own rotation, shape-matched over itself and its beam neighbours.
@@ -154,17 +172,26 @@ Ten mechanics run inside the mass-spring loop on top of the beams, cells and she
 
 ## Detaching parts
 
-Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door and Hood. Each hangs on named brackets of attachment beams:
+Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood and the left and right front fenders. Each hangs on named brackets of attachment beams:
 
 | Part | Brackets |
 | --- | --- |
 | Doors | upper hinge, lower hinge, latch |
 | Hood | left hinge, right hinge, latch |
+| Front fenders | front bolts, two top bolts, rear bolts at the door pillar |
 | Bumpers | one per bolt |
 
 - **Bracket failure:** a bracket lets go as a unit after losing half its beams (a hood latch after its first). Failures stay local, so a door whose upper hinge and latch tear off swings and hangs on its lower hinge.
 - **Load sharing:** each snapped beam concentrates stress in its bracket neighbours (mechanic 7). A moderate hit leaves a part hanging; a severe one tears it free as one panel.
 - **Free parts:** a part with no brackets left moves into its own simulation context with exactly the momentum it had, keeps deforming, and goes to sleep once it comes to rest.
+
+**Front fenders.** Each fender is a 4 × 2 × 2 lattice over the wheel arch, from the arch's crown to the hood line. It is bolted along its front, top and rear edges to the outer half of the structure on its own side.
+
+- Its sheet is soft and crumples readily.
+- Struts behind it, which only push, stand in for the inner apron. A crushed fender therefore folds out and back instead of in under the hood.
+- The rear bolts at the door pillar hold longest.
+
+At 50 km/h into the wall a fender buckles. At 60 km/h its front and top bolts tear and it hangs from the rear ones. At 80 km/h one fender rips off and falls by the wall, leaving the inner wheel arch exposed. A torn-off fender keeps its dents but drops the accordion pleats, which follow the chassis' crumple zone.
 
 **The hood's roof fold.** The hood is a 3 × 5 × 2 lattice, from the hinge row at the cowl to the latch at the front:
 
@@ -241,7 +268,12 @@ The default is HIGH on desktop and MEDIUM on touch devices.
   - **Sun:** a directional light with cascaded shadow maps. The nearest cascade covers only about 11 m around the car, which gives sharp contact shadows under the chassis.
   - **Fill:** a hemisphere sky-bounce light, with image-based reflections from the sky. There is no flat ambient light.
   - **Post:** an HDR render goes through a light bloom and ACES tone mapping, then MSAA or FXAA depending on the graphics preset.
-- **Materials:** physically based. Clearcoat sand paint, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, a dark radiator with a micro-grid texture, and chrome bumpers. The ground is a clean grey checker gridmap.
+- **Grime:** the truck carries road dirt, computed in the shaders from each vertex's position on the undamaged model, so the pattern stays put on the metal however a panel bends or wherever a torn-off part lands.
+  - Mud collects low on the body (rockers, bumpers, lower doors), with a ragged edge and short run-down streaks, and it sprays up and back from each wheel with flung specks.
+  - Dust settles on faces that look up.
+  - Mud makes paint matte and dulls chrome. The tyres go grey-brown and the wheels collect brake dust.
+  - The truck starts with a working truck's everyday dirt and gets dirtier with distance, quite dirty after about 5 km, faster while its tyres spin. RESET VEHICLE washes it.
+- **Materials:** physically based. Clearcoat sand paint with a working truck's sheen rather than a mirror finish, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, a dark radiator with a micro-grid texture, and chrome bumpers. The ground is a worn grey checker gridmap with asphalt areas and painted markings.
 - **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Each flexnode's map is affine (x → R·x + T), so a vertex needs one blended matrix: (Σ w·R)·v + Σ w·T.
 - **Intact panels:** a panel moving as a rigid body skips skinning altogether. The worker fits one matrix to its flexnodes (their mean rotation and the shift of their centroid), and the page draws the panel's rest geometry under it, uploading no vertices. A panel stays skinned while it is pleated, while any of its flexnodes is awake or dented, or while a flexnode sits more than 7 mm off the fit (16 mm to leave). That covers bent structure, and the frame and doors flexing under hard braking and cornering. An intact truck is drawn almost entirely from matrices. Normals are recomputed once a panel is dented. The panels take turns under a budget of 20,000 triangles per frame, since a crash dents many at once; a panel waiting for its turn shows its rotated rest normals.
 - **Accordion pleats:** a crushed bay can't shorten its sheet metal, so the fenders, wheel tubs and body sides ahead of the cowl fold into sharp pleats across it. The pleats are a triangle wave of 24 cm rest wavelength, standing (λ/4)·√(1 − r²) high (deepened 1.4× so they read clearly) for a bay squeezed to a fraction r of its length. Normals are recomputed, so the folds catch the light.

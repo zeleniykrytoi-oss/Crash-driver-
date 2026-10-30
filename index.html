@@ -274,21 +274,21 @@ function physicsLib() {
   /* ------------------------------------ constants ------------------------------------ */
   const DT = 0.0005, DT2 = DT * DT;  // fixed physics substep: 0.5 ms = 2000 Hz, independent of the render rate
   const MAX_NODES = 4500;            // f-node budget: structure + rigid blocks + hubs + tread probes + flexnodes
-  const MAX_BEAMS = 750;             // beams, including the engine / gearbox lattices
+  const MAX_BEAMS = 900;             // beams, including the engine / gearbox lattices
   const MAX_STEPS = 120;             // substeps per render frame: a slow device gets slow motion, never a bigger step
   const stepsIn = (sec) => Math.max(1, Math.round(sec / DT));   // a duration as a number of substeps
   const G = 9.81;
 
   const NODE_STRUCT = 0, NODE_HUB = 1, NODE_TREAD = 2, NODE_FLEX = 3, NODE_BLOCK = 4;
   const BEAM_STRUCT = 0, BEAM_ATTACH = 1, BEAM_SUPPORT = 2, BEAM_RIGID = 3, BEAM_MOUNT = 4, BEAM_SHEAR = 5;
-  const P_CHASSIS = 0, P_BUMPER_F = 1, P_BUMPER_R = 2, P_DOOR_L = 3, P_DOOR_R = 4, P_HOOD = 5;
-  const PART_LABELS = ['CHASSIS', 'FRONT BUMPER', 'REAR BUMPER', 'LEFT DOOR', 'RIGHT DOOR', 'HOOD'];
+  const P_CHASSIS = 0, P_BUMPER_F = 1, P_BUMPER_R = 2, P_DOOR_L = 3, P_DOOR_R = 4, P_HOOD = 5, P_FENDER_L = 6, P_FENDER_R = 7, N_PARTS = 8;
+  const PART_LABELS = ['CHASSIS', 'FRONT BUMPER', 'REAR BUMPER', 'LEFT DOOR', 'RIGHT DOOR', 'HOOD', 'LEFT FENDER', 'RIGHT FENDER'];
 
   const GROUND_MU = 0.55;            // sheet steel sliding on concrete (body, bumpers, detached parts)
 
   const VEHICLE = {
     totalMass: 1950, hubMass: 42, engineMass: 230, gearboxMass: 95,
-    partMass: [0, 22, 20, 26, 26, 20],
+    partMass: [0, 22, 20, 26, 26, 20, 13, 13],
     flexMassTotal: 108,
     stationMerge: 0.22, stationMaxGap: 0.62, crumpleGap: 0.42,
     wheel: { I: 1.9, kT: 42000, cT: 260, rays: 32, rowFrac: 0.36 },
@@ -345,6 +345,9 @@ function physicsLib() {
       hoodFold:   { E: 4.0e4, yield: 0.012, zeta: 0.18 },            // underside around the hood's middle row: gives first, so the hood folds up into a ridge
       hoodPanel:  { E: 1.2e5, zeta: 0.18 },                          // the hood's outer segments: stiff, so the two halves of the fold stay flat
       door:       { E: 6.5e4, zeta: 0.1 },
+      fender:     { E: 5.0e4, yield: 0.02, zeta: 0.15 },            // thin sheet over the wheel arch: crumples readily
+      attachFender: { E: 5.5e4, yield: 0.035, brP: 0.17, brC: 0.5, zeta: 0.25 },    // the bolts along its front and top edges
+      attachFenderRear: { E: 7.0e4, yield: 0.035, brP: 0.4, brk: 0.5, brC: 0.8, zeta: 0.25 },   // at the door pillar: holds longest
       bumper:     { E: 5.5e4, zeta: 0.35 },
       attach:     { E: 5.5e4, yield: 0.035, brP: 0.18, brC: 0.4, zeta: 0.3 },
       attachHood: { E: 6.0e4, yield: 0.035, brP: 0.2, brC: 0.55, zeta: 0.25 },
@@ -545,9 +548,9 @@ function physicsLib() {
       for (const d of defs) { if (d.type === 0) w.addBox(...d.args); else w.addRamp(...d.args); }
       return w;
     }
-    addBox(x0, x1, height, z0, z1, mu) {
-      this.defs.push({ type: 0, args: [x0, x1, height, z0, z1, mu] });
-      this.add({ type: 0, x0, x1, z0, z1, h: height, mu, minx: x0, maxx: x1, minz: z0, maxz: z1, maxy: height });
+    addBox(x0, x1, height, z0, z1, mu, style = 'concrete') {   // style only picks the look on the page
+      this.defs.push({ type: 0, args: [x0, x1, height, z0, z1, mu, style] });
+      this.add({ type: 0, x0, x1, z0, z1, h: height, mu, style, minx: x0, maxx: x1, minz: z0, maxz: z1, maxy: height });
     }
     // Wedge ramp rising along +z from z0 (height 0) to z0+len (height len*tan), with a vertical drop at the end.
     addRamp(cx, z0, len, width, deg, mu) {
@@ -1033,6 +1036,7 @@ function physicsLib() {
         const C = ctxs[c];
         if (C.sleeping) continue;
         for (let r = 0; r < C.ranges.length; r++) this.contactRange(C.ranges[r][0], C.ranges[r][1], C);
+        if (C.nCols > 0) this.collideBeams(C);
       }
       this.contactFlex();
       // 4. a node a contact moved takes its velocity from the corrected position; then the friction lock
@@ -1689,6 +1693,50 @@ function physicsLib() {
       pos[i3] -= tx * k; pos[i3 + 1] -= ty * k; pos[i3 + 2] -= tz * k;
     }
 
+    // Beams against boxes: a post narrower than the node spacing would slip between the nodes and meet only
+    // the skin, whose ties then sprang the truck back off it. For each structural beam crossing a box, its
+    // point nearest the box's vertical axis is pushed back out, inelastically like the engine-block contact:
+    // only the depth this step added, through the face it came in by. Costs nothing away from obstacles.
+    collideBeams(C) {
+      const pos = this.pos, prev = this.prev, inv = this.inv, ba = this.ba, bb = this.bb, btype = this.btype, list = C.beams, cols = this.world.cols;
+      for (let ci = 0; ci < C.nCols; ci++) {
+        const c = cols[C.cols[ci]];
+        if (c.type !== 0) continue;
+        const cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
+        for (let q = 0; q < C.nb; q++) {
+          const j = list[q], ty = btype[j];
+          if (ty !== BEAM_STRUCT && ty !== BEAM_SHEAR) continue;
+          const a = ba[j] * 3, b = bb[j] * 3, ax = pos[a], az = pos[a + 2], bx = pos[b], bz = pos[b + 2];
+          if ((ax < c.x0 && bx < c.x0) || (ax > c.x1 && bx > c.x1) || (az < c.z0 && bz < c.z0) || (az > c.z1 && bz > c.z1)) continue;
+          const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+          if (l2 < 1e-8) continue;
+          const t = ((cx - ax) * dx + (cz - az) * dz) / l2;
+          // near an end the node's own contact handles it; there, too, a light far node would take the whole
+          // correction magnified by 1 / u and be fired off at hundreds of m/s
+          if (t < 0.15 || t > 0.85) continue;
+          const u = 1 - t, px = ax * u + bx * t, py = pos[a + 1] * u + pos[b + 1] * t, pz = az * u + bz * t;
+          if (px <= c.x0 || px >= c.x1 || pz <= c.z0 || pz >= c.z1 || py >= c.h || py < 0) continue;
+          // the face it came in by: one the point was outside of a step ago, the shallowest of those
+          const qx = prev[a] * u + prev[b] * t, qy = prev[a + 1] * u + prev[b + 1] * t, qz = prev[a + 2] * u + prev[b + 2] * t;
+          let d = 1e9, dp = 0, nx = 0, ny = 0, nz = 0;
+          const face = (cur, was, fx, fy, fz) => { if (cur < d) { d = cur; dp = was; nx = fx; ny = fy; nz = fz; } };
+          if (qx <= c.x0) face(px - c.x0, qx - c.x0, -1, 0, 0);
+          if (qx >= c.x1) face(c.x1 - px, c.x1 - qx, 1, 0, 0);
+          if (qz <= c.z0) face(pz - c.z0, qz - c.z0, 0, 0, -1);
+          if (qz >= c.z1) face(c.z1 - pz, c.z1 - qz, 0, 0, 1);
+          if (qy >= c.h) face(c.h - py, c.h - qy, 0, 1, 0);
+          if (d === 1e9) continue;   // already inside a step ago: leave it, never fire it out
+          const fresh = Math.min(d, d - Math.max(0, dp), 0.02);   // at most 2 cm a step (40 m/s of approach)
+          if (!(fresh > 0)) continue;
+          const wa = inv[ba[j]] * u, wb = inv[bb[j]] * t, W = wa * u + wb * t;
+          if (W <= 0) continue;
+          const k = fresh / W;
+          pos[a] += wa * k * nx; pos[a + 1] += wa * k * ny; pos[a + 2] += wa * k * nz;
+          pos[b] += wb * k * nx; pos[b + 1] += wb * k * ny; pos[b + 2] += wb * k * nz;
+        }
+      }
+    }
+
     contactFlex() {
       const list = this.fList, fs = this.fStart;
       for (let q = 0; q < this.nActive; q++) {
@@ -2076,9 +2124,11 @@ function physicsLib() {
       return { min: mn, max: mx };
     };
     const pct = (arr, q) => arr[Math.min(arr.length - 1, Math.max(0, Math.floor(q * (arr.length - 1))))];
-    const chassisV = collect(m => m.part === P_CHASSIS && m.cat === 'panel');
+    // the fenders hang on brackets of their own but still shape the chassis' cross-sections, as they did
+    // when they were part of it, so the crumple zone's rings sit where they always have
+    const chassisV = collect(m => (m.part === P_CHASSIS || m.part === P_FENDER_L || m.part === P_FENDER_R) && m.cat === 'panel');
     const partV = [];
-    for (let p = 1; p <= 5; p++) {
+    for (let p = 1; p < N_PARTS; p++) {
       partV[p] = collect(m => m.part === p && m.cat === 'panel');                    // fit lattices to the skin, not mirrors/glass
       if (!partV[p].length) partV[p] = collect(m => m.part === p && m.cat !== 'rigid');
     }
@@ -2245,8 +2295,8 @@ function physicsLib() {
     // unit once it has lost half its beams, so damage stays local: a door can hang from its lower hinge
     // after the upper one tears, and only flies off when its last bracket fails.
     const bracketOf = new Map();
-    const attach = (p, n, count, fam, bracket) => {
-      for (const c of nearestChassis(n, count)) { const j = sim.addBeam(n, c, fam, BEAM_ATTACH, p); if (j >= 0) { sim.parts[p].attach.push(j); bracketOf.set(j, bracket); } }
+    const attach = (p, n, count, fam, bracket, filter) => {
+      for (const c of nearestChassis(n, count, filter)) { const j = sim.addBeam(n, c, fam, BEAM_ATTACH, p); if (j >= 0) { sim.parts[p].attach.push(j); bracketOf.set(j, bracket); } }
     };
     const support = (p, n, filter) => {
       for (const c of nearestChassis(n, 1, filter)) { const j = sim.addBeam(n, c, BF.support, BEAM_SUPPORT, p); if (j >= 0) sim.parts[p].support.push(j); }
@@ -2290,6 +2340,31 @@ function physicsLib() {
       for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) sim.airQuads.push({ part: p, n: Int32Array.of(D.id(i, j, 0), D.id(i + 1, j, 0), D.id(i + 1, j + 1, 0), D.id(i, j + 1, 0)) });
       for (const j of [0, 1]) support(p, D.id(1, j, 1));
     }
+    // Front fenders: a 4 x 2 x 2 lattice over the wheel arch (rows from the arch's crown to the hood line),
+    // bolted to the structure along their front, top and rear edges. Soft sheet that crumples readily; a
+    // frontal hit tears the front bolts first, so a fender folds back and hangs on its rear bolts, and a
+    // hard one rips it off.
+    for (const p of [P_FENDER_L, P_FENDER_R]) {
+      const fb = partBox[p];
+      if (!fb) continue;
+      const V = partV[p], side = p === P_FENDER_L ? 1 : -1;
+      const wf = model.wheels.filter(w => w.front && (w.c.x > 0) === (side > 0))[0];
+      const crown = wf ? wf.c.y + wf.radius + 0.07 : fb.min[1] + 0.3;
+      const y0 = Math.min(Math.max(fb.min[1] + 0.07, crown), fb.max[1] - 0.16), y1 = fb.max[1] - 0.05;
+      const F = lattice(p, 4, 2, 2, (i, j, k) => {
+        const z = lerp(fb.max[2] - 0.06, fb.min[2] + 0.06, i / 3), y = lerp(y0, y1, j);
+        const outer = surfaceExtreme(V, 2, 1, 0, z, y, side, side > 0 ? fb.max[0] : fb.min[0]) - side * 0.012;
+        return [outer - side * 0.08 * k, y, z];
+      }, BF.fender, null, VF.door);
+      // bolted to the outer half of the structure on its own side: bolts reaching to the middle dragged a
+      // crushed fender in under the hood
+      const own = (c) => R[c * 3] * side > 0.3;
+      for (const j of [0, 1]) attach(p, F.id(0, j, 1), 2, BF.attachFender, 'front', own);
+      for (const i of [1, 2]) attach(p, F.id(i, 1, 1), 2, BF.attachFender, 'top' + i, own);
+      for (const j of [0, 1]) attach(p, F.id(3, j, 1), 2, BF.attachFenderRear, 'rear', own);
+      // the inner apron: struts that only push, so a crushed fender folds out and back instead of in under the hood
+      for (const i of [1, 2]) for (const j of [0, 1]) support(p, F.id(i, j, 1), (c) => own(c) && Math.abs(R[c * 3]) < Math.abs(R[F.id(i, j, 1) * 3]) - 0.05);
+    }
     for (const p of [P_BUMPER_F, P_BUMPER_R]) {
       const bb = partBox[p];
       if (!bb) continue;
@@ -2303,9 +2378,9 @@ function physicsLib() {
       attach(p, Bm.id(0, 1, 1), 2, BF.attach, 'end0');
       attach(p, Bm.id(3, 1, 1), 2, BF.attach, 'end3');
     }
-    for (let p = 1; p <= 5; p++) if (!sim.parts[p]) sim.parts[p] = { id: p, n0: sim.nNodes, n1: sim.nNodes, attach: [], support: [], detached: false, ctx: 0, dent: 0 };
+    for (let p = 1; p < N_PARTS; p++) if (!sim.parts[p]) sim.parts[p] = { id: p, n0: sim.nNodes, n1: sim.nNodes, attach: [], support: [], detached: false, ctx: 0, dent: 0 };
     // brackets become break groups: a bracket fails after half its beams (a hood latch after its first)
-    for (let p = 1; p <= 5; p++) {
+    for (let p = 1; p < N_PARTS; p++) {
       const map = new Map();
       for (const j of sim.parts[p].attach) {
         const k = bracketOf.get(j);
@@ -2433,13 +2508,13 @@ function physicsLib() {
     const chassisMass = VEHICLE.totalMass - 4 * VEHICLE.hubMass - partMassSum - VEHICLE.flexMassTotal - VEHICLE.engineMass - VEHICLE.gearboxMass;
     const nCh = chassisRange.n1 - chassisRange.n0;
     for (let i = chassisRange.n0; i < chassisRange.n1; i++) sim.mass[i] = chassisMass / nCh;
-    for (let p = 1; p <= 5; p++) {
+    for (let p = 1; p < N_PARTS; p++) {
       const P = sim.parts[p], n = P.n1 - P.n0;
       for (let i = P.n0; i < P.n1; i++) sim.mass[i] = VEHICLE.partMass[p] / Math.max(n, 1);
     }
 
     // --- flexnodes: area-weighted, voxel-thinned surface samples of each part's panels
-    const partTris = [[], [], [], [], [], []];
+    const partTris = Array.from({ length: N_PARTS }, () => []);
     for (const m of meshes) {
       if (m.cat !== 'panel') continue;
       if (sim.parts[m.part].n1 === sim.parts[m.part].n0) continue;
@@ -2477,8 +2552,8 @@ function physicsLib() {
       }
     };
     sim.fStart = sim.nNodes;
-    for (let p = 0; p < 6; p++) {
-      sim.fp[p] = { yield: p === P_BUMPER_F || p === P_BUMPER_R ? 0.015 : (p === 0 ? 0.012 : 0.01), maxP: 0.3 };
+    for (let p = 0; p < N_PARTS; p++) {
+      sim.fp[p] = { yield: p === P_BUMPER_F || p === P_BUMPER_R ? 0.015 : (p === 0 ? 0.012 : (p >= P_FENDER_L ? 0.008 : 0.01)), maxP: 0.3 };
       sim.fp[p].y2 = sim.fp[p].yield * sim.fp[p].yield;
       if (!counts[p]) continue;
       const smp = sampleSurface(partTris[p], counts[p], rng), pts = smp.pos;
@@ -2769,7 +2844,7 @@ function physicsLib() {
 
     buildHash() {
       const sim = this.sim, R = sim.rest, h = 0.12;
-      this.hashH = h; this.hash = [new Map(), new Map(), new Map(), new Map(), new Map(), new Map()];
+      this.hashH = h; this.hash = Array.from({ length: N_PARTS }, () => new Map());
       for (let f = 0; f < sim.nFlex; f++) {
         const i = sim.fStart + f, p = sim.part[i];
         const key = this.hkey(R[i * 3], R[i * 3 + 1], R[i * 3 + 2], 0, 0, 0);
@@ -2879,7 +2954,7 @@ function physicsLib() {
         zc[i] = (st[i].z + st[i + 1].z) / 2; this.pFront[i] = zc[i] > cowl ? 1 : 0;
       }
       for (const s of this.skins) {
-        if (!s.panel || s.part !== P_CHASSIS || /frame/.test(s.name)) continue;   // the chassis frame sits under the truck
+        if (!s.panel || (s.part !== P_CHASSIS && s.part !== P_FENDER_L && s.part !== P_FENDER_R) || /frame/.test(s.name)) continue;   // the chassis frame sits under the truck
         const nv = s.nv, P = s.restP, N = s.restN, pw = new Float32Array(nv), pb = new Uint8Array(nv), pt = new Float32Array(nv), pz = new Float32Array(nv);
         let any = false;
         for (let v = 0; v < nv; v++) {
@@ -2980,7 +3055,7 @@ function physicsLib() {
         const s = S[(start + k) % S.length];
         const po = s.item.offset + 17, no = po + s.nv * 3;
         const { fid, phi, off, restP, restN, refN, nv } = s;
-        const plW = pleating ? s.pw : null, plB = s.pb, plT = s.pt, plS = s.pz;
+        const plW = pleating && !sim.parts[s.part].detached ? s.pw : null, plB = s.pb, plT = s.pt, plS = s.pz;   // a torn-off fender keeps no pleats
         // An intact panel moves as a rigid body: then one matrix, fitted to its flexnodes, replaces skinning
         // all its vertices (and the page uploads nothing). It stays skinned while it is pleated or any of its
         // flexnodes is awake or dented, and while a flexnode sits more than 7 mm off the fit (16 mm to leave):
@@ -3470,7 +3545,7 @@ function physicsLib() {
 
   return { DT, MAX_NODES, MAX_BEAMS, MAX_STEPS, STATS, NODE_STRUCT, NODE_HUB, NODE_TREAD, NODE_FLEX, NODE_BLOCK,
     BEAM_STRUCT, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, FX_SCRAPE, FX_SNAP, FX_IMPACT, P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD,
-    PART_LABELS, VEHICLE, TYRE, World, SimCore, mulberry32 };
+    P_FENDER_L, P_FENDER_R, N_PARTS, PART_LABELS, VEHICLE, TYRE, World, SimCore, mulberry32 };
 }
 
 /* =========================================================================================
@@ -3509,8 +3584,9 @@ function workerMain(LIB) {
 
 const PHYS = physicsLib();   // this thread's copy: constants, the World for the scene, and the fallback core
 const { DT, MAX_STEPS, NODE_FLEX, NODE_TREAD, NODE_HUB, NODE_BLOCK, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, FX_SCRAPE, FX_SNAP, FX_IMPACT,
-  P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, mulberry32 } = PHYS;
-const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a];
+  P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, P_FENDER_L, P_FENDER_R, mulberry32 } = PHYS;
+const DIRT0 = 0.35;   // a working truck's everyday road dirt, before it has driven anywhere
+const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a, 0xffe45f, 0xffe45f];
 const BATCH_MS = 45;   // a batch of substeps stops early past this much time, so a heavy moment can't hold a frame back
 
 class PhysicsLink {
@@ -3638,6 +3714,9 @@ function detectPart(chain) {
   if (/hood|bonnet/.test(chain)) return P_HOOD;
   if (/door[a-z]*([_\s.-](l|left)|left)([_\s.\-\d]|$)|left[_\s]?door|(^|[^a-z])mirror([_\s.-](l|left)|left)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_L;
   if (/door[a-z]*([_\s.-](r|right)|right)([_\s.\-\d]|$)|right[_\s]?door|(^|[^a-z])mirror([_\s.-](r|right)|right)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_R;
+  // front fenders (not the bed's fender flares)
+  if (/fender([_\s.-](l|left)|left)([_\s.\-\d]|$)|left[_\s]?fender/.test(chain)) return P_FENDER_L;
+  if (/fender([_\s.-](r|right)|right)([_\s.\-\d]|$)|right[_\s]?fender/.test(chain)) return P_FENDER_R;
   if (/bumper[a-z]*([_\s.-](f|front)|front)([_\s.\-\d]|$)|front[_\s]?bumper/.test(chain)) return P_BUMPER_F;
   if (/bumper[a-z]*([_\s.-](r|rear|b|back)|rear|back)([_\s.\-\d]|$)|rear[_\s]?bumper/.test(chain)) return P_BUMPER_R;
   return P_CHASSIS;
@@ -3826,27 +3905,87 @@ function radiatorTexture() {
   return t;
 }
 
+/* Grime: road dirt, mud spray and dust on the truck, computed in the shaders from each vertex's position on
+   the undamaged model (a 'rest' attribute), so the pattern stays put on the metal however the panel bends
+   or wherever a torn-off part lands. Mud collects low on the body (rockers, bumpers, lower doors), sprays
+   up and back from each wheel and runs down in streaks; dust settles on faces that look up. The amount
+   (uDirt) grows as the truck drives, faster while its tyres spin, and a reset washes it. Mud makes paint
+   matte and dulls chrome; the tyres go grey-brown and the wheels collect brake dust. */
+const GRIME = {
+  uDirt: { value: 0.35 },
+  uWheels: { value: new THREE.Vector4(1.5, -1.5, 0.38, 0.4) },   // front axle z, rear axle z, hub height, tyre radius (model space)
+};
+function grime(mat, mode) {
+  mat.userData.grimePatch = (sh) => {
+    sh.uniforms.uDirt = GRIME.uDirt; sh.uniforms.uWheels = GRIME.uWheels;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec3 rest;\nvarying vec3 vRest;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = rest;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uDirt; uniform vec4 uWheels; varying vec3 vRest;
+        float gHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+        float gNoise(vec3 x) {
+          vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(gHash(i), gHash(i + vec3(1, 0, 0)), f.x), mix(gHash(i + vec3(0, 1, 0)), gHash(i + vec3(1, 1, 0)), f.x), f.y),
+                     mix(mix(gHash(i + vec3(0, 0, 1)), gHash(i + vec3(1, 0, 1)), f.x), mix(gHash(i + vec3(0, 1, 1)), gHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float n1 = gNoise(vRest * 6.0), n2 = gNoise(vRest * vec3(26.0, 3.5, 26.0)), n3 = gNoise(vRest * 41.0);
+        float dirtAmt, dustAmt;
+        vec3 dirtCol = vec3(0.16, 0.12, 0.075), dustCol = vec3(0.42, 0.37, 0.28);
+        #if ${mode} == 0
+          // body: low on the truck, up and back from each tyre, in streaks
+          float low = 1.0 - smoothstep(0.42, 0.95, vRest.y);
+          float dF = length(vec2(vRest.z - uWheels.x, vRest.y - uWheels.z)), dR = length(vec2(vRest.z - uWheels.y, vRest.y - uWheels.z));
+          float behindF = smoothstep(0.25, -0.6, vRest.z - uWheels.x), behindR = smoothstep(0.25, -0.6, vRest.z - uWheels.y);
+          float spray = max(exp(-pow(max(0.0, dF - uWheels.w) / 0.32, 2.0)) * (0.55 + 0.45 * behindF), exp(-pow(max(0.0, dR - uWheels.w) / 0.32, 2.0)) * (0.55 + 0.45 * behindR));
+          float mask = clamp(low * 0.85 + spray * 0.9, 0.0, 1.0);
+          // a ragged edge from coarse noise, short run-down streaks, and specks flung off the tyres
+          float nLow = gNoise(vRest * vec3(2.2, 3.0, 2.2) + 7.3), speck = smoothstep(0.78, 0.86, gNoise(vRest * 55.0)) * spray;
+          dirtAmt = clamp(smoothstep(0.32, 0.72, mask + (nLow - 0.5) * 0.7 + (n1 - 0.5) * 0.3 + (n2 - 0.5) * 0.3 * mask) + speck * 0.8, 0.0, 1.0) * uDirt;
+          vec3 wn = normalize((vec4(vNormal, 0.0) * viewMatrix).xyz);
+          dustAmt = smoothstep(0.5, 0.95, abs(wn.y)) * step(0.0, wn.y * (gl_FrontFacing ? 1.0 : -1.0)) * (0.25 + 0.75 * n1) * (0.25 + 0.5 * uDirt);
+        #else
+          // wheels: dust over the tyre, brake dust on the rim
+          dirtAmt = (0.4 + 0.45 * n1 + 0.15 * n3) * uDirt;
+          dustAmt = 0.0;
+          dirtCol = mix(vec3(0.07, 0.06, 0.05), dirtCol, ${mode === 1 ? '1.0' : '0.3'});
+        #endif
+        diffuseColor.rgb = mix(diffuseColor.rgb, dirtCol, clamp(dirtAmt, 0.0, 1.0) * 0.85);
+        diffuseColor.rgb = mix(diffuseColor.rgb, dustCol, clamp(dustAmt, 0.0, 1.0) * 0.45);
+        float grimeAmt = clamp(max(dirtAmt, dustAmt * 0.7), 0.0, 1.0);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.93, grimeAmt);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor *= 1.0 - grimeAmt * 0.85;')
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat *= 1.0 - grimeAmt;\n#endif');
+  };
+  mat.onBeforeCompile = mat.userData.grimePatch;
+  mat.customProgramCacheKey = () => 'grime' + mode;
+  return mat;
+}
+
 function makeMaterials(envMap) {
   const std = (o) => new THREE.MeshStandardMaterial({ envMap, side: THREE.DoubleSide, ...o });
+  const g = grime;
   return {
-    // glossy two-coat paint, the sand colour of the reference trucks
-    paint: new THREE.MeshPhysicalMaterial({ color: 0xb89a6a, roughness: 0.3, metalness: 0.0, specularIntensity: 1.0, clearcoat: 1.0, clearcoatRoughness: 0.03, envMap, envMapIntensity: 1.3, side: THREE.DoubleSide }),
-    trim: std({ color: 0xbdbab3, roughness: 0.24, metalness: 0.9, envMapIntensity: 1.25 }),          // grille surround between the headlights
+    // two-coat paint, the sand colour of the reference trucks: a working truck's clearcoat, not a mirror
+    paint: g(new THREE.MeshPhysicalMaterial({ color: 0xb4976a, roughness: 0.42, metalness: 0.0, specularIntensity: 0.8, clearcoat: 0.85, clearcoatRoughness: 0.14, envMap, envMapIntensity: 1.05, side: THREE.DoubleSide }), 0),
+    trim: g(std({ color: 0xb5b2aa, roughness: 0.3, metalness: 0.85, envMapIntensity: 1.1 }), 0),          // grille surround between the headlights
     radiator: std({ color: 0xffffff, map: radiatorTexture(), roughness: 0.9, metalness: 0.25, envMapIntensity: 0.2 }),
-    lens: std({ color: 0xf2f5f7, roughness: 0.03, metalness: 0.0, transparent: true, opacity: 0.34, emissive: 0xfff2d8, emissiveIntensity: 0.22, envMapIntensity: 1.8, depthWrite: false }),
-    chrome: std({ color: 0xe6e2da, roughness: 0.16, metalness: 1.0, envMapIntensity: 1.2 }),
-    mech: std({ color: 0x2b2a28, roughness: 0.72, metalness: 0.35, envMapIntensity: 0.4 }),
-    exhaust: std({ color: 0x5a5550, roughness: 0.55, metalness: 0.7, envMapIntensity: 0.5 }),
+    lens: g(std({ color: 0xf2f5f7, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.34, emissive: 0xfff2d8, emissiveIntensity: 0.22, envMapIntensity: 1.6, depthWrite: false }), 0),
+    chrome: g(std({ color: 0xdcd8cf, roughness: 0.2, metalness: 1.0, envMapIntensity: 1.1 }), 0),
+    mech: g(std({ color: 0x2b2a28, roughness: 0.78, metalness: 0.3, envMapIntensity: 0.35 }), 0),
+    exhaust: g(std({ color: 0x4e4740, roughness: 0.7, metalness: 0.6, envMapIntensity: 0.4 }), 0),
     interior: std({ color: 0x3a3632, roughness: 0.85, metalness: 0.0, envMapIntensity: 0.25 }),
-    glass: std({ color: 0x27323a, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.5, envMapIntensity: 1.6, depthWrite: false }),
+    glass: g(std({ color: 0x27323a, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.5, envMapIntensity: 1.5, depthWrite: false }), 0),
     headlight: std({ color: 0xfff8ec, emissive: 0xfff1d2, emissiveIntensity: 2.4, roughness: 0.12, metalness: 0.6 }),   // reflector + bulb
     parking: std({ color: 0xffe9c4, emissive: 0xffcf86, emissiveIntensity: 0.8, roughness: 0.25 }),
     taillight: std({ color: 0x7a0c08, emissive: 0x5a0402, emissiveIntensity: 0.8, roughness: 0.25 }),
     reverse: std({ color: 0xe8e4dc, roughness: 0.25 }),
     signal: std({ color: 0xd88a1e, emissive: 0x5a3000, emissiveIntensity: 0.6, roughness: 0.3 }),
     plate: std({ color: 0xd8d2c0, roughness: 0.6 }),
-    rubber: new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.95, metalness: 0.0, envMap, envMapIntensity: 0.45 }),   // matte, rough tread
-    rim: new THREE.MeshStandardMaterial({ color: 0xebe7dd, roughness: 0.3, metalness: 0.55, envMap, envMapIntensity: 1.0, side: THREE.DoubleSide }),
+    rubber: g(new THREE.MeshStandardMaterial({ color: 0x262422, roughness: 0.95, metalness: 0.0, envMap, envMapIntensity: 0.4 }), 1),   // matte, rough tread
+    rim: g(new THREE.MeshStandardMaterial({ color: 0xe2ded3, roughness: 0.34, metalness: 0.55, envMap, envMapIntensity: 0.95, side: THREE.DoubleSide }), 2),
     rimDark: new THREE.MeshStandardMaterial({ color: 0x141312, roughness: 0.8, side: THREE.DoubleSide }),
     disc: new THREE.MeshStandardMaterial({ color: 0x77716b, roughness: 0.38, metalness: 0.85, envMap }),
     caliper: new THREE.MeshStandardMaterial({ color: 0x2c2a28, roughness: 0.6, metalness: 0.4, envMap }),
@@ -3943,6 +4082,7 @@ class VehicleView {
       const b = summary.meshes[i];
       const mesh = new THREE.Mesh(m.geom, m.mat);
       mesh.name = m.name; mesh.userData.cat = m.cat; mesh.userData.part = m.part;
+      if (!m.geom.attributes.rest) m.geom.setAttribute('rest', new THREE.BufferAttribute(m.geom.attributes.position.array.slice(), 3));   // for the grime
       this.meshes.push(mesh);
       mesh.castShadow = m.mat !== mats.glass && m.mat !== mats.lens;
       mesh.receiveShadow = true;
@@ -4022,10 +4162,12 @@ class VehicleView {
       [R, 0.22 * W, 1], [R - 0.008, 0.42 * W, 1], [R - 0.03, 0.49 * W], [Rr + 0.6 * (R - Rr), 0.52 * W], [Rr + 0.03, 0.49 * W], [Rr + 0.004, 0.40 * W],
     ];
     const tireGeo = latheX(prof, S, (s, p) => (prof[p][2] ? ((s + (prof[p][1] > 0 ? 1 : 0)) % 3 === 0 ? -0.007 : 0) : 0));
+    tireGeo.setAttribute('rest', new THREE.BufferAttribute(tireGeo.attributes.position.array.slice(), 3));
     const tire = new THREE.Mesh(tireGeo, mats.rubber);
     tire.castShadow = true; tire.receiveShadow = true; tire.frustumCulled = false;
     content.add(tire);
     const rimGeo = latheX([[Rr * 0.94, -0.44 * W], [Rr, -0.40 * W], [Rr, 0.36 * W], [Rr * 1.07, 0.44 * W], [Rr * 1.0, 0.45 * W], [Rr * 0.9, 0.30 * W], [Rr * 0.62, 0.22 * W], [0.1, 0.27 * W], [0.07, 0.31 * W], [0.05, 0.34 * W], [0.001, 0.34 * W]], 48);
+    rimGeo.setAttribute('rest', new THREE.BufferAttribute(rimGeo.attributes.position.array.slice(), 3));
     const rim = new THREE.Mesh(rimGeo, mats.rim);
     rim.castShadow = true; rim.receiveShadow = true; rim.frustumCulled = false;
     content.add(rim);
@@ -4564,10 +4706,115 @@ function buildEnvironment(scene, renderer, world) {
   });
   gridTex.repeat.set(600, 600);
   gridTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.82, metalness: 0, envMap: env, envMapIntensity: 0.35 }));
+  const groundMat = new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.82, metalness: 0, envMap: env, envMapIntensity: 0.35 });
+  // years of use: broad pale and dark patches, oil stains and rubber streaks over the tiles (world-space
+  // noise, 1 unit = one 4 m texture repeat), so the floor doesn't read as a sterile repeat
+  groundMat.userData.grimePatch = (sh) => {
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        float gH2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float gN2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gH2(i), gH2(i + vec2(1, 0)), f.x), mix(gH2(i + vec2(0, 1)), gH2(i + vec2(1, 1)), f.x), f.y); }`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        #ifdef USE_MAP
+          vec2 gp = vMapUv;
+          float wear = gN2(gp * 0.07) * 0.6 + gN2(gp * 0.23) * 0.3 + gN2(gp * 1.1) * 0.1;
+          float oil = smoothstep(0.88, 0.96, gN2(gp * 0.45 + 13.0)) * smoothstep(0.4, 0.7, gN2(gp * 0.06 + 9.0)) * 0.35;
+          float skid = smoothstep(0.62, 0.95, gN2(vec2(gp.x * 2.6, gp.y * 0.12) + 41.0)) * smoothstep(0.65, 0.85, gN2(gp * 0.05 + 3.0)) * 0.3;
+          diffuseColor.rgb *= (0.9 + 0.16 * wear) * (1.0 - oil) * (1.0 - skid);
+        #endif`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        #ifdef USE_MAP
+          roughnessFactor = mix(roughnessFactor, 0.45, oil);
+        #endif`);
+  };
+  groundMat.onBeforeCompile = groundMat.userData.grimePatch;
+  groundMat.customProgramCacheKey = () => 'groundwear';
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // painted and paved areas on the floor: decals just above it, pulled forward so they never flicker
+  const decal = (map, w, l, x, z, o = {}) => {
+    const m = new THREE.Mesh(o.geo || new THREE.PlaneGeometry(w, l), new THREE.MeshStandardMaterial({ map, roughness: o.rough || 0.86, metalness: 0, envMap: env, envMapIntensity: 0.3,
+      transparent: !!o.alpha, depthWrite: !o.alpha, polygonOffset: true, polygonOffsetFactor: -2 - (o.lift || 0), polygonOffsetUnits: -2 - (o.lift || 0) }));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = o.rot || 0; m.position.set(x, 0.002 + 0.001 * (o.lift || 0), z);
+    m.receiveShadow = true;
+    scene.add(m);
+    return m;
+  };
+  const asphalt = (ctx, w, h) => {
+    ctx.fillStyle = '#3b3c3e'; ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, w * h / 10, 0.22, rng);
+    for (let i = 0; i < 14; i++) { ctx.fillStyle = `rgba(${rng() < 0.5 ? '20,20,22' : '90,90,92'},${0.05 + rng() * 0.08})`; ctx.beginPath(); ctx.ellipse(rng() * w, rng() * h, 10 + rng() * w / 5, 6 + rng() * h / 8, rng() * 3, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(15,15,16,0.5)'; ctx.lineWidth = 1.2;
+    for (let i = 0; i < 6; i++) { let x = rng() * w, y = rng() * h; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (rng() - 0.5) * 30; y += rng() * 22; ctx.lineTo(x, y); } ctx.stroke(); }   // cracks
+  };
+  // a 2 km drag strip along x = 60, its distance painted every 100 m from the start line at z = -900
+  const strip = canvasTexture(256, 600, (ctx, w, h) => {
+    asphalt(ctx, w, h);
+    ctx.fillStyle = 'rgba(235,235,228,0.9)'; ctx.fillRect(8, 0, 7, h); ctx.fillRect(w - 15, 0, 7, h);
+    ctx.fillStyle = 'rgba(230,190,60,0.9)'; ctx.fillRect(w / 2 - 3, 0, 6, h * 0.25); ctx.fillRect(w / 2 - 3, h * 0.5, 6, h * 0.25);
+  });
+  strip.repeat.set(1, 2000 / 24);
+  decal(strip, 10, 2000, 60, 0);
+  const label = (text, color, w = 256, h = 128, size = 92) => canvasTexture(w, h, (ctx) => { ctx.fillStyle = color; ctx.font = `bold ${size}px Arial, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, w / 2, h / 2 + 4); });
+  for (let k = 0; k <= 18; k++) { const t = label(k ? k * 100 + '' : 'START', 'rgba(240,240,232,0.92)', 256, 128, k ? 92 : 64); decal(t, 5, 2.5, 60, -900 + k * 100, { alpha: true, lift: 1, rot: Math.PI }); }
+  // a skid pad for cornering and drifts: a 30 m asphalt disc with painted circles
+  const pad = canvasTexture(1024, 1024, (ctx, w, h) => {
+    asphalt(ctx, w, h);
+    ctx.strokeStyle = 'rgba(236,236,228,0.85)'; ctx.lineWidth = 6;
+    for (const r of [12, 20, 28]) { ctx.beginPath(); ctx.arc(w / 2, h / 2, r / 60 * w, 0, 7); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(230,190,60,0.9)'; ctx.beginPath(); ctx.arc(w / 2, h / 2, 10, 0, 7); ctx.fill();
+  });
+  decal(pad, 0, 0, -95, -45, { geo: new THREE.CircleGeometry(30, 72) });
+  // the wall's run-up: yellow lines every 5 m with the distance to the wall, and a spawn box
+  const runup = canvasTexture(512, 1024, (ctx, w, h) => {
+    ctx.strokeStyle = 'rgba(232,186,48,0.9)'; ctx.fillStyle = 'rgba(232,186,48,0.9)'; ctx.lineWidth = 5;
+    ctx.font = 'bold 44px Arial, sans-serif'; ctx.textBaseline = 'middle';
+    for (let m = 5; m <= 40; m += 5) { const y = m / 40 * h - 3; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); ctx.fillText(m + ' m', 14, y - 28); }
+  });
+  decal(runup, 18, 40, 0, 27, { alpha: true, rot: Math.PI });
+  const box = canvasTexture(256, 256, (ctx, w, h) => { ctx.strokeStyle = 'rgba(240,240,232,0.9)'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, w - 12, h - 12); ctx.setLineDash([18, 14]); ctx.beginPath(); ctx.moveTo(w / 2, 20); ctx.lineTo(w / 2, h - 20); ctx.stroke(); });
+  decal(box, 3.4, 7, 0, 0, { alpha: true });
+  // rubber laid down by earlier runs: dark arcs near the spawn and the wall
+  const marks = canvasTexture(1024, 1024, (ctx, w, h) => {
+    for (let i = 0; i < 9; i++) {
+      const cx = rng() * w, cy = rng() * h, r = 200 + rng() * 500, a0 = rng() * 6.28, a1 = a0 + 0.4 + rng() * 0.9, g = 18 + rng() * 10;
+      ctx.lineWidth = 9 + rng() * 5;
+      for (const off of [0, g]) { ctx.strokeStyle = `rgba(18,18,18,${0.18 + rng() * 0.22})`; ctx.beginPath(); ctx.arc(cx, cy, r + off, a0, a1); ctx.stroke(); }
+    }
+  });
+  decal(marks, 70, 70, 0, 20, { alpha: true, lift: 1 });
+  decal(marks, 60, 60, -95, -45, { alpha: true, lift: 1, rot: 1.3 });
+
+  // two ragged ridgelines on the horizon, the far one paler in the haze
+  const ridge = (R, hMin, hMax, color, seed) => {
+    const N = 360, pos = [], idx = [], ph = [0, 1, 2, 3].map(k => seed * 7.1 + k * 1.7);
+    for (let i = 0; i <= N; i++) {
+      const a = i / N * Math.PI * 2;
+      let h = 0;
+      for (let k = 0; k < 4; k++) h += Math.sin(a * (3 + k * 5) + ph[k]) / (k + 1) + Math.sin(a * (7 + k * 11) + ph[k] * 2.3) * 0.35 / (k + 1);
+      h = hMin + (hMax - hMin) * Math.max(0, Math.min(1, 0.5 + 0.4 * h));
+      const r = R + 40 * Math.sin(a * 5 + seed);
+      pos.push(Math.sin(a) * r, -3, Math.cos(a) * r, Math.sin(a) * (r + 30), h, Math.cos(a) * (r + 30));
+      if (i < N) { const b = i * 2; idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 1, metalness: 0, side: THREE.DoubleSide }));
+    m.frustumCulled = false;
+    scene.add(m);
+  };
+  ridge(1150, 35, 120, 0x8d927f, 2);
+  ridge(880, 6, 48, 0x6f765f, 5);
+
+  // yellow-and-black hazard stripes (ramp drops, the posts' feet, speed bumps)
+  const hazardTex = canvasTexture(256, 64, (ctx, w, h) => {
+    ctx.fillStyle = '#1d1d1d'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#e2b13c';
+    for (let x = -h; x < w + h; x += 48) { ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x + 24, h); ctx.lineTo(x + 24 + h, 0); ctx.lineTo(x + h, 0); ctx.closePath(); ctx.fill(); }
+  });
 
   // poured concrete: fine aggregate, faint board-form streaks, panel joints and tie holes
   const concrete = canvasTexture(512, 512, (ctx, w, h) => {
@@ -4579,22 +4826,68 @@ function buildEnvironment(scene, renderer, world) {
     ctx.fillStyle = 'rgba(55,50,44,0.55)';
     for (const x of [w / 4, 3 * w / 4]) for (const y of [h / 4, 3 * h / 4]) { ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); }
   });
+  // corrugated steel: shipping containers in four liveries, and pale warehouse cladding
+  const corrugated = (base, rib, w = 512, h = 256) => canvasTexture(w, h, (ctx) => {
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 16) { const g = ctx.createLinearGradient(x, 0, x + 16, 0); g.addColorStop(0, 'rgba(0,0,0,0.22)'); g.addColorStop(0.5, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0.22)'); ctx.fillStyle = g; ctx.fillRect(x, 0, 16, h); }
+    ctx.fillStyle = rib; ctx.fillRect(0, 0, w, 7); ctx.fillRect(0, h - 9, w, 9);
+    speckle(ctx, w, h, 5000, 0.12, rng);
+    for (let i = 0; i < 40; i++) { ctx.fillStyle = `rgba(90,52,28,${0.05 + rng() * 0.12})`; ctx.fillRect(rng() * w, h * (0.6 + rng() * 0.4), 2 + rng() * 6, 10 + rng() * 40); }   // rust runs
+  });
+  const liveries = ['#8e2f22', '#2e5a86', '#3f6b45', '#9a9488', '#b46a1f'].map(c => corrugated(c, 'rgba(0,0,0,0.35)'));
+  const cladding = corrugated('#c9cdd0', 'rgba(60,64,68,0.5)');
+  const stripes = canvasTexture(256, 64, (ctx, w, h) => {   // red-and-white barrier paint over concrete
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#e9e4da' : '#b8261c'; ctx.fillRect(i * w / 4, 0, w / 4, h); }
+    speckle(ctx, w, h, 3000, 0.18, rng);
+  });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xd8b13a, roughness: 0.45, metalness: 0.6, envMap: env, envMapIntensity: 0.5 });
+  const mat = (map, o = {}) => new THREE.MeshStandardMaterial({ map, roughness: 0.9, envMap: env, envMapIntensity: 0.3, ...o });
+  const blocks = [], bumps = [];
   for (const c of world.cols) {
     if (c.type !== 0) continue;
-    const wx = c.x1 - c.x0, wz = c.z1 - c.z0;
-    const tex = concrete.clone(); tex.needsUpdate = true; tex.repeat.set(wx / 2.4, c.h / 2.4);
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(wx, c.h, wz), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.93, envMap: env, envMapIntensity: 0.3 }));
-    wall.position.set((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2);
+    const wx = c.x1 - c.x0, wz = c.z1 - c.z0, cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
+    if (c.style === 'block') { blocks.push(c); continue; }
+    if (c.style === 'bump') { bumps.push(c); continue; }
+    if (/^container/.test(c.style)) {
+      for (let k = 0; k * 2.6 < c.h - 0.01; k++) {
+        const t = liveries[Math.floor(Math.abs(cx * 7 + cz * 3 + k * 5)) % liveries.length].clone(); t.needsUpdate = true; t.repeat.set(wx / 3, 1);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(wx, 2.59, wz), mat(t, { roughness: 0.62, metalness: 0.35 }));
+        box.position.set(cx, 2.6 * k + 1.3, cz);
+        box.castShadow = box.receiveShadow = true;
+        scene.add(box);
+      }
+      continue;
+    }
+    let m;
+    if (c.style === 'pole') m = steel;
+    else if (c.style === 'warehouse') { const t = cladding.clone(); t.needsUpdate = true; t.repeat.set(wx / 6, 1); m = mat(t, { roughness: 0.55, metalness: 0.45 }); }
+    else { const t = concrete.clone(); t.needsUpdate = true; t.repeat.set(wx / 2.4, c.h / 2.4); m = mat(t, { roughness: 0.93 }); }
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(wx, c.h, wz), m);
+    wall.position.set(cx, c.h / 2, cz);
     wall.castShadow = wall.receiveShadow = true;
     scene.add(wall);
+    if (c.style === 'pole' || c.style === 'offset') {   // hazard band at the foot
+      const t = hazardTex.clone(); t.needsUpdate = true; t.repeat.set(Math.max(1, (wx + wz) / 1.5), 1);
+      const band = new THREE.Mesh(new THREE.BoxGeometry(wx + 0.01, 0.5, wz + 0.01), mat(t, { roughness: 0.7 }));
+      band.position.set(cx, 0.25, cz);
+      scene.add(band);
+    }
   }
+  // the barrier blocks and speed bumps are many: one instanced draw each
+  const place = (list, geo, material) => {
+    if (!list.length) return;
+    const im = new THREE.InstancedMesh(geo, material, list.length), m4 = new THREE.Matrix4();
+    list.forEach((c, i) => im.setMatrixAt(i, m4.makeScale(c.x1 - c.x0, c.h, c.z1 - c.z0).setPosition((c.x0 + c.x1) / 2, c.h / 2, (c.z0 + c.z1) / 2)));
+    im.castShadow = im.receiveShadow = true;
+    scene.add(im);
+  };
+  const stripesZ = stripes.clone(); stripesZ.needsUpdate = true;
+  place(blocks, new THREE.BoxGeometry(1, 1, 1), mat(stripesZ, { roughness: 0.85 }));
+  const bumpTex = hazardTex.clone(); bumpTex.needsUpdate = true; bumpTex.repeat.set(4, 1);
+  place(bumps, new THREE.BoxGeometry(1, 1, 1), mat(bumpTex, { roughness: 0.75 }));
 
   // stunt ramps: concrete deck and flanks, a hazard band on the vertical drop
-  const hazard = canvasTexture(256, 64, (ctx, w, h) => {
-    ctx.fillStyle = '#1d1d1d'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#e2b13c';
-    for (let x = -h; x < w + h; x += 48) { ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x + 24, h); ctx.lineTo(x + 24 + h, 0); ctx.lineTo(x + h, 0); ctx.closePath(); ctx.fill(); }
-  });
+  const hazard = hazardTex;
   for (const c of world.cols) {
     if (c.type !== 1) continue;
     const deck = concrete.clone(); deck.needsUpdate = true; deck.repeat.set(c.width / 2.4, c.len / Math.cos(c.deg * Math.PI / 180) / 2.4);
@@ -4764,6 +5057,16 @@ async function main() {
   world.addBox(-9, 9, 5, 47, 49.5, 0.6);
   world.addRamp(-20, 18, 14, 6, 10, 0.75);
   world.addRamp(20, 20, 10, 6, 22, 0.75);
+  // a steel post for narrow-object hits, and a short block for small-overlap hits, either side of the wall
+  world.addBox(37.8, 38.2, 3.6, 41.8, 42.2, 0.5, 'pole');
+  world.addBox(26, 32, 1.6, 46, 48.5, 0.6, 'offset');
+  // shipping containers stacked two high behind the wall
+  for (const [x0, z0, n] of [[-24.4, 56, 2], [-12.2, 56, 2], [0, 56, 1], [12.2, 56, 2], [-6, 61, 1]]) world.addBox(x0, x0 + 12.2, 2.6 * n, z0, z0 + 2.44, 0.5, 'container' + n);
+  // a corridor of red-and-white concrete blocks on the left, with speed bumps across it
+  for (let z = -22; z < 40; z += 3.4) for (const x0 of [-48.6, -39.4]) world.addBox(x0, x0 + 0.6, 0.8, z, z + 3, 0.6, 'block');
+  for (const z of [-12, -4, 4, 12, 20, 28]) world.addBox(-48, -39.4, 0.09, z, z + 0.5, 0.8, 'bump');
+  // warehouses far off, so the horizon isn't empty (solid, if you drive that far)
+  for (const [x0, x1, h, z0, z1] of [[-270, -190, 12, 300, 360], [140, 230, 10, 380, 450], [-430, -360, 16, -160, -60], [300, 390, 14, -330, -250], [-120, -40, 9, -520, -470]]) world.addBox(x0, x1, h, z0, z1, 0.5, 'warehouse');
   const envr = buildEnvironment(scene, renderer, world);
   // the sun: cascaded shadow maps, the nearest cascade drawn tight around the car for crisp contact shadows
   const csm = new CSM({
@@ -4800,10 +5103,19 @@ async function main() {
   setLoader('Binding flexbodies to f-nodes…', 0.9);
   await nextFrame();
   const view = new VehicleView(summary, model, scene, mats);
+  {   // the grime's mud spray comes off the axles
+    const W = model.wheels, fr = W.filter(w => w.front), rr = W.filter(w => !w.front), avg = (a, f) => a.reduce((t, w) => t + f(w), 0) / Math.max(1, a.length);
+    if (fr.length && rr.length) GRIME.uWheels.value.set(avg(fr, w => w.c.z), avg(rr, w => w.c.z), avg(W, w => w.c.y), avg(W, w => w.radius));
+  }
   // every lit material renders through the shadow cascades
   scene.traverse((o) => {
     const list = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
-    for (const mt of list) if (mt.isMeshStandardMaterial && !mt.userData.csm) { csm.setupMaterial(mt); mt.userData.csm = true; }
+    for (const mt of list) {
+      if (!mt.isMeshStandardMaterial || mt.userData.csm) continue;
+      csm.setupMaterial(mt); mt.userData.csm = true;
+      // the cascades replace onBeforeCompile: run theirs, then the grime's
+      if (mt.userData.grimePatch) { const csmPatch = mt.onBeforeCompile; mt.onBeforeCompile = (sh, r) => { csmPatch.call(mt, sh, r); mt.userData.grimePatch(sh); }; }
+    }
   });
 
   // post-processing: HDR render -> light bloom -> ACES tone map -> subtle warm balance -> FXAA (when the
@@ -5021,7 +5333,7 @@ async function main() {
   function doReset(silent) {
     acc = 0;
     if (!silent) pushFeed('VEHICLE RESET');
-    return link.call('reset').then(() => { link.dropLatest(); view.reset(); fx.reset(); needFrame = true; snapNext = true; });
+    return link.call('reset').then(() => { link.dropLatest(); view.reset(); fx.reset(); GRIME.uDirt.value = DIRT0; needFrame = true; snapNext = true; });
   }
   function cycleCam() { rig.mode = (rig.mode + 1) % 3; rig.userYaw = rig.userPitch = 0; $('camName').textContent = rig.names[rig.mode]; }
   function toggleNodes() { const on = !view.debug; view.setDebug(on); needFrame = true; $('btnNodes').setAttribute('aria-pressed', String(on)); }
@@ -5058,7 +5370,7 @@ async function main() {
 
   // console / automation hook: hook.call(op, args) runs commands inside the physics thread
   const hook = window.__crashDriver = {
-    link, summary, view, rig, renderer, composer, scene, camera, csm, state, stats, settings, fx, mode: link.mode, paused: false,
+    link, summary, view, rig, renderer, composer, scene, camera, csm, state, stats, settings, fx, grime: GRIME, mode: link.mode, paused: false,
     call: (op, args) => link.call(op, args),
     reset: () => doReset(true),
     refresh: () => { needFrame = true; },
@@ -5113,6 +5425,11 @@ async function main() {
       const f = view.apply(buf);
       readFrame(f);
       stepsWindow += f[8];   // substeps the physics thread actually ran (it may stop a batch early)
+      // road dirt builds up with distance (dirty after ~5 km), faster while the tyres spin
+      const simDt = f[8] * DT;
+      let spin = 0;
+      for (let i = 0; i < 4; i++) spin += Math.abs(stats.slips[i]) > 0.15 ? 1 : 0;
+      GRIME.uDirt.value = Math.min(1, GRIME.uDirt.value + simDt * (Math.abs(state.speed) / 8000 + spin * 0.004));
       fx.ingest(f, summary, state, view);
       if (snapNext) { rig.snap(state); snapNext = false; }
     }
