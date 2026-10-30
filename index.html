@@ -520,6 +520,8 @@ function physicsLib() {
       attachTailgate: { E: 8.0e4, yield: 0.035, brP: 0.22, brk: 0.4, brC: 0.6, zeta: 0.4 },   // hinges below, latches above
       bumper:     { E: 5.5e4, zeta: 0.35 },
       attach:     { E: 5.5e4, yield: 0.035, brP: 0.18, brC: 0.4, zeta: 0.3 },
+      attachBumperBolt: { E: 5.5e4, yield: 0.035, brP: 0.07, brk: 0.3, brC: 0.22, zeta: 0.3 },
+      attachBumperEnd:  { E: 7.0e4, yield: 0.035, brP: 0.24, brk: 0.45, brC: 0.6, zeta: 0.3 },
       attachHood: { E: 6.0e4, yield: 0.035, brP: 0.2, brC: 0.55, zeta: 0.25 },
       hoodLatch:  { E: 6.0e4, yield: 0.06, brP: 0.6, brC: 9, zeta: 0.25 },   // a hook: tears open in tension, but keeps pushing the hood back when the front crushes
       attachDoor: { E: 9.0e4, yield: 0.035, brP: 0.22, brk: 0.45, brC: 0.6, zeta: 0.25 },
@@ -2559,9 +2561,12 @@ function physicsLib() {
         const face = surfaceExtreme(V, 0, 1, 2, x, y, fwd, fwd > 0 ? bb.max[2] : bb.min[2]) - fwd * 0.015;
         return [x, y, face - fwd * 0.11 * k];
       }, BF.bumper, null, VF.bumper);
-      for (const i of [1, 2]) for (const j of [0, 1]) attach(p, Bm.id(i, j, 1), 3, BF.attach, 'bolt' + i + j);
-      attach(p, Bm.id(0, 1, 1), 2, BF.attach, 'end0');
-      attach(p, Bm.id(3, 1, 1), 2, BF.attach, 'end3');
+      // at the front the middle bolts shear first and the end brackets hold longest, so a hard offset hit
+      // leaves the bumper hanging from one end, its other end down on the ground
+      const front = p === P_BUMPER_F;   // the rear bumper keeps its even, stronger bolts
+      for (const i of [1, 2]) for (const j of [0, 1]) attach(p, Bm.id(i, j, 1), 3, front ? BF.attachBumperBolt : BF.attach, 'bolt' + i + j);
+      attach(p, Bm.id(0, 1, 1), 2, front ? BF.attachBumperEnd : BF.attach, 'end0');
+      attach(p, Bm.id(3, 1, 1), 2, front ? BF.attachBumperEnd : BF.attach, 'end3');
     }
     // Bolt-on pieces: the headlights, grille and radiator at the front, the taillights at the back. Each is
     // a small 2 x 2 x 2 box lattice fitted to its meshes, clipped to the structure at its back face by two
@@ -3874,7 +3879,7 @@ function workerMain(LIB) {
 const PHYS = physicsLib();   // this thread's copy: constants, the World for the scene, and the fallback core
 const { DT, MAX_STEPS, NODE_FLEX, NODE_TREAD, NODE_HUB, NODE_BLOCK, BEAM_ATTACH, BEAM_SUPPORT, BEAM_RIGID, BEAM_MOUNT, BEAM_SHEAR, FX_SCRAPE, FX_SNAP, FX_IMPACT,
   P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, P_FENDER_L, P_FENDER_R, P_HEADLIGHT_L, P_HEADLIGHT_R, P_GRILLE, P_RADIATOR, P_TAILGATE, P_TAILLIGHT_L, P_TAILLIGHT_R, mulberry32 } = PHYS;
-const DIRT0 = 0.35;   // a working truck's everyday road dirt, before it has driven anywhere
+const DIRT0 = 0.12;   // a light film of road dust before the truck has driven anywhere
 const COURSE = { x: -44, half: 3.6, z0: -30, z1: 58 };   // the suspension test course's lane (centre x, half width, start and end)
 const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a, 0xffe45f, 0xffe45f, 0xffffff, 0xffffff, 0xc9a0ff, 0x7fd4c9, 0x5fe0ff, 0xff7a6a, 0xff7a6a];
 const BATCH_MS = 45;   // a batch of substeps stops early past this much time, so a heavy moment can't hold a frame back
@@ -4007,7 +4012,6 @@ function detectPart(chain) {
   if (/(headlight|signal)[a-z]*[_\s.-]?(r|right)([_\s.\-\d]|$)/.test(chain)) return P_HEADLIGHT_R;
   if (/taillight[a-z]*[_\s.-]?(l|left)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_L;
   if (/taillight[a-z]*[_\s.-]?(r|right)([_\s.\-\d]|$)/.test(chain)) return P_TAILLIGHT_R;
-  if (/radiator/.test(chain) && !/radtube/.test(chain)) return P_RADIATOR;
   if (/grille/.test(chain)) return P_GRILLE;
   if (/door[a-z]*([_\s.-](l|left)|left)([_\s.\-\d]|$)|left[_\s]?door|(^|[^a-z])mirror([_\s.-](l|left)|left)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_L;
   if (/door[a-z]*([_\s.-](r|right)|right)([_\s.\-\d]|$)|right[_\s]?door|(^|[^a-z])mirror([_\s.-](r|right)|right)([_\s.\-\d]|$)/.test(chain)) return P_DOOR_R;
@@ -4209,7 +4213,7 @@ function radiatorTexture() {
    (uDirt) grows as the truck drives, faster while its tyres spin, and a reset washes it. Mud makes paint
    matte and dulls chrome; the tyres go grey-brown and the wheels collect brake dust. */
 const GRIME = {
-  uDirt: { value: 0.35 },
+  uDirt: { value: 0.12 },
   uCrack: { value: 0 }, uCrackC: { value: new THREE.Vector2(0, 1.3) },   // the windshield's cracks: how far, and where the web is centred
   uWheels: { value: new THREE.Vector4(1.5, -1.5, 0.38, 0.4) },   // front axle z, rear axle z, hub height, tyre radius (model space)
 };
@@ -4287,7 +4291,7 @@ function makeMaterials(envMap) {
   const g = grime;
   return {
     // two-coat paint, the sand colour of the reference trucks: a working truck's clearcoat, not a mirror
-    paint: g(new THREE.MeshPhysicalMaterial({ color: 0xb4976a, roughness: 0.42, metalness: 0.0, specularIntensity: 0.8, clearcoat: 0.85, clearcoatRoughness: 0.14, envMap, envMapIntensity: 1.05, side: THREE.DoubleSide }), 0),
+    paint: g(new THREE.MeshPhysicalMaterial({ color: 0xc3634d, roughness: 0.42, metalness: 0.0, specularIntensity: 0.8, clearcoat: 0.85, clearcoatRoughness: 0.14, envMap, envMapIntensity: 1.05, side: THREE.DoubleSide }), 0),
     trim: g(std({ color: 0xb5b2aa, roughness: 0.3, metalness: 0.85, envMapIntensity: 1.1 }), 0),          // grille surround between the headlights
     radiator: std({ color: 0xffffff, map: radiatorTexture(), roughness: 0.9, metalness: 0.25, envMapIntensity: 0.2 }),
     lens: g(std({ color: 0xf2f5f7, roughness: 0.06, metalness: 0.0, transparent: true, opacity: 0.34, emissive: 0xfff2d8, emissiveIntensity: 0.22, envMapIntensity: 1.6, depthWrite: false }), 0),
@@ -4415,6 +4419,11 @@ class VehicleView {
       return (b.min.z + b.max.z) / 2 > cowl - 0.05 && !/wiper/.test(m.name);
     });
     this.bayShown = true;
+    // The engine, manifold, radiator, hoses and battery are out of the picture altogether for now: under
+    // the hood they're never seen, and in a crash they only showed as black slabs (the physics keeps its
+    // engine and gearbox blocks).
+    for (const m of this.meshes) if (/engine|header|radiator|radtube|engbay/.test(m.name)) { m.visible = false; m.userData.hidden = true; }
+    this.bayParts = this.bayParts.filter(m => !m.userData.hidden);
     // headlight reflectors (left, right): their skinned vertices place the headlight beams
     this.lamps = [/headlight_l/, /headlight_r/].map(rx => this.meshes.findIndex(m => rx.test(m.name) && m.material === mats.headlight))
       .map(i => (i >= 0 ? this.meshes[i] : null));
@@ -4682,6 +4691,11 @@ class ParticleFX {
     this.sFrame = new Float32Array(MAXS); this.nS = 0;
     this.kP = new Float32Array(MAXK * 3); this.kV = new Float32Array(MAXK * 3); this.kAge = new Float32Array(MAXK); this.kLife = new Float32Array(MAXK); this.kW = new Float32Array(MAXK); this.nK = 0;
     this.keys = new Uint32Array(MAXS);
+    // debris: small dark chips of paint, plastic and grit flung out of an impact, tumbling and bouncing
+    const MAXD = 700;
+    this.capD = MAXD; this.budD = 300;
+    this.dP = new Float32Array(MAXD * 3); this.dV = new Float32Array(MAXD * 3); this.dAge = new Float32Array(MAXD); this.dLife = new Float32Array(MAXD);
+    this.dS = new Float32Array(MAXD); this.dRot = new Float32Array(MAXD); this.dSpin = new Float32Array(MAXD); this.dTint = new Float32Array(MAXD); this.nD = 0;
     this.wheelAcc = new Float32Array(16); this.steamAcc = 0; this.simT = 0; this.steamT0 = -1; this.pending = 0;
     this.wind = new THREE.Vector3(0.7, 0, 0.35);
     this._v = new THREE.Vector3(); this._a = new THREE.Vector3(); this._b = new THREE.Vector3();
@@ -4752,10 +4766,36 @@ class ParticleFX {
     this.sparks = new THREE.Mesh(gk, this.sparkMat);
     this.sparks.frustumCulled = false; this.sparks.renderOrder = 11;
     scene.add(this.sparks);
+
+    const gd = quad(-0.5, 0.5, -0.5, 0.5);
+    this.aDPos = inst(gd, 'iPos', MAXD, 3); this.aDSize = inst(gd, 'iSize', MAXD, 1); this.aDRot = inst(gd, 'iRot', MAXD, 1); this.aDTint = inst(gd, 'iTint', MAXD, 1);
+    gd.instanceCount = 0;
+    this.debrisMat = new THREE.ShaderMaterial({
+      uniforms: { uSun: this.smokeMat.uniforms.uSun, uAmb: this.smokeMat.uniforms.uAmb },
+      vertexShader: `attribute vec3 iPos; attribute float iSize, iRot, iTint; varying vec2 vQ; varying float vT, vR;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(iPos, 1.0);
+          float c = cos(iRot), s = sin(iRot);
+          mv.xy += vec2(c * position.x - s * position.y, s * position.x + c * position.y * 0.6) * iSize;   // flattened: a chip seen edge-on as it turns
+          gl_Position = projectionMatrix * mv;
+          vQ = position.xy; vT = iTint; vR = iRot;
+        }`,
+      fragmentShader: `uniform vec3 uSun, uAmb; varying vec2 vQ; varying float vT, vR;
+        void main() {
+          // an irregular chip, not a square
+          float a = atan(vQ.y, vQ.x), r = length(vQ) * 2.0;
+          if (r > 0.75 + 0.25 * sin(a * 3.0 + vT * 17.0) * cos(a * 2.0 + vT * 5.0)) discard;
+          vec3 base = mix(vec3(0.07, 0.065, 0.06), vec3(0.5, 0.27, 0.22), step(0.72, vT));   // mostly dark grit and plastic, some flecks of paint
+          gl_FragColor = vec4(base * (uAmb + uSun * (0.55 + 0.45 * abs(sin(vR)))), 1.0);
+        }`,
+    });
+    this.debris = new THREE.Mesh(gd, this.debrisMat);
+    this.debris.frustumCulled = false; this.debris.renderOrder = 9;
+    scene.add(this.debris);
   }
 
   // Particle budgets and emission scale from the graphics preset.
-  setBudget(smoke, sparks, rate) { this.budS = Math.min(this.capS, smoke); this.budK = Math.min(this.capK, sparks); this.rate = rate; this.nS = Math.min(this.nS, this.budS); this.nK = Math.min(this.nK, this.budK); }
+  setBudget(smoke, sparks, rate) { this.budS = Math.min(this.capS, smoke); this.budK = Math.min(this.capK, sparks); this.budD = Math.min(this.capD, Math.round(smoke / 3)); this.rate = rate; this.nS = Math.min(this.nS, this.budS); this.nK = Math.min(this.nK, this.budK); this.nD = Math.min(this.nD, this.budD); }
 
   // Smoke takes the time of day's light: the sun's colour from above, the sky's all round, the floodlights.
   setLight(T) {
@@ -4764,7 +4804,7 @@ class ParticleFX {
     this.smokeMat.uniforms.uSun.value.copy(sun); this.smokeMat.uniforms.uAmb.value.copy(amb);
   }
 
-  reset() { this.nS = 0; this.nK = 0; this.steamT0 = -1; this.steamAcc = 0; this.wheelAcc.fill(0); }
+  reset() { this.nS = 0; this.nK = 0; this.nD = 0; this.steamT0 = -1; this.steamAcc = 0; this.wheelAcc.fill(0); }
 
   puff(x, y, z, vx, vy, vz, life, s0, s1, a0, tint, drag, buoy) {
     if (this.nS >= this.budS) return;
@@ -4773,6 +4813,13 @@ class ParticleFX {
     this.sAge[i] = 0; this.sLife[i] = life; this.sS0[i] = s0; this.sS1[i] = s1; this.sA[i] = a0;
     this.sRot[i] = Math.random() * 6.283; this.sSpin[i] = (Math.random() - 0.5) * 0.8; this.sFrame[i] = Math.floor(Math.random() * 4);
     this.sTint[i3] = tint[0]; this.sTint[i3 + 1] = tint[1]; this.sTint[i3 + 2] = tint[2]; this.sDrag[i] = drag; this.sBuoy[i] = buoy;
+  }
+
+  chip(x, y, z, vx, vy, vz) {
+    if (this.nD >= this.budD) return;
+    const i = this.nD++, i3 = i * 3, r = Math.random;
+    this.dP[i3] = x; this.dP[i3 + 1] = y; this.dP[i3 + 2] = z; this.dV[i3] = vx; this.dV[i3 + 1] = vy; this.dV[i3 + 2] = vz;
+    this.dAge[i] = 0; this.dLife[i] = 2.5 + r() * 3; this.dS[i] = 0.025 + r() * r() * 0.07; this.dRot[i] = r() * 6.283; this.dSpin[i] = (r() - 0.5) * 30; this.dTint[i] = r();
   }
 
   spark(x, y, z, vx, vy, vz, life, w) {
@@ -4787,7 +4834,7 @@ class ParticleFX {
     const L = summary.layout, dt = f[8] * DT, R = this.rate, rnd = Math.random;
     if (!(dt > 0)) return;
     this.pending += dt; this.simT += dt;
-    const vel = state.vel, SMOKE = [0.93, 0.93, 0.94], DUST = [0.76, 0.73, 0.68];
+    const vel = state.vel, SMOKE = [0.93, 0.93, 0.94], DUST = [0.8, 0.78, 0.74], GRIT = [0.84, 0.85, 0.86];
     // tyres: smoke from the contact patch while it slips, a little dust while rolling fast
     summary.wheels.forEach((w, i) => {
       const o = L.wheels + i * L.wheelStride, e = o + 17 + 2 * w.nr;
@@ -4824,7 +4871,7 @@ class ParticleFX {
     // a big impact's dust is held to ~60 puffs a batch (times the preset's rate): a little, not a sandstorm
     let dustAsk = 0;
     for (let k = 0; k < nE; k++) { const o = E + k * 8; if (f[o] === FX_IMPACT) dustAsk += wt[FX_IMPACT] * Math.min(5, 0.6 + f[o + 7] / 4); }
-    const dustK = 0.5 * R * Math.min(1, 120 / Math.max(dustAsk, 1e-6));
+    const dustK = 0.6 * R * Math.min(1, 260 / Math.max(dustAsk, 1e-6));
     for (let k = 0; k < nE; k++) {
       const o = E + k * 8, kind = f[o], x = f[o + 1], y = Math.max(0.03, f[o + 2]), z = f[o + 3], vx = f[o + 4], vy = f[o + 5], vz = f[o + 6], str = f[o + 7];
       if (kind === FX_SCRAPE) {
@@ -4835,15 +4882,19 @@ class ParticleFX {
           this.spark(x, y + 0.02, z, vx * m + (rnd() - 0.5) * 4, 0.6 + rnd() * 3.2, vz * m + (rnd() - 0.5) * 4, 0.25 + rnd() * 0.65, 0.011 + rnd() * 0.012);
         }
         if (rnd() < 4 * per) this.puff(x, y + 0.05, z, vx * 0.2, 0.3, vz * 0.2, 1.4 + rnd(), 0.22, 1.2, 0.2, DUST, 2.2, 0.02);
+        if (rnd() < 6 * per) this.chip(x, y + 0.03, z, vx * 0.5 + (rnd() - 0.5) * 2, 0.8 + rnd() * 2, vz * 0.5 + (rnd() - 0.5) * 2);
       } else if (kind === FX_SNAP) {
         const n = Math.round((5 + rnd() * 8) * R * Math.min(wt[kind], 3));
         for (let q = 0; q < n; q++) this.spark(x, y, z, vx * 0.4 + (rnd() - 0.5) * 9, (rnd() - 0.2) * 7, vz * 0.4 + (rnd() - 0.5) * 9, 0.2 + rnd() * 0.5, 0.01 + rnd() * 0.01);
         if (rnd() < 0.6) this.puff(x, y, z, vx * 0.3, 0.4, vz * 0.3, 1.5 + rnd(), 0.25, 1.5, 0.28, [0.55, 0.54, 0.52], 2, 0.1);
+        for (let q = Math.floor((2 + rnd() * 4) * R); q > 0; q--) this.chip(x, y, z, vx * 0.5 + (rnd() - 0.5) * 6, 1 + rnd() * 4, vz * 0.5 + (rnd() - 0.5) * 6);
       } else if (kind === FX_IMPACT) {
+        // an obstacle or the floor struck hard: a billow of pale concrete dust and a spray of chips
         const n = Math.floor(wt[kind] * Math.min(5, 0.6 + str / 4) * dustK + rnd());
         for (let q = 0; q < n; q++) {
-          const a = rnd() * 6.283, sp = 1.5 + rnd() * 2.5;
-          this.puff(x, y + 0.05, z, Math.cos(a) * sp + vel.x * 0.2, 0.5 + rnd(), Math.sin(a) * sp + vel.z * 0.2, 1.8 + rnd() * 1.2, 0.45, 2.6 + rnd(), 0.38, DUST, 2.4, 0.0);
+          const a = rnd() * 6.283, sp = 1.5 + rnd() * 3;
+          this.puff(x, y + 0.1, z, Math.cos(a) * sp + vel.x * 0.15, 0.6 + rnd() * 1.4, Math.sin(a) * sp + vel.z * 0.15, 2.4 + rnd() * 2.2, 0.55, 3.2 + rnd() * 1.8, 0.62, GRIT, 2.0, 0.25);
+          for (let c = 0; c < 2; c++) { const b = rnd() * 6.283, v = 2 + rnd() * 5; this.chip(x, y + 0.1, z, Math.cos(b) * v + vel.x * 0.3, 1.5 + rnd() * 5, Math.sin(b) * v + vel.z * 0.3); }
         }
       }
     }
@@ -4893,6 +4944,27 @@ class ParticleFX {
         i++;
       }
     }
+    if (dt > 0) {
+      for (let i = 0; i < this.nD;) {
+        this.dAge[i] += dt;
+        if (this.dAge[i] >= this.dLife[i]) { this.killD(i); continue; }
+        const i3 = i * 3, d = 1 - Math.min(1, 1.2 * dt);   // light chips feel the air
+        this.dV[i3] *= d; this.dV[i3 + 1] = this.dV[i3 + 1] * d - 9.81 * dt; this.dV[i3 + 2] *= d;
+        this.dP[i3] += this.dV[i3] * dt; this.dP[i3 + 1] += this.dV[i3 + 1] * dt; this.dP[i3 + 2] += this.dV[i3 + 2] * dt;
+        if (this.dP[i3 + 1] < 0.01) { this.dP[i3 + 1] = 0.01; this.dV[i3 + 1] = Math.abs(this.dV[i3 + 1]) * 0.25; this.dV[i3] *= 0.5; this.dV[i3 + 2] *= 0.5; this.dSpin[i] *= 0.6; }
+        this.dRot[i] += this.dSpin[i] * dt;
+        i++;
+      }
+    }
+    {
+      const P = this.aDPos.array, S = this.aDSize.array, Ro = this.aDRot.array, T = this.aDTint.array;
+      for (let i = 0; i < this.nD; i++) {
+        const i3 = i * 3, fade = Math.min(1, (this.dLife[i] - this.dAge[i]) * 2);
+        P[i3] = this.dP[i3]; P[i3 + 1] = this.dP[i3 + 1]; P[i3 + 2] = this.dP[i3 + 2]; S[i] = this.dS[i] * fade; Ro[i] = this.dRot[i]; T[i] = this.dTint[i];
+      }
+      for (const a of [this.aDPos, this.aDSize, this.aDRot, this.aDTint]) a.needsUpdate = true;
+      this.debris.geometry.instanceCount = this.nD;
+    }
     // smoke, sorted back to front along the view direction
     const cp = camera.position, dir = camera.getWorldDirection(this._v), keys = this.keys, n = this.nS;
     for (let i = 0; i < n; i++) {
@@ -4929,6 +5001,14 @@ class ParticleFX {
     for (let c = 0; c < 3; c++) { this.sP[i3 + c] = this.sP[j3 + c]; this.sV[i3 + c] = this.sV[j3 + c]; this.sTint[i3 + c] = this.sTint[j3 + c]; }
     this.sAge[i] = this.sAge[j]; this.sLife[i] = this.sLife[j]; this.sS0[i] = this.sS0[j]; this.sS1[i] = this.sS1[j]; this.sA[i] = this.sA[j];
     this.sRot[i] = this.sRot[j]; this.sSpin[i] = this.sSpin[j]; this.sDrag[i] = this.sDrag[j]; this.sBuoy[i] = this.sBuoy[j]; this.sFrame[i] = this.sFrame[j];
+  }
+
+  killD(i) {
+    const j = --this.nD;
+    if (i === j) return;
+    const i3 = i * 3, j3 = j * 3;
+    for (let c = 0; c < 3; c++) { this.dP[i3 + c] = this.dP[j3 + c]; this.dV[i3 + c] = this.dV[j3 + c]; }
+    this.dAge[i] = this.dAge[j]; this.dLife[i] = this.dLife[j]; this.dS[i] = this.dS[j]; this.dRot[i] = this.dRot[j]; this.dSpin[i] = this.dSpin[j]; this.dTint[i] = this.dTint[j];
   }
 
   killK(i) {
@@ -4971,18 +5051,30 @@ function buildEnvironment(scene, renderer, world) {
     uniforms: {
       uSun: { value: SUN_DIR.clone() }, uZen: { value: new THREE.Color(0.36, 0.52, 0.80) }, uHor: { value: new THREE.Color(1.02, 1.02, 1.0) },
       uGnd: { value: new THREE.Color(0.8, 0.8, 0.8) }, uGlow: { value: new THREE.Color(1.0, 0.96, 0.88) }, uHalo: { value: 0 }, uDisc: { value: 1 }, uStars: { value: 0 },
+      uCloud: { value: 0.55 }, uCloudCol: { value: new THREE.Color(1, 1, 1) },
     },
     vertexShader: `varying vec3 vDir; void main(){ vec4 wp = modelMatrix * vec4(position,1.0); vDir = normalize(wp.xyz - cameraPosition); gl_Position = projectionMatrix * viewMatrix * wp; gl_Position.z = gl_Position.w; }`,
-    fragmentShader: `uniform vec3 uSun, uZen, uHor, uGnd, uGlow; uniform float uHalo, uDisc, uStars; varying vec3 vDir;
+    fragmentShader: `uniform vec3 uSun, uZen, uHor, uGnd, uGlow, uCloudCol; uniform float uHalo, uDisc, uStars, uCloud; varying vec3 vDir;
       float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h2(i), h2(i + vec2(1, 0)), f.x), mix(h2(i + vec2(0, 1)), h2(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int k = 0; k < 5; k++) { s += a * n2(p); p = p * 2.03 + 17.1; a *= 0.5; } return s; }
       void main(){
         vec3 d = normalize(vDir); float h = d.y;
-        vec3 col = mix(uHor, uZen, pow(clamp(h, 0.0, 1.0), 0.42));
+        vec3 col = mix(uHor, uZen, pow(clamp(h, 0.0, 1.0), 0.32));
         col = mix(col, uGnd, smoothstep(0.0, -0.05, h));
         float s = max(dot(d, uSun), 0.0);
         col += uGlow * (pow(s, 6.0) * uHalo + pow(s, 24.0) * 0.22 + pow(s, 400.0) * 1.2);
         col += uGlow * smoothstep(0.9995, 0.9998, s) * 10.0 * uDisc;
         if (uStars > 0.0 && h > 0.0) col += vec3(step(0.9986, hash(floor(d * 420.0)))) * uStars * smoothstep(0.02, 0.3, h);
+        // fair-weather cumulus on a cloud deck: bright tops toward the sun, grey bellies, thinning into the haze
+        if (uCloud > 0.0 && h > 0.0) {
+          vec2 q = d.xz / (h + 0.12) * 1.2;
+          float f = fbm(q + vec2(4.7, 1.3)), c = smoothstep(0.62 - 0.22 * uCloud, 0.86, f) * smoothstep(0.03, 0.22, h);
+          float lit = fbm(q + vec2(4.7, 1.3) + uSun.xz * 0.06) - f;
+          vec3 cc = uCloudCol * mix(0.72, 1.08, smoothstep(-0.06, 0.06, -lit));
+          col = mix(col, cc, c * 0.95);
+        }
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -4998,24 +5090,28 @@ function buildEnvironment(scene, renderer, world) {
 
   // neutral distance haze only. No ambient light: the sun (a directional light with cascaded shadow
   // maps, created in main) plus a hemisphere sky-bounce fill and the sky's own reflections.
-  scene.fog = new THREE.Fog(0xe7eaed, 260, 1500);
-  const hemi = new THREE.HemisphereLight(0xdfe9f5, 0x8a8782, 0.62);
+  scene.fog = new THREE.Fog(0xeef3f8, 260, 1700);
+  const hemi = new THREE.HemisphereLight(0x8fb6ea, 0x9a9890, 1.0);
   scene.add(hemi);
 
   const line = (ctx, x0, y0, x1, y1) => { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
-  // ground: gridmap of 2 m light / mid-grey checker tiles, each split by thin 0.5 m lines
-  const gridTex = canvasTexture(1024, 1024, (ctx, w, h) => {
-    const t = w / 2;
-    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#9fa1a2' : '#d6d7d7'; ctx.fillRect(i * t, j * t, t, t); }
-    speckle(ctx, w, h, 6000, 0.035, rng);
-    ctx.strokeStyle = 'rgba(70,72,74,0.32)'; ctx.lineWidth = 2;
-    for (let k = 1; k < 8; k++) { if (k === 4) continue; const q = k * w / 8; line(ctx, q, 0, q, h); line(ctx, 0, q, w, q); }
-    ctx.strokeStyle = 'rgba(46,48,50,0.62)'; ctx.lineWidth = 3;
-    for (const q of [1.5, t, w - 1.5]) { line(ctx, q, 0, q, h); line(ctx, 0, q, w, q); }
+  // The classic gridmap: one 4 m texture tile, white, ruled every 0.5 m with fine grey lines and bordered by
+  // a heavy dark line, so the floor reads as big squares of small squares. The same ruling covers every
+  // obstacle (in a cool grey that the blue sky turns blue on the faces it lights).
+  const gridPaint = (base, fine, bold, w = 1024) => canvasTexture(w, w, (ctx) => {
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, w);
+    speckle(ctx, w, w, 5000, 0.025, rng);
+    ctx.strokeStyle = fine; ctx.lineWidth = w / 420;
+    for (let k = 1; k < 8; k++) { const q = k * w / 8; line(ctx, q, 0, q, w); line(ctx, 0, q, w, q); }
+    ctx.strokeStyle = bold; ctx.lineWidth = w / 200;
+    for (const q of [0, w]) { line(ctx, q, 0, q, w); line(ctx, 0, q, w, q); }
   });
+  const gridTex = gridPaint('#f3f5f7', 'rgba(84,92,104,0.72)', 'rgba(20,23,27,0.95)');
   gridTex.repeat.set(600, 600);
   gridTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const groundMat = new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.82, metalness: 0, envMap: env, envMapIntensity: 0.35 });
+  const blockTex = gridPaint('#c9d3df', 'rgba(60,72,88,0.55)', 'rgba(18,22,30,0.92)', 512);
+  blockTex.anisotropy = gridTex.anisotropy;
+  const groundMat = new THREE.MeshStandardMaterial({ map: gridTex, roughness: 0.9, metalness: 0, envMap: env, envMapIntensity: 0.25 });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -5030,53 +5126,44 @@ function buildEnvironment(scene, renderer, world) {
     scene.add(m);
     return m;
   };
-  const asphalt = (ctx, w, h) => {
-    ctx.fillStyle = '#3b3c3e'; ctx.fillRect(0, 0, w, h);
-    speckle(ctx, w, h, w * h / 10, 0.22, rng);
-    for (let i = 0; i < 14; i++) { ctx.fillStyle = `rgba(${rng() < 0.5 ? '20,20,22' : '90,90,92'},${0.05 + rng() * 0.08})`; ctx.beginPath(); ctx.ellipse(rng() * w, rng() * h, 10 + rng() * w / 5, 6 + rng() * h / 8, rng() * 3, 0, 7); ctx.fill(); }
-    ctx.strokeStyle = 'rgba(15,15,16,0.5)'; ctx.lineWidth = 1.2;
-    for (let i = 0; i < 6; i++) { let x = rng() * w, y = rng() * h; ctx.beginPath(); ctx.moveTo(x, y); for (let k = 0; k < 8; k++) { x += (rng() - 0.5) * 30; y += rng() * 22; ctx.lineTo(x, y); } ctx.stroke(); }   // cracks
-  };
+  // markings are painted straight on the grid: yellow lines, dark lettering
+  const PAINT = 'rgba(226,170,30,0.95)', INK = 'rgba(38,42,48,0.88)';
   // a 2 km drag strip along x = 60, its distance painted every 100 m from the start line at z = -900
   const strip = canvasTexture(256, 600, (ctx, w, h) => {
-    asphalt(ctx, w, h);
-    ctx.fillStyle = 'rgba(235,235,228,0.9)'; ctx.fillRect(8, 0, 7, h); ctx.fillRect(w - 15, 0, 7, h);
-    ctx.fillStyle = 'rgba(230,190,60,0.9)'; ctx.fillRect(w / 2 - 3, 0, 6, h * 0.25); ctx.fillRect(w / 2 - 3, h * 0.5, 6, h * 0.25);
+    ctx.fillStyle = PAINT; ctx.fillRect(4, 0, 8, h); ctx.fillRect(w - 12, 0, 8, h);
+    ctx.fillStyle = INK; ctx.fillRect(w / 2 - 3, 0, 6, h * 0.25); ctx.fillRect(w / 2 - 3, h * 0.5, 6, h * 0.25);
   });
   strip.repeat.set(1, 2000 / 24);
-  decal(strip, 10, 2000, 60, 0);
+  decal(strip, 10, 2000, 60, 0, { alpha: true });
   const label = (text, color, w = 256, h = 128, size = 92) => canvasTexture(w, h, (ctx) => { ctx.fillStyle = color; ctx.font = `bold ${size}px Arial, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, w / 2, h / 2 + 4); });
-  for (let k = 0; k <= 18; k++) { const t = label(k ? k * 100 + '' : 'START', 'rgba(240,240,232,0.92)', 256, 128, k ? 92 : 64); decal(t, 5, 2.5, 60, -900 + k * 100, { alpha: true, lift: 1, rot: Math.PI }); }
-  // the suspension course's lane: asphalt with white edges and a dashed yellow centre line, its sections
-  // named on the floor
+  for (let k = 0; k <= 18; k++) { const t = label(k ? k * 100 + '' : 'START', INK, 256, 128, k ? 92 : 64); decal(t, 5, 2.5, 60, -900 + k * 100, { alpha: true, lift: 1, rot: Math.PI }); }
+  // the suspension course's lane: yellow edges and a dashed centre line, its sections named on the floor
   const lane = canvasTexture(256, 512, (ctx, w, h) => {
-    asphalt(ctx, w, h);
-    ctx.fillStyle = 'rgba(235,235,228,0.9)'; ctx.fillRect(6, 0, 7, h); ctx.fillRect(w - 13, 0, 7, h);
-    ctx.fillStyle = 'rgba(230,190,60,0.9)'; ctx.fillRect(w / 2 - 3, 0, 6, h * 0.5);
+    ctx.fillStyle = PAINT; ctx.fillRect(2, 0, 9, h); ctx.fillRect(w - 11, 0, 9, h);
+    ctx.fillStyle = INK; ctx.fillRect(w / 2 - 3, 0, 6, h * 0.5);
   });
   const laneLen = COURSE.z1 - COURSE.z0;
   lane.repeat.set(1, laneLen / 8);
-  decal(lane, COURSE.half * 2 + 0.6, laneLen, COURSE.x, (COURSE.z0 + COURSE.z1) / 2);
+  decal(lane, COURSE.half * 2 + 0.6, laneLen, COURSE.x, (COURSE.z0 + COURSE.z1) / 2, { alpha: true });
   for (const [text, z, size] of [['SUSPENSION TEST', -27, 50], ['BUMPS', -24, 80], ['TWIST', 2.5, 80], ['WASHBOARD', 28, 66], ['KERBS', 43, 80]]) {
-    decal(label(text, 'rgba(240,240,232,0.92)', 512, 128, size), 5.6, 1.4, COURSE.x, z, { alpha: true, lift: 1, rot: Math.PI });
+    decal(label(text, INK, 512, 128, size), 5.6, 1.4, COURSE.x, z, { alpha: true, lift: 1, rot: Math.PI });
   }
-  decal(label('RTI 15°', 'rgba(240,240,232,0.92)', 256, 128, 70), 2.6, 1.3, COURSE.x + 8.2, -1.6, { alpha: true, lift: 1, rot: Math.PI });
-  // a skid pad for cornering and drifts: a 30 m asphalt disc with painted circles
+  decal(label('RTI 15°', INK, 256, 128, 70), 2.6, 1.3, COURSE.x + 8.2, -1.6, { alpha: true, lift: 1, rot: Math.PI });
+  // a skid pad for cornering and drifts: painted circles of 12, 20 and 28 m
   const pad = canvasTexture(1024, 1024, (ctx, w, h) => {
-    asphalt(ctx, w, h);
-    ctx.strokeStyle = 'rgba(236,236,228,0.85)'; ctx.lineWidth = 6;
+    ctx.strokeStyle = PAINT; ctx.lineWidth = 7;
     for (const r of [12, 20, 28]) { ctx.beginPath(); ctx.arc(w / 2, h / 2, r / 60 * w, 0, 7); ctx.stroke(); }
-    ctx.fillStyle = 'rgba(230,190,60,0.9)'; ctx.beginPath(); ctx.arc(w / 2, h / 2, 10, 0, 7); ctx.fill();
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(w / 2, h / 2, 10, 0, 7); ctx.fill();
   });
-  decal(pad, 0, 0, -95, -45, { geo: new THREE.CircleGeometry(30, 72) });
+  decal(pad, 0, 0, -95, -45, { geo: new THREE.CircleGeometry(30, 72), alpha: true });
   // the wall's run-up: yellow lines every 5 m with the distance to the wall, and a spawn box
   const runup = canvasTexture(512, 1024, (ctx, w, h) => {
-    ctx.strokeStyle = 'rgba(232,186,48,0.9)'; ctx.fillStyle = 'rgba(232,186,48,0.9)'; ctx.lineWidth = 5;
+    ctx.strokeStyle = PAINT; ctx.fillStyle = PAINT; ctx.lineWidth = 5;
     ctx.font = 'bold 44px Arial, sans-serif'; ctx.textBaseline = 'middle';
     for (let m = 5; m <= 40; m += 5) { const y = m / 40 * h - 3; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); ctx.fillText(m + ' m', 14, y - 28); }
   });
   decal(runup, 18, 40, 0, 27, { alpha: true, rot: Math.PI });
-  const box = canvasTexture(256, 256, (ctx, w, h) => { ctx.strokeStyle = 'rgba(240,240,232,0.9)'; ctx.lineWidth = 8; ctx.strokeRect(6, 6, w - 12, h - 12); ctx.setLineDash([18, 14]); ctx.beginPath(); ctx.moveTo(w / 2, 20); ctx.lineTo(w / 2, h - 20); ctx.stroke(); });
+  const box = canvasTexture(256, 256, (ctx, w, h) => { ctx.strokeStyle = PAINT; ctx.lineWidth = 8; ctx.strokeRect(6, 6, w - 12, h - 12); ctx.setLineDash([18, 14]); ctx.beginPath(); ctx.moveTo(w / 2, 20); ctx.lineTo(w / 2, h - 20); ctx.stroke(); });
   decal(box, 3.4, 7, 0, 0, { alpha: true });
 
   // two ragged ridgelines on the horizon, the far one paler in the haze
@@ -5097,8 +5184,50 @@ function buildEnvironment(scene, renderer, world) {
     m.frustumCulled = false;
     scene.add(m);
   };
-  ridge(1150, 35, 120, 0x8d927f, 2);
-  ridge(880, 6, 48, 0x6f765f, 5);
+  // pale sand dunes ring the horizon, like the gridmap's white hills
+  ridge(1150, 30, 110, 0xe9e6df, 2);
+  ridge(860, 6, 40, 0xf1efe9, 5);
+
+  // A palm island off to the right of the bench: a sand mound with low bushes and a few palms (scenery
+  // only; the physics doesn't know it's there).
+  const frondTex = canvasTexture(64, 256, (ctx, w, h) => {
+    ctx.strokeStyle = '#6f9a3e'; ctx.lineWidth = 3; line(ctx, w / 2, h, w / 2, 0);
+    ctx.strokeStyle = '#78b04a'; ctx.lineWidth = 5;
+    for (let y = 8; y < h - 8; y += 9) { const l = (w / 2 - 3) * Math.sin(Math.PI * y / h); line(ctx, w / 2, y + 6, w / 2 - l, y - 4); line(ctx, w / 2, y + 6, w / 2 + l, y - 4); }
+  });
+  frondTex.wrapS = frondTex.wrapT = THREE.ClampToEdgeWrapping;
+  const frondMat = new THREE.MeshStandardMaterial({ map: frondTex, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.8 });
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b7a62, roughness: 0.95 });
+  const bushMat = new THREE.MeshStandardMaterial({ color: 0x5f9a42, roughness: 0.9, flatShading: true });
+  const sandMat = new THREE.MeshStandardMaterial({ color: 0xe8e0cb, roughness: 1 });
+  const frondGeo = (() => {   // a leaf drooping over its length
+    const g = new THREE.PlaneGeometry(1.1, 4.2, 1, 8), P = g.attributes.position;
+    for (let i = 0; i < P.count; i++) { const t = (P.getY(i) + 2.1) / 4.2; P.setXYZ(i, P.getX(i), t * 3.6, -1.6 * t * t); }
+    g.computeVertexNormals();
+    return g;
+  })();
+  const palm = (x, z, hgt, lean, yaw) => {
+    const top = new THREE.Vector3(x + Math.sin(yaw) * lean, hgt, z + Math.cos(yaw) * lean);
+    const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x, 0, z), new THREE.Vector3(x + Math.sin(yaw) * lean * 0.2, hgt * 0.55, z + Math.cos(yaw) * lean * 0.2), top);
+    const trunk = new THREE.Mesh(new THREE.TubeGeometry(curve, 10, 0.17, 7), trunkMat);
+    trunk.castShadow = true; scene.add(trunk);
+    for (let k = 0; k < 9; k++) {
+      const f = new THREE.Mesh(frondGeo, frondMat);
+      f.position.copy(top); f.rotation.set(-0.35 - rng() * 0.3, k / 9 * Math.PI * 2 + rng() * 0.3, 0, 'YXZ');
+      f.castShadow = true; scene.add(f);
+    }
+  };
+  const island = (x, z, r) => {
+    const mound = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 10, 0, Math.PI * 2, 0, Math.PI / 2), sandMat);
+    mound.scale.set(r, 1.6, r * 0.8); mound.position.set(x, -0.2, z); mound.receiveShadow = true; scene.add(mound);
+    for (let k = 0; k < 14; k++) {
+      const a = rng() * 6.283, d = Math.sqrt(rng()) * r * 0.7, b = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), bushMat);
+      b.scale.set(1 + rng() * 1.4, 0.7 + rng() * 0.8, 1 + rng() * 1.4); b.position.set(x + Math.cos(a) * d, 0.9, z + Math.sin(a) * d * 0.8); b.castShadow = true; scene.add(b);
+    }
+    for (let k = 0; k < 6; k++) { const a = rng() * 6.283, d = rng() * r * 0.55; palm(x + Math.cos(a) * d, z + Math.sin(a) * d * 0.8, 7 + rng() * 4, 1 + rng() * 2, rng() * 6.283); }
+  };
+  island(86, 96, 16);
+  island(-150, 210, 22);
 
   // yellow-and-black hazard stripes (ramp drops, the posts' feet, speed bumps)
   const hazardTex = canvasTexture(256, 64, (ctx, w, h) => {
@@ -5107,62 +5236,31 @@ function buildEnvironment(scene, renderer, world) {
     for (let x = -h; x < w + h; x += 48) { ctx.beginPath(); ctx.moveTo(x, h); ctx.lineTo(x + 24, h); ctx.lineTo(x + 24 + h, 0); ctx.lineTo(x + h, 0); ctx.closePath(); ctx.fill(); }
   });
 
-  // poured concrete: fine aggregate, faint board-form streaks, panel joints and tie holes
-  const concrete = canvasTexture(512, 512, (ctx, w, h) => {
-    ctx.fillStyle = '#b4ad9f'; ctx.fillRect(0, 0, w, h);
-    speckle(ctx, w, h, 22000, 0.1, rng);
-    for (let i = 0; i < 46; i++) { ctx.fillStyle = `rgba(92,84,72,${0.025 + rng() * 0.05})`; ctx.fillRect(0, rng() * h, w, 1 + rng() * 2); }
-    ctx.strokeStyle = 'rgba(70,64,56,0.35)'; ctx.lineWidth = 2;
-    line(ctx, 0, h / 2, w, h / 2); line(ctx, w / 2, 0, w / 2, h);
-    ctx.fillStyle = 'rgba(55,50,44,0.55)';
-    for (const x of [w / 4, 3 * w / 4]) for (const y of [h / 4, 3 * h / 4]) { ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); }
-  });
-  // corrugated steel: shipping containers in four liveries, and pale warehouse cladding
-  const corrugated = (base, rib, w = 512, h = 256) => canvasTexture(w, h, (ctx) => {
-    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
-    for (let x = 0; x < w; x += 16) { const g = ctx.createLinearGradient(x, 0, x + 16, 0); g.addColorStop(0, 'rgba(0,0,0,0.22)'); g.addColorStop(0.5, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0.22)'); ctx.fillStyle = g; ctx.fillRect(x, 0, 16, h); }
-    ctx.fillStyle = rib; ctx.fillRect(0, 0, w, 7); ctx.fillRect(0, h - 9, w, 9);
-    speckle(ctx, w, h, 5000, 0.12, rng);
-    for (let i = 0; i < 40; i++) { ctx.fillStyle = `rgba(90,52,28,${0.05 + rng() * 0.12})`; ctx.fillRect(rng() * w, h * (0.6 + rng() * 0.4), 2 + rng() * 6, 10 + rng() * 40); }   // rust runs
-  });
-  const liveries = ['#8e2f22', '#2e5a86', '#3f6b45', '#9a9488', '#b46a1f'].map(c => corrugated(c, 'rgba(0,0,0,0.35)'));
-  const steel = new THREE.MeshStandardMaterial({ color: 0xd8b13a, roughness: 0.45, metalness: 0.6, envMap: env, envMapIntensity: 0.5 });
   const mat = (map, o = {}) => new THREE.MeshStandardMaterial({ map, roughness: 0.9, envMap: env, envMapIntensity: 0.3, ...o });
+  // every block is ruled in world units: each face's UVs span its size over the 4 m grid tile
+  const gridBox = (wx, h, wz) => {
+    const g = new THREE.BoxGeometry(wx, h, wz), uv = g.attributes.uv, dims = [[wz, h], [wz, h], [wx, wz], [wx, wz], [wx, h], [wx, h]];
+    for (let f = 0; f < 6; f++) for (let v = 0; v < 4; v++) { const i = f * 4 + v; uv.setXY(i, uv.getX(i) * dims[f][0] / 4, uv.getY(i) * dims[f][1] / 4); }
+    return g;
+  };
+  const blockMat = mat(blockTex, { roughness: 0.85 });
   for (const c of world.cols) {
     if (c.type !== 0) continue;
     const wx = c.x1 - c.x0, wz = c.z1 - c.z0, cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
-    if (/^container/.test(c.style)) {
-      for (let k = 0; k * 2.6 < c.h - 0.01; k++) {
-        const t = liveries[Math.floor(Math.abs(cx * 7 + cz * 3 + k * 5)) % liveries.length].clone(); t.needsUpdate = true; t.repeat.set(wx / 3, 1);
-        const box = new THREE.Mesh(new THREE.BoxGeometry(wx, 2.59, wz), mat(t, { roughness: 0.62, metalness: 0.35 }));
-        box.position.set(cx, 2.6 * k + 1.3, cz);
-        box.castShadow = box.receiveShadow = true;
-        scene.add(box);
-      }
-      continue;
-    }
-    let m;
-    if (c.style === 'pole') m = steel;
-    else if (c.style === 'kerb') { const t = hazardTex.clone(); t.needsUpdate = true; t.repeat.set(Math.max(1, wx / 1.5), 1); m = mat(t, { roughness: 0.75 }); }
-    else { const t = concrete.clone(); t.needsUpdate = true; t.repeat.set(wx / 2.4, c.h / 2.4); m = mat(t, { roughness: 0.93 }); }
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(wx, c.h, wz), m);
+    let m = blockMat;
+    if (c.style === 'kerb') { const t = hazardTex.clone(); t.needsUpdate = true; t.repeat.set(Math.max(1, wx / 1.5), 1); m = mat(t, { roughness: 0.75 }); }
+    const wall = new THREE.Mesh(c.style === 'kerb' ? new THREE.BoxGeometry(wx, c.h, wz) : gridBox(wx, c.h, wz), m);
     wall.position.set(cx, c.h / 2, cz);
     wall.castShadow = wall.receiveShadow = true;
     scene.add(wall);
-    if (c.style === 'pole' || c.style === 'offset') {   // hazard band at the foot
-      const t = hazardTex.clone(); t.needsUpdate = true; t.repeat.set(Math.max(1, (wx + wz) / 1.5), 1);
-      const band = new THREE.Mesh(new THREE.BoxGeometry(wx + 0.01, 0.5, wz + 0.01), mat(t, { roughness: 0.7 }));
-      band.position.set(cx, 0.25, cz);
-      scene.add(band);
-    }
   }
   // humps: a raised-cosine strip across the lane with closed ends, merged into one draw per finish (the
   // tall ones dark with a yellow crest band, the washboard plain dark)
   const humpTex = canvasTexture(256, 256, (ctx, w, h) => {
-    ctx.fillStyle = '#4a4c4f'; ctx.fillRect(0, 0, w, h); speckle(ctx, w, h, 9000, 0.2, rng);
-    ctx.fillStyle = '#e2b13c'; for (let x = 0; x < w; x += 64) ctx.fillRect(x + 8, h * 0.42, 40, h * 0.16);
+    ctx.fillStyle = '#9aa1a9'; ctx.fillRect(0, 0, w, h); speckle(ctx, w, h, 9000, 0.12, rng);
+    ctx.fillStyle = '#e2aa1e'; for (let x = 0; x < w; x += 64) ctx.fillRect(x + 8, h * 0.42, 40, h * 0.16);
   });
-  const washTex = canvasTexture(128, 128, (ctx, w, h) => { ctx.fillStyle = '#4a4c4f'; ctx.fillRect(0, 0, w, h); speckle(ctx, w, h, 3000, 0.2, rng); });
+  const washTex = canvasTexture(128, 128, (ctx, w, h) => { ctx.fillStyle = '#a7aeb6'; ctx.fillRect(0, 0, w, h); speckle(ctx, w, h, 3000, 0.12, rng); });
   const humpGeo = (list) => {
     const P = [], U = [], I = [];
     for (const c of list) {
@@ -5187,17 +5285,13 @@ function buildEnvironment(scene, renderer, world) {
     scene.add(hm);
   }
 
-  // stunt ramps: concrete deck and flanks, a hazard band on the vertical drop
-  const hazard = hazardTex;
+  // stunt ramps, ruled like the blocks
   for (const c of world.cols) {
     if (c.type !== 1) continue;
-    const deck = concrete.clone(); deck.needsUpdate = true; deck.repeat.set(c.width / 2.4, c.len / Math.cos(c.deg * Math.PI / 180) / 2.4);
-    const side = concrete.clone(); side.needsUpdate = true;
-    const drop = hazard.clone(); drop.needsUpdate = true; drop.repeat.set(c.width / 3, 1);
-    const ramp = new THREE.Mesh(rampGeometry(c), [
-      new THREE.MeshStandardMaterial({ map: deck, roughness: 0.88, envMap: env, envMapIntensity: 0.3 }),
-      new THREE.MeshStandardMaterial({ map: drop, roughness: 0.7, envMap: env, envMapIntensity: 0.3 }),
-      new THREE.MeshStandardMaterial({ map: side, roughness: 0.93, envMap: env, envMapIntensity: 0.3 })]);
+    const deck = blockTex.clone(); deck.needsUpdate = true; deck.repeat.set(c.width / 4, c.len / Math.cos(c.deg * Math.PI / 180) / 4);
+    const drop = blockTex.clone(); drop.needsUpdate = true; drop.repeat.set(c.width / 4, c.h / 4);
+    const side = blockTex.clone(); side.needsUpdate = true; side.repeat.set(0.6, 0.6);
+    const ramp = new THREE.Mesh(rampGeometry(c), [mat(deck, { roughness: 0.85 }), mat(drop, { roughness: 0.85 }), mat(side, { roughness: 0.85 })]);
     ramp.castShadow = ramp.receiveShadow = true;
     scene.add(ramp);
   }
@@ -5206,7 +5300,7 @@ function buildEnvironment(scene, renderer, world) {
   const poleMat = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.6, metalness: 0.6, envMap: env, envMapIntensity: 0.4 });
   const headMat = new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.5, metalness: 0.4 });
   const glowMat = new THREE.MeshStandardMaterial({ color: 0xfff1d8, emissive: 0xffd9a8, emissiveIntensity: 0, roughness: 0.3 });
-  const floods = [];
+  const floods = [], poles = [];
   for (const [x, z, tx, tz] of [[-11, 44, -3, 38], [11, 44, 3, 38], [-28, 25, -20, 25], [28, 24, 20, 24], [9, 4, 0, 6]]) {
     const pole = new THREE.Group();
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 9, 10), poleMat);
@@ -5218,7 +5312,7 @@ function buildEnvironment(scene, renderer, world) {
     lens.position.set(head.position.x, 8.93, head.position.z); lens.rotation.set(Math.PI / 2, 0, -ang);
     post.castShadow = head.castShadow = true;
     pole.add(post, head, lens);
-    scene.add(pole);
+    scene.add(pole); poles.push(pole);
     const light = new THREE.SpotLight(0xffdcae, 0, 70, 0.8, 0.6, 2);
     light.position.set(head.position.x, 8.85, head.position.z);
     light.target.position.set(tx, 0, tz);
@@ -5226,7 +5320,7 @@ function buildEnvironment(scene, renderer, world) {
     scene.add(light, light.target);
     floods.push(light);
   }
-  return { sky, env, skyMat, hemi, makeEnv, floods, glowMat };
+  return { sky, env, skyMat, hemi, makeEnv, floods, glowMat, poles };
 }
 
 function rampGeometry(c) {
@@ -5492,10 +5586,10 @@ async function main() {
   // Time of day: sky colours, the sun (or moon) direction, colour and strength, the sky-bounce fill,
   // exposure, haze and bloom, and how far the lamps are lit: floodlights, headlights and tail lights.
   const TIMES = {
-    day: { sun: [-0.55, 0.72, -0.42], sunColor: 0xfff3e4, sunI: 3.3, sky: 0xdfe9f5, gnd: 0x8a8782, hemiI: 0.62, exposure: 0.92, fog: 0xe7eaed,
-      zen: [0.36, 0.52, 0.80], hor: [1.02, 1.02, 1.0], below: [0.8, 0.8, 0.8], glow: [1.0, 0.96, 0.88], halo: 0, disc: 1, stars: 0, lamps: 0, beams: 0, bloom: 0.2 },
+    day: { sun: [-0.55, 0.72, -0.42], sunColor: 0xfff5e8, sunI: 3.3, sky: 0x8fb6ea, gnd: 0xa09e96, hemiI: 1.0, exposure: 0.9, fog: 0xeef3f8,
+      zen: [0.035, 0.19, 0.78], hor: [0.92, 1.0, 1.1], below: [0.85, 0.86, 0.88], glow: [1.0, 0.97, 0.9], halo: 0, disc: 1, stars: 0, lamps: 0, beams: 0, bloom: 0.22, cloud: 0.6, cloudCol: [1.05, 1.05, 1.06] },
     evening: { sun: [-0.78, 0.13, -0.61], sunColor: 0xffa35c, sunI: 2.2, sky: 0x8d93bd, gnd: 0x6a5244, hemiI: 0.42, exposure: 1.0, fog: 0xc79a7e,
-      zen: [0.16, 0.22, 0.46], hor: [1.08, 0.6, 0.34], below: [0.42, 0.36, 0.33], glow: [1.0, 0.58, 0.28], halo: 0.55, disc: 1, stars: 0, lamps: 0.45, beams: 0.7, bloom: 0.32 },
+      zen: [0.16, 0.22, 0.46], hor: [1.08, 0.6, 0.34], below: [0.42, 0.36, 0.33], glow: [1.0, 0.58, 0.28], halo: 0.55, disc: 1, stars: 0, lamps: 0.45, beams: 0.7, bloom: 0.32, cloud: 0.4, cloudCol: [1.0, 0.62, 0.44] },
     night: { sun: [0.36, 0.64, 0.68], sunColor: 0x9db6ff, sunI: 0.3, sky: 0x26365a, gnd: 0x0c0e13, hemiI: 0.2, exposure: 1.08, fog: 0x0a0d15,
       zen: [0.008, 0.013, 0.034], hor: [0.045, 0.06, 0.1], below: [0.02, 0.02, 0.025], glow: [0.75, 0.82, 1.0], halo: 0, disc: 0.35, stars: 1, lamps: 1, beams: 1, bloom: 0.45 },
   };
@@ -5539,6 +5633,7 @@ async function main() {
     const T = TIMES[name], u = envr.skyMat.uniforms, sun = new THREE.Vector3(...T.sun).normalize();
     u.uSun.value.copy(sun); u.uZen.value.setRGB(...T.zen); u.uHor.value.setRGB(...T.hor); u.uGnd.value.setRGB(...T.below);
     u.uGlow.value.setRGB(...T.glow); u.uHalo.value = T.halo; u.uDisc.value = T.disc; u.uStars.value = T.stars;
+    u.uCloud.value = T.cloud || 0; if (T.cloudCol) u.uCloudCol.value.setRGB(...T.cloudCol);
     csm.lightDirection.copy(sun).negate();
     for (const l of csm.lights) { l.color.set(T.sunColor); l.intensity = T.sunI; }
     envr.hemi.color.set(T.sky); envr.hemi.groundColor.set(T.gnd); envr.hemi.intensity = T.hemiI;
@@ -5552,6 +5647,7 @@ async function main() {
     // floodlights; the truck's lights switch on by themselves in the evening and at night (L toggles them)
     lampLevel = T.lamps;
     envr.glowMat.emissiveIntensity = 3.5 * lampLevel;
+    for (const pl of envr.poles) pl.visible = lampLevel > 0;   // the floodlight poles stand only in the evening and at night
     document.body.dataset.time = name;
     setLights(T.beams > 0);
     needFrame = true;
@@ -5731,7 +5827,7 @@ async function main() {
   // --- main menu: title screen over a desaturated live view, Choose Level, Options, Exit. Physics is
   // paused while it is up; Esc or MENU opens it in a session, and Resume carries on where it left off.
   const LEVEL = {
-    day: { label: 'Day', desc: 'A concrete test bench in full sun: crash wall, ramps, a steel post, a suspension test course (bumps, twist, washboard, kerbs, an articulation ramp), a 2 km drag strip and a skid pad.' },
+    day: { label: 'Day', desc: 'The white gridmap under a blue sky: crash wall, ramps, a steel post, a suspension test course (bumps, twist, washboard, kerbs, an articulation ramp), a 2 km drag strip and a skid pad.' },
     evening: { label: 'Evening', desc: 'The same bench in low evening sun: long shadows and warm light, with the floodlights coming on.' },
     night: { label: 'Night', desc: 'After dark under five floodlights. Headlights on; the floodlights light the run-up to the wall.' },
   };

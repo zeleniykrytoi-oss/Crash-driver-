@@ -6,13 +6,13 @@ A soft-body vehicle crash simulator in a single HTML file, styled after the 2013
 - 46 volume cells;
 - a sheet-metal skin of 5592 stretch springs and 3524 dihedral bending springs.
 
-In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate, headlights, grille, radiator and taillights hang from their hinges, bolts and clips or tear off when their brackets fail.
+In a crash the crumple zone folds progressively into an accordion and bulges sideways. The front piles up against a rigid engine block, and the hood folds up into a ridge like a roof. A corner hit twists the frame. Bumpers, hood, doors, front fenders, tailgate, headlights, grille and taillights hang from their hinges, bolts and clips or tear off when their brackets fail; an offset hit leaves the front bumper dangling from one end.
 
-The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area has a steel post, a small-overlap block, containers, a suspension test course, a drag strip and a skid pad.
+The truck gets dirty as it drives, with mud low on the body and sprayed up behind the wheels. The test area is a white gridmap under a blue sky with clouds, ringed by pale dunes, with ruled grey blocks, a steel post, a suspension test course, a drag strip, a skid pad and palm islands.
 
 The tyres use a contact-patch friction model with slip ratio, slip angle and static/kinetic friction, on coil-over suspension with asymmetric dampers and anti-roll bars. The drivetrain is a full-size V8 pickup's: 0–100 km/h in 8 s and a 178 km/h limiter.
 
-Tyre smoke, a little dust, radiator steam and sparks come from the physics itself: slipping tyres, metal scraping on concrete, beams snapping and the body slamming down.
+Tyre smoke, impact dust, flying debris, radiator steam and sparks come from the physics itself: slipping tyres, metal scraping on concrete, beams snapping and the body slamming into the wall or the floor.
 
 ## Run it
 
@@ -70,7 +70,9 @@ The windows and buttons are drawn in a plain desktop style (Segoe UI, light grey
 
 The chase camera holds the truck's heading closely, so a hard turn doesn't show the truck from the side as if it slid. Its lens widens a little with speed.
 
-The test area, seen from the spawn (+x is to the left):
+The test area is the classic gridmap: a white floor ruled every 0.5 m in fine grey lines inside 4 m squares edged in heavy black, under a deep blue sky with drifting fair-weather cumulus. Every obstacle is a block ruled the same way in a cool grey, which the sky turns blue on its shaded faces. Pale sand dunes ring the horizon, and two islands of sand, bushes and palms stand off to the right (scenery only). Markings are painted straight on the grid in yellow, with dark lettering. The floodlight poles stand only in the evening and at night.
+
+Seen from the spawn (+x is to the left):
 
 | Feature | Where | For |
 | --- | --- | --- |
@@ -78,11 +80,11 @@ The test area, seen from the spawn (+x is to the left):
 | Ramps of 10° and 22° | either side of the run-up | jumps and rollovers |
 | Steel post, 0.4 m square | right of the wall | narrow-object hits |
 | Short concrete block, 6 m wide and 1.6 m tall | right of the wall | small-overlap hits |
-| Shipping containers, stacked two high | behind the wall | a backdrop to hit |
+| Grid blocks, some stacked two high | behind the wall | a backdrop to hit |
 | Suspension test course: an asphalt lane with four speed humps, a twist section, a washboard and two kerbs, plus a 15° ramp beside it for one wheel | 44 m left, from 30 m behind the spawn to the wall's end | suspension travel, articulation and damping |
 | Asphalt drag strip, 2 km, with the distance painted every 100 m | 60 m left, starting 900 m behind the spawn | acceleration and top speed |
 | Asphalt skid pad, 30 m radius, with painted circles | 95 m left, 45 m behind | cornering and drifts |
-| Two ridgelines | on the horizon | — |
+| Sand dunes; palm islands | on the horizon; off to the right | — |
 
 The suspension course, driven toward the wall end:
 
@@ -206,7 +208,7 @@ The truck is built like a 1990s body-on-frame pickup: it has no engineered crump
 
 | Wall hit | Front crush | Engine pushed back | What it looks like |
 | --- | --- | --- | --- |
-| 30 km/h | ~8 cm | — | bumper and grille pushed in, a fender bolt or two gone |
+| 30 km/h | ~7 cm | — | bumper and grille pushed in, a fender bolt or two gone |
 | 50 km/h | ~28 cm | 10 cm | the nose folds, the hood ridges up, headlights smash, a fender hangs or falls |
 | 80 km/h | ~47 cm | 31 cm | the front crushed to the wheels, the windshield cracked across, the frame twisted |
 | 100 km/h | ~53 cm | 40 cm | the engine driven into the firewall, the cab's front folding with the A-pillars bent and the floor buckled, a front wheel shoved back, the fenders torn off |
@@ -220,7 +222,7 @@ RESET VEHICLE repairs both.
 
 ## Detaching parts
 
-Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood, the left and right front fenders, the tailgate, the left and right headlights, the radiator and the left and right taillights. The grille is cut out of the fascia (the triangles between the headlights) into a part of its own. Each part hangs on named brackets of attachment beams:
+Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, Right Door, Hood, the left and right front fenders, the tailgate, the left and right headlights and the left and right taillights. The grille is cut out of the fascia (the triangles between the headlights) into a part of its own. Each part hangs on named brackets of attachment beams:
 
 | Part | Lattice | Brackets |
 | --- | --- | --- |
@@ -228,11 +230,12 @@ Parts come from GLTF node names: Chassis, Front Bumper, Rear Bumper, Left Door, 
 | Hood | 3 × 5 × 2 | left hinge, right hinge, latch |
 | Front fenders | 4 × 2 × 2 | front bolts, two top bolts, rear bolts at the door pillar |
 | Tailgate | 3 × 2 × 2 | two hinges below, two latches above |
-| Bumpers | 4 × 2 × 2 | one per bolt |
+| Bumpers | 4 × 2 × 2 | four middle bolts and two end brackets |
 | Headlights, grille, taillights | 2 × 2 × 2 box fitted to the part | left and right plastic clips at the face toward the cab |
-| Radiator | 2 × 2 × 2 box | left and right bolts to the core support |
 
-The headlights, grille and taillights are small housings on plastic clips that let go early; the radiator, at 9 kg, is bolted and holds a little longer. A jump off either ramp leaves them all in place. A 50 km/h wall hit knocks the grille and radiator out. A harder or offset hit takes the headlights too, and a knocked-out headlight goes dark. The tailgate swings on its hinges once its latches tear and comes off in a hard rear hit.
+The headlights, grille and taillights are small housings on plastic clips that let go early. A 50 km/h wall hit knocks the grille out. A harder or offset hit takes the headlights too, and a knocked-out headlight goes dark. A nose-first landing off a ramp at 70 km/h can knock off the front bumper or a headlight.
+
+**The front bumper.** Its four middle bolts shear early, and the two end brackets are stronger and hold longest. In a straight hit the bumper is pushed in and stays on. In an offset or angled hit the bolts and the near end tear, and the bumper hangs from its far end with its other end on the ground. The rear bumper keeps even, stronger bolts. The tailgate swings on its hinges once its latches tear and comes off in a hard rear hit.
 
 - **Bracket failure:** a bracket lets go as a unit after losing half its beams (a hood latch after its first). Failures stay local, so a door whose upper hinge and latch tear off swings and hangs on its lower hinge.
 - **Load sharing:** each snapped beam concentrates stress in its bracket neighbours (mechanic 7). A moderate hit leaves a part hanging; a severe one tears it free as one panel.
@@ -340,13 +343,13 @@ The default is HIGH on desktop and MEDIUM on touch devices.
   - Mud collects low on the body (rockers, bumpers, lower doors), with a ragged edge and short run-down streaks, and it sprays up and back from each wheel with flung specks.
   - Dust settles on faces that look up.
   - Mud makes paint matte and dulls chrome. The tyres go grey-brown and the wheels collect brake dust.
-  - The truck starts with a working truck's everyday dirt and gets dirtier with distance, quite dirty after about 5 km, faster while its tyres spin. RESET VEHICLE washes it.
-- **Materials:** physically based. Clearcoat sand paint with a working truck's sheen rather than a mirror finish, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, a dark radiator with a micro-grid texture, and chrome bumpers. The ground is a worn grey checker gridmap with asphalt areas and painted markings.
+  - The truck starts with a light film of road dust and gets dirtier with distance, quite dirty after about 5 km, faster while its tyres spin. RESET VEHICLE washes it.
+- **Materials:** physically based. Clearcoat coral-red paint with a working truck's sheen rather than a mirror finish, matte rough rubber, glass headlight lenses over emissive reflectors, a satin grille split out of the fascia, and chrome bumpers. The ground is the white gridmap with painted markings.
 - **Skinning:** panel vertices ride on their four nearest same-side flexnodes, rotated with each flexnode's blended node rotation. The weights fade to zero at the fifth-nearest flexnode, so there are no seams. Each flexnode's map is affine (x → R·x + T), so a vertex needs one blended matrix: (Σ w·R)·v + Σ w·T.
 - **Intact panels:** a panel moving as a rigid body skips skinning altogether. The worker fits one matrix to its flexnodes (their mean rotation and the shift of their centroid), and the page draws the panel's rest geometry under it, uploading no vertices. A panel stays skinned while it is pleated, while any of its flexnodes is awake or dented, or while a flexnode sits more than 7 mm off the fit (16 mm to leave). That covers bent structure, and the frame and doors flexing under hard braking and cornering. An intact truck is drawn almost entirely from matrices. Normals are recomputed once a panel is dented. The panels take turns under a budget of 20,000 triangles per frame, since a crash dents many at once; a panel waiting for its turn shows its rotated rest normals.
 - **Accordion pleats:** a crushed bay can't shorten its sheet metal, so the fenders, wheel tubs and body sides ahead of the cowl fold into sharp pleats across it. The pleats are a triangle wave of 24 cm rest wavelength, standing (λ/4)·√(1 − r²) high (deepened 1.4× so they read clearly) for a bay squeezed to a fraction r of its length. Normals are recomputed, so the folds catch the light.
 - **Torn metal:** triangles of a dented panel that stretch past 1.8× along an edge are removed from the mesh on both the worker and the page, so the panel opens up into strips.
-- **Rigid parts:** the engine and gearbox meshes ride on their blocks. Radiator and suspension parts in the engine bay are skinned to the structure. All the dark mechanical parts ahead of the cowl (engine, manifold, battery and airbox, radiator, front suspension and steering) are hidden once the crumple zone shortens by 3 cm, so a crash never shows them as black shards through the panels.
+- **Engine bay:** the engine, manifold, radiator, hoses and battery meshes aren't drawn at all for now. Under the hood they're never seen, and in a crash they only showed as black slabs. The physics keeps its engine and gearbox blocks. The front suspension and steering are hidden once the crumple zone shortens by 3 cm, so a crash never shows them as black shards through the panels.
 - **Wheels:** the stock GLTF wheels are measured and removed. The generated wheels (tyre, rim, instanced lug nuts, disc and caliper) spin, steer, and squash where the probes report compression.
 
 ## Effects
@@ -362,7 +365,9 @@ A scraping node raises an event every 0.5 ms substep, so each sampled event stan
 | Effect | Source | Look |
 | --- | --- | --- |
 | Tyre smoke | a tyre slipping faster than 1.5 m/s: burnouts, locked brakes, drifts | white puffs from the contact patch that billow to 3–5 m and drift for 4–7 s |
-| Dust | a little grit from tyres rolling fast or slipping, metal scraping, and impacts; a big impact's dust is capped per batch | low brown-grey puffs that settle quickly |
+| Dust | a little grit from tyres rolling fast or slipping and from metal scraping | low brown-grey puffs that settle quickly |
+| Impact dust | a node slammed into the wall or the floor faster than 4 m/s; a big impact's dust is capped per batch | a billow of pale concrete dust spreading out from the contact and rising slowly |
+| Debris | impacts, snapped beams and scraping metal | small dark chips of grit and plastic with flecks of paint, flung out, tumbling as they fly and bouncing on the floor; up to a third of the smoke budget |
 | Radiator steam | the crumple zone crushed past 8 cm | coolant steam rising from the grille for half a minute, fading; after a very hard hit, puffs of dark smoke mixed in |
 | Sparks | about 12 sparks per second per scraping node for each m/s of sliding, plus a burst per snapped beam | hot additive streaks stretched along their velocity, cooling from white through yellow to red; they fall, bounce off the ground and bloom |
 
