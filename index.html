@@ -101,6 +101,14 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 #hud .seg button[aria-checked="true"] { background: rgba(255, 106, 19, 0.16); border-color: var(--accent); }
 .set-note { margin: 12px 12px 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
 
+/* --- spawn points: a list in the same kind of app --- */
+.sp-list { display: flex; flex-direction: column; padding: 6px; max-height: calc(100vh - var(--bar-h) - 80px); overflow-y: auto; }
+#hud .sp-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 9px; text-align: left; color: var(--ink); background: transparent; border: 0; border-left: 2px solid transparent; border-radius: 2px; }
+#hud .sp-item:hover { background: rgba(255, 255, 255, 0.07); }
+#hud .sp-item[aria-checked="true"] { border-left-color: var(--accent); background: rgba(255, 255, 255, 0.05); }
+.sp-item b { font-weight: 600; font-size: 12.5px; }
+.sp-item span { font-size: 11.5px; color: var(--muted); }
+
 /* --- speedometer app (lower right) --- */
 .speedo { position: absolute; right: calc(10px + var(--safe-r)); bottom: calc(10px + var(--safe-b)); width: 176px; padding: 10px 12px 11px; box-sizing: border-box; }
 .sp-main { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
@@ -135,8 +143,10 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
 @media (hover: hover) and (pointer: fine) { .pad { display: none; } }   /* the on-screen pedals are for touch screens only */
 @media (hover: none) and (pointer: coarse) {
   .keys { display: none; }
-  .speedo { right: 50%; transform: translateX(50%); bottom: calc(var(--edge) + var(--safe-b)); width: 150px; padding: 8px 10px; }
-  #spd { font-size: 32px; }
+  /* the speedometer goes up into the top-right corner under the toolbar, out of the way of the view */
+  .speedo { top: calc(var(--bar-h) + var(--safe-t) + 10px); bottom: auto; width: 124px; padding: 6px 9px 7px; }
+  #spd { font-size: 26px; }
+  .sp-row { margin-top: 5px; }
   .foot { bottom: calc(var(--edge) + var(--safe-b) + 100px); }
 }
 @media (max-width: 900px) {
@@ -154,9 +164,8 @@ body { font-family: var(--font-display); -webkit-user-select: none; user-select:
   .credit { max-width: 70vw; }
 }
 @media (max-width: 430px) { .bb-mark .bb-label { display: none; } }
-@media (max-width: 560px) and (hover: none) and (pointer: coarse) {
-  .speedo { bottom: calc(var(--edge) + var(--safe-b) + 190px); }   /* above the steering and pedal buttons */
-}
+@media (max-width: 560px) { .phys.closed { width: 120px; } }   /* folded, it leaves room for the speedometer */
+@media (max-width: 560px) and (hover: none) and (pointer: coarse) { .feed { top: calc(var(--bar-h) + var(--safe-t) + 92px); } }
 @media (max-height: 520px) {
   .steer { width: 68px; height: 68px; }
   .paddle.brake { height: 104px; }
@@ -224,6 +233,8 @@ body.in-menu #hud > :not(#settings) { display: none !important; }
 .lv-var { margin: 1px 0 10px; color: #666; font-size: 11.5px; }
 .lv-dl { margin: 0; font-size: 11.5px; color: #333; }
 .lv-desc { margin: 2px 0 12px; font-size: 11.5px; line-height: 1.45; color: #333; }
+.lv-sel { margin: 3px 0 12px; width: 100%; height: 26px; font: 12px var(--font-ui); color: #1b1b1b; background: #fff; border: 1px solid #8a8a8a; border-radius: 2px; }
+.lv-sel:focus-visible { outline: 1px dotted #111; }
 .lv-go { margin-top: auto; min-width: 0; width: 100%; height: 30px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8); }
 /* Options: the settings panel, drawn as a desktop window while the menu is up */
 body.in-menu .settings { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 2 * var(--edge))); max-width: none; padding: 0;
@@ -291,6 +302,7 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
     <button id="btnLights" class="bb" type="button" aria-pressed="false" title="Headlights (L)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6.5a5.5 5.5 0 0 0 0 11h2.5v-11z"/><path d="M15.5 8.5 20 7.5M15.5 12H20M15.5 15.5 20 16.5"/></svg><span class="bb-label">Lights</span><kbd>L</kbd></button>
     <button id="btnSlow" class="bb" type="button" aria-pressed="false" title="Slow motion ×0.05 (T)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.5" r="7.5"/><path d="M12 8.5v4l2.8 1.8M9.5 3.5h5"/></svg><span class="bb-label">Slow motion</span><kbd>T</kbd></button>
     <button id="btnNodes" class="bb" type="button" aria-pressed="false" title="Node and beam view (N)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 6.8h8M7 8.8l4 7.4M17 7.8l-4 8.4"/></svg><span class="bb-label">Node view</span><kbd>N</kbd></button>
+    <button id="btnSpawn" class="bb" type="button" aria-expanded="false" aria-controls="spawns" title="Spawn point (P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span class="bb-label">Spawn</span><span class="bb-val" id="spawnName">Start box</span><kbd>P</kbd></button>
     <button id="btnSettings" class="bb" type="button" aria-expanded="false" aria-controls="settings" title="Settings (G)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span class="bb-label">Settings</span><kbd>G</kbd></button>
     <span class="bar-fill"></span>
     <span class="bar-stat" id="statLine">4500 nodes · 0 beams</span>
@@ -323,6 +335,11 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
 
   <ol id="feed" class="feed" aria-live="polite"></ol>
 
+  <section id="spawns" class="app settings spawns" hidden aria-label="Spawn point">
+    <div class="set-head"><span>Spawn point</span><button id="btnSpawnClose" class="set-x" type="button" aria-label="Close">×</button></div>
+    <div class="sp-list" role="radiogroup" aria-label="Spawn point" id="spawnList"></div>
+  </section>
+
   <section id="settings" class="app settings" hidden aria-label="Settings">
     <div class="set-head"><span>Settings</span><button id="btnSetClose" class="set-x" type="button" aria-label="Close settings">×</button></div>
     <div class="set-row">
@@ -351,7 +368,7 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
   </div>
 
   <div class="foot">
-    <p class="app keys" id="keys"><kbd>W</kbd> <kbd>S</kbd> throttle, brake (hold at a stop to reverse) · <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>R</kbd> reset · <kbd>C</kbd> camera · <kbd>L</kbd> lights · <kbd>T</kbd> slow motion · <kbd>N</kbd> node view · <kbd>+</kbd> <kbd>−</kbd> or wheel zoom · drag to look around · <kbd>Esc</kbd> menu</p>
+    <p class="app keys" id="keys"><kbd>W</kbd> <kbd>S</kbd> throttle, brake (hold at a stop to reverse) · <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>R</kbd> reset · <kbd>C</kbd> camera · <kbd>L</kbd> lights · <kbd>T</kbd> slow motion · <kbd>N</kbd> node view · <kbd>P</kbd> spawn point · <kbd>+</kbd> <kbd>−</kbd> or wheel zoom · drag to look around · <kbd>Esc</kbd> menu</p>
     <div class="credit" id="credit">Vehicle model: “Gavril_D_ Beamng” by <a href="https://sketchfab.com/akhikavi7" target="_blank" rel="noopener">akhikavi7</a>, <a href="https://sketchfab.com/3d-models/gavril-d--beamng-16aa7bf3a00e4d4fb74edc52fda042f5" target="_blank" rel="noopener">Sketchfab</a>, CC-BY-4.0</div>
   </div>
 
@@ -393,6 +410,8 @@ body.in-menu .set-note { margin: 12px 12px 12px; font-family: var(--font-ui); fo
         <p class="lv-var" id="lvVar">Day</p>
         <p class="lv-dl">Description:</p>
         <p class="lv-desc" id="lvDesc"></p>
+        <label class="lv-dl" for="lvSpawn">Spawn point:</label>
+        <select id="lvSpawn" class="lv-sel"></select>
         <button id="lvGo" class="mn-btn lv-go" type="button">Go!</button>
       </div>
     </div>
@@ -742,20 +761,21 @@ function physicsLib() {
     }
     addBox(x0, x1, height, z0, z1, mu, style = 'concrete') {   // style only picks the look on the page
       this.defs.push({ type: 0, args: [x0, x1, height, z0, z1, mu, style] });
-      this.add({ type: 0, x0, x1, z0, z1, h: height, mu, style, minx: x0, maxx: x1, minz: z0, maxz: z1, maxy: height });
+      this.add({ type: 0, x0, x1, z0, z1, h: height, mu, style, minx: x0, maxx: x1, minz: z0, maxz: z1, maxy: height, ylo: -0.5 });
     }
-    // Wedge ramp rising along +z from z0 (height 0) to z0+len (height len*tan), with a vertical drop at the end.
-    addRamp(cx, z0, len, width, deg, mu) {
-      this.defs.push({ type: 1, args: [cx, z0, len, width, deg, mu] });
+    // Wedge ramp rising along +z from z0 (height 0) to z0+len (height len*tan), with a vertical drop at the end;
+    // y0 stands it on something (the tower's roof).
+    addRamp(cx, z0, len, width, deg, mu, y0 = 0) {
+      this.defs.push({ type: 1, args: [cx, z0, len, width, deg, mu, y0] });
       const a = deg * Math.PI / 180, h = len * Math.tan(a);
-      this.add({ type: 1, x0: cx - width / 2, x1: cx + width / 2, z0, z1: z0 + len, h, ta: Math.tan(a), ca: Math.cos(a), sa: Math.sin(a), mu,
-        minx: cx - width / 2, maxx: cx + width / 2, minz: z0, maxz: z0 + len, maxy: h, deg, len, width, cx });
+      this.add({ type: 1, x0: cx - width / 2, x1: cx + width / 2, z0, z1: z0 + len, h, y0, ta: Math.tan(a), ca: Math.cos(a), sa: Math.sin(a), mu,
+        minx: cx - width / 2, maxx: cx + width / 2, minz: z0, maxz: z0 + len, maxy: y0 + h, ylo: y0 - 0.5, deg, len, width, cx });
     }
     // Smooth hump across x from z0 over len metres, height h: a raised-cosine profile (a speed hump, a
     // washboard ridge, or half of a twist course when it spans one wheel track).
     addHump(x0, x1, z0, len, h, mu) {
       this.defs.push({ type: 2, args: [x0, x1, z0, len, h, mu] });
-      this.add({ type: 2, x0, x1, z0, z1: z0 + len, h, len, k: 2 * Math.PI / len, mu, minx: x0, maxx: x1, minz: z0, maxz: z0 + len, maxy: h });
+      this.add({ type: 2, x0, x1, z0, z1: z0 + len, h, len, k: 2 * Math.PI / len, mu, minx: x0, maxx: x1, minz: z0, maxz: z0 + len, maxy: h, ylo: -0.5 });
     }
     add(c) {
       const ci = this.cols.length, s = this.cell;
@@ -798,7 +818,7 @@ function physicsLib() {
       const cols = this.cols;
       for (let q = 0; q < n; q++) {
         const c = cols[list[q]];
-        if (x < c.minx || x > c.maxx || z < c.minz || z > c.maxz || y > c.maxy || y < -0.5) continue;
+        if (x < c.minx || x > c.maxx || z < c.minz || z > c.maxz || y > c.maxy || y < c.ylo) continue;
         let d, nx, ny, nz, t;
         if (c.type === 0) {
           d = x - c.x0; nx = -1; ny = 0; nz = 0;
@@ -812,7 +832,7 @@ function physicsLib() {
           const sl = c.h * 0.5 * c.k * Math.sin(u), inv = 1 / Math.sqrt(1 + sl * sl);   // the profile's slope
           d = (top - y) * inv; nx = 0; ny = inv; nz = -sl * inv;
         } else {
-          const top = (z - c.z0) * c.ta;
+          const top = c.y0 + (z - c.z0) * c.ta;
           if (y > top) continue;
           d = (top - y) * c.ca; nx = 0; ny = c.ca; nz = -c.sa;
           t = c.z1 - z; if (t < d) { d = t; nx = 0; ny = 0; nz = 1; }
@@ -836,7 +856,7 @@ function physicsLib() {
         if (x < c.minx - m || x > c.maxx + m || z < c.minz - m || z > c.maxz + m || y > c.maxy + m) continue;
         if (c.type === 0) return true;
         if (c.type === 2) { if (y < c.h * 0.5 * (1 - Math.cos((Math.min(c.z1, Math.max(c.z0, z)) - c.z0) * c.k)) + m) return true; continue; }
-        if (y < (z - c.z0) * c.ta + m / c.ca) return true;
+        if (y < c.y0 + (z - c.z0) * c.ta + m / c.ca) return true;
       }
       return false;
     }
@@ -3638,7 +3658,7 @@ function physicsLib() {
     command(op, a) {
       a = a || {};
       if (op === 'reset') { this.reset(); return this.probe(); }
-      if (op === 'place') { this.place(+a.x || 0, +a.z || 0, +a.yaw || 0, +a.speed || 0, +a.y || 0, a.vel); return this.probe(); }
+      if (op === 'place') { this.place(+a.x || 0, +a.z || 0, +a.yaw || 0, +a.speed || 0, +a.y || 0, a.vel, +a.roll || 0); return this.probe(); }
       if (op === 'run') return this.run(a);
       if (op === 'probe') return this.probe();
       if (op === 'bench') return this.bench(a.frames || 30);
@@ -3647,10 +3667,29 @@ function physicsLib() {
       throw new Error('unknown command ' + op);
     }
 
-    place(x, z, yaw, speed, dy, vel) {
+    // Move the truck rigidly: roll about its long axis (through 0.9 m up), then yaw, then to (x, dy, z).
+    place(x, z, yaw, speed, dy, vel, roll = 0) {
       const sim = this.sim, c = Math.cos(yaw), s = Math.sin(yaw);
       let vx = speed * s, vz = speed * c;
       if (vel) { vx = +vel[0] || 0; vz = +vel[1] || 0; speed = Math.hypot(vx, vz); }
+      if (roll) {
+        const cr = Math.cos(roll), sr = Math.sin(roll), yc = 0.9;
+        for (const arr of [sim.pos, sim.prev]) for (let i = 0; i < sim.nNodes; i++) { const px = arr[i * 3], py = arr[i * 3 + 1] - yc; arr[i * 3] = cr * px - sr * py; arr[i * 3 + 1] = yc + sr * px + cr * py; }
+      }
+      // the shape-matching frames turn with it: their rotation is found iteratively from the last one, and a
+      // half turn in one go would leave them stuck facing the old way
+      if (yaw || roll) {
+        const yw = Math.cos(yaw / 2), yy = Math.sin(yaw / 2), rw = Math.cos(roll / 2), rz = Math.sin(roll / 2);
+        const pw = yw * rw, px = yy * rz, py = yy * rw, pz = yw * rz;   // q_yaw * q_roll (yaw about y, roll about z)
+        for (const fr of sim.frames) {
+          const q = fr.q, w0 = q[0], x0 = q[1], y0 = q[2], z0 = q[3];
+          q[0] = pw * w0 - px * x0 - py * y0 - pz * z0;
+          q[1] = pw * x0 + px * w0 + py * z0 - pz * y0;
+          q[2] = pw * y0 - px * z0 + py * w0 + pz * x0;
+          q[3] = pw * z0 + px * y0 - py * x0 + pz * w0;
+          fr.step = -1;
+        }
+      }
       for (const arr of [sim.pos, sim.prev]) {
         for (let i = 0; i < sim.nNodes; i++) { const px = arr[i * 3], pz = arr[i * 3 + 2]; arr[i * 3] = x + c * px + s * pz; arr[i * 3 + 1] += dy; arr[i * 3 + 2] = z - s * px + c * pz; }
       }
@@ -3901,6 +3940,19 @@ const { DT, MAX_STEPS, NODE_FLEX, NODE_TREAD, NODE_HUB, NODE_BLOCK, BEAM_ATTACH,
   P_CHASSIS, P_BUMPER_F, P_BUMPER_R, P_DOOR_L, P_DOOR_R, P_HOOD, P_FENDER_L, P_FENDER_R, P_HEADLIGHT_L, P_HEADLIGHT_R, P_GRILLE, P_RADIATOR, P_TAILGATE, P_TAILLIGHT_L, P_TAILLIGHT_R, mulberry32 } = PHYS;
 const DIRT0 = 0.12;   // a light film of road dust before the truck has driven anywhere
 const COURSE = { x: -44, half: 3.6, z0: -30, z1: 58 };   // the suspension test course's lane (centre x, half width, start and end)
+const TOWER = { x0: 100, x1: 116, h: 22, z0: -40, z1: 10, kick: 109.35 };   // footprint, height, the kicker's centre
+// Spawn points: where Reset (and Go!) put the truck. y lifts it (onto the tower's roof); roll turns it over.
+const SPAWNS = [
+  { id: 'start', label: 'Start box', note: 'The test bench, facing the crash wall 45 m ahead', x: 0, z: 0, yaw: 0 },
+  { id: 'tower', label: 'Tower roof', note: '22 m up: a kicker at the end of the roof rolls it over', x: (TOWER.x0 + TOWER.x1) / 2, z: TOWER.z0 + 5, yaw: 0, y: TOWER.h },
+  { id: 'drop', label: 'Roof drop', note: 'Upside down, 12 m in the air: it lands on its roof', x: 30, z: -30, yaw: 0, y: 12, roll: Math.PI },
+  { id: 'ramp10', label: 'Ramp, 10°', note: 'Lined up on the low ramp', x: -20, z: -12, yaw: 0 },
+  { id: 'ramp22', label: 'Ramp, 22°', note: 'Lined up on the high ramp', x: 20, z: -6, yaw: 0 },
+  { id: 'post', label: 'Steel post', note: 'Lined up on the post for a narrow-object hit', x: 38, z: 8, yaw: 0 },
+  { id: 'course', label: 'Suspension course', note: 'At the start of the bumps, twist and washboard', x: COURSE.x, z: COURSE.z0 - 2, yaw: 0 },
+  { id: 'strip', label: 'Drag strip', note: 'On the start line of the 2 km strip', x: 60, z: -902, yaw: 0 },
+  { id: 'pad', label: 'Skid pad', note: 'On the 20 m circle of the skid pad', x: -75, z: -45, yaw: 0 },
+];
 const PART_COLORS = [0xffa424, 0x5fe0ff, 0x5fe0ff, 0xff6fd8, 0xff6fd8, 0x9dff6a, 0xffe45f, 0xffe45f, 0xffffff, 0xffffff, 0xc9a0ff, 0x7fd4c9, 0x5fe0ff, 0xff7a6a, 0xff7a6a];
 const BATCH_MS = 45;   // a batch of substeps stops early past this much time, so a heavy moment can't hold a frame back
 
@@ -5351,7 +5403,7 @@ function buildEnvironment(scene, renderer, world) {
     const drop = blockTex.clone(); drop.needsUpdate = true; drop.repeat.set(c.width / 4, c.h / 4);
     const side = blockTex.clone(); side.needsUpdate = true; side.repeat.set(0.6, 0.6);
     const ramp = new THREE.Mesh(rampGeometry(c), [mat(deck, { roughness: 0.85 }), mat(drop, { roughness: 0.85 }), mat(side, { roughness: 0.85 })]);
-    ramp.castShadow = ramp.receiveShadow = true;
+    ramp.position.y = c.y0; ramp.castShadow = ramp.receiveShadow = true;
     scene.add(ramp);
   }
 
@@ -5433,18 +5485,40 @@ const GradeShader = {
 class CameraRig {
   constructor(camera) {
     this.camera = camera; this.mode = 0; this.yaw = 0; this.pitch = 0.18; this.dist = 7.5; this.userYaw = 0; this.userPitch = 0; this.idle = 0;
-    this.pos = new THREE.Vector3(0, 3, -8); this.look = new THREE.Vector3(); this.names = ['Chase', 'Orbit', 'Trackside'];
+    this.pos = new THREE.Vector3(0, 3, -8); this.look = new THREE.Vector3(); this.names = ['Chase', 'Orbit', 'Trackside', 'Free'];
+    this.free = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, move: new THREE.Vector3(), fast: false, speed: 9 };
     this.heading = 0; this.fovZoom = 1;
     this.target = new THREE.Vector3(); this.desired = new THREE.Vector3();
   }
-  // Zoom: the chase and orbit cameras move closer / further (2.8-24 m), the trackside camera narrows its lens.
+  // Entering the free camera starts it where the camera is, looking the same way.
+  setMode(m) {
+    this.mode = m; this.userYaw = this.userPitch = 0;
+    if (m === 3) {
+      const F = this.free, d = this.camera.getWorldDirection(new THREE.Vector3());
+      F.pos.copy(this.camera.position); F.yaw = Math.atan2(d.x, d.z); F.pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
+    }
+  }
+  turn(dYaw, dPitch) { const F = this.free; F.yaw += dYaw; F.pitch = Math.max(-1.5, Math.min(1.5, F.pitch + dPitch)); }
+  fly(fwd, right, up, fast) { this.free.move.set(right, up, fwd); this.free.fast = fast; }
+  // Zoom: the chase and orbit cameras move closer / further (2.8-24 m), the trackside camera narrows its lens,
+  // the free camera flies slower / faster.
   zoom(f) {
+    if (this.mode === 3) { this.free.speed = Math.min(60, Math.max(1.5, this.free.speed / f)); return; }
     if (this.mode === 2) this.fovZoom = Math.min(1.6, Math.max(0.3, this.fovZoom * f));
     else this.dist = Math.min(24, Math.max(2.8, this.dist * f));
   }
   snap(state) { this.heading = Math.atan2(state.fwd.x, state.fwd.z); this.update(state, 1, true); }
   update(state, dt, snap = false) {
     const cam = this.camera, cm = state.cm;
+    if (this.mode === 3) {   // free camera: fly along the view, Q / E straight down / up
+      const F = this.free, cp = Math.cos(F.pitch), dir = new THREE.Vector3(Math.sin(F.yaw) * cp, Math.sin(F.pitch), Math.cos(F.yaw) * cp);
+      const right = new THREE.Vector3(-Math.cos(F.yaw), 0, Math.sin(F.yaw)), v = F.speed * (F.fast ? 4 : 1) * dt;
+      F.pos.addScaledVector(dir, F.move.z * v).addScaledVector(right, F.move.x * v);
+      F.pos.y = Math.max(0.3, F.pos.y + F.move.y * v);
+      cam.position.copy(F.pos); cam.lookAt(F.pos.x + dir.x, F.pos.y + dir.y, F.pos.z + dir.z);
+      cam.fov += (58 - cam.fov) * Math.min(1, dt * 3); cam.updateProjectionMatrix();
+      return;
+    }
     const target = this.target.set(cm.x, cm.y + 0.6, cm.z), desired = this.desired;
     const h = Math.atan2(state.fwd.x, state.fwd.z);
     let dh = h - this.heading;
@@ -5540,6 +5614,10 @@ async function main() {
   world.addRamp(20, 20, 10, 6, 22, 0.75);
   // a steel post for narrow-object hits, and a short block for small-overlap hits, either side of the wall
   world.addBox(37.8, 38.2, 3.6, 41.8, 42.2, 0.5, 'pole');
+  // a 22 m grid tower out to the left (+x) with a 50 m roof to drive off (a spawn point on its roof)
+  world.addBox(TOWER.x0, TOWER.x1, TOWER.h, TOWER.z0, TOWER.z1, 0.6);
+  // a kicker at its end under the left wheels only: off it the truck corkscrews (steer right of it for a plain jump)
+  world.addRamp(TOWER.kick, TOWER.z1 - 3.2, 3.2, 2.2, 10, 0.7, TOWER.h);
   world.addBox(26, 32, 1.6, 46, 48.5, 0.6, 'offset');
   // shipping containers stacked two high behind the wall
   for (const [x0, z0, n] of [[-24.4, 56, 2], [-12.2, 56, 2], [0, 56, 1], [12.2, 56, 2], [-6, 61, 1]]) world.addBox(x0, x0 + 12.2, 2.6 * n, z0, z0 + 2.44, 0.5, 'container' + n);
@@ -5761,21 +5839,23 @@ async function main() {
 
   // --- input
   const keys = new Set(), touch = { left: false, right: false, throttle: false, brake: false };
-  const KEYMAP = { KeyW: 'throttle', ArrowUp: 'throttle', KeyS: 'brake', ArrowDown: 'brake', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' };
+  const KEYMAP = { KeyW: 'throttle', ArrowUp: 'throttle', KeyS: 'brake', ArrowDown: 'brake', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
+    KeyE: 'up', KeyQ: 'down', ShiftLeft: 'fast', ShiftRight: 'fast' };   // the last three move the free camera
   window.addEventListener('keydown', (e) => {
     if (byeOn) { e.preventDefault(); if (!e.repeat) leaveBye(); return; }
     if (menuOpen) { if (!e.repeat) menuKey(e); return; }   // no driving while the menu is up
-    if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); e.preventDefault(); }
+    if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); if (KEYMAP[e.code] !== 'fast') e.preventDefault(); }
     if (e.repeat) return;
     if (e.code === 'KeyR') doReset();
     if (e.code === 'KeyC') cycleCam();
     if (e.code === 'KeyN') toggleNodes();
     if (e.code === 'KeyT') toggleSlow();
     if (e.code === 'KeyG') showSettings(panel.hidden);
+    if (e.code === 'KeyP') showSpawns(spawnPanel.hidden);
     if (e.code === 'KeyL') toggleLights();
     if (e.code === 'Equal' || e.code === 'NumpadAdd') rig.zoom(0.88);
     if (e.code === 'Minus' || e.code === 'NumpadSubtract') rig.zoom(1.14);
-    if (e.code === 'Escape') { if (!panel.hidden) showSettings(false); else openMenu(); }
+    if (e.code === 'Escape') { if (!panel.hidden) showSettings(false); else if (!spawnPanel.hidden) showSpawns(false); else openMenu(); }
   });
   window.addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
   window.addEventListener('blur', () => { keys.clear(); for (const k in touch) touch[k] = false; document.querySelectorAll('.ctl.on').forEach(b => b.classList.remove('on')); });
@@ -5805,7 +5885,8 @@ async function main() {
     if (t) { t.x = e.clientX; t.y = e.clientY; }
     if (touchesOnView.size === 2 && pinch > 0) { const d = pinchSpan(); if (d > 10) { rig.zoom(pinch / d); pinch = d; rig.idle = 0; } return; }
     if (!drag || drag.id !== e.pointerId) return;
-    rig.userYaw -= (e.clientX - drag.x) * 0.006; rig.userPitch += (e.clientY - drag.y) * 0.004; rig.idle = 0;
+    if (rig.mode === 3) rig.turn(-(e.clientX - drag.x) * 0.004, -(e.clientY - drag.y) * 0.004);
+    else { rig.userYaw -= (e.clientX - drag.x) * 0.006; rig.userPitch += (e.clientY - drag.y) * 0.004; rig.idle = 0; }
     drag.x = e.clientX; drag.y = e.clientY;
   });
   const endDrag = (e) => { touchesOnView.delete(e.pointerId); if (touchesOnView.size < 2) pinch = 0; if (drag && drag.id === e.pointerId) drag = null; };
@@ -5840,16 +5921,49 @@ async function main() {
 
   const input = { throttle: 0, brake: 0, steer: 0 };
   let acc = 0, needFrame = false, snapNext = false;
-  function doReset(silent) {
+  // Reset puts a fresh truck at the chosen spawn point
+  let spawn = SPAWNS[0];
+  try { spawn = SPAWNS.find(sp => sp.id === localStorage.getItem('beamsweb.spawn')) || spawn; } catch (_) { /* not remembered */ }
+  if (SPAWNS.some(sp => sp.id === params.get('spawn'))) spawn = SPAWNS.find(sp => sp.id === params.get('spawn'));
+  function doReset(silent, toStart) {   // toStart: the plain reset pose (the menu parks the truck from there)
     acc = 0;
-    if (!silent) pushFeed('Vehicle reset');
-    return link.call('reset').then(() => { link.dropLatest(); view.reset(); fx.reset(); GRIME.uDirt.value = DIRT0; GRIME.uCrack.value = 0; if (lampsBroken) { lampsBroken = false; view.smashLamps(false); setLights(lightsOn); } needFrame = true; snapNext = true; });
+    if (!silent) pushFeed('Vehicle reset' + (spawn.id !== 'start' ? ' · ' + spawn.label : ''));
+    return link.call('reset')
+      .then(() => (toStart || spawn.id === 'start' ? null : link.call('place', { x: spawn.x, z: spawn.z, yaw: spawn.yaw, y: spawn.y || 0, roll: spawn.roll || 0 })))
+      .then(() => { link.dropLatest(); view.reset(); fx.reset(); GRIME.uDirt.value = DIRT0; GRIME.uCrack.value = 0; if (lampsBroken) { lampsBroken = false; view.smashLamps(false); setLights(lightsOn); } needFrame = true; snapNext = true; });
   }
-  function cycleCam() { rig.mode = (rig.mode + 1) % 3; rig.userYaw = rig.userPitch = 0; $('camName').textContent = rig.names[rig.mode]; }
+  function chooseSpawn(sp, go) {
+    spawn = sp;
+    try { localStorage.setItem('beamsweb.spawn', sp.id); } catch (_) { /* not remembered */ }
+    $('spawnName').textContent = sp.label;
+    for (const b of $('spawnList').children) b.setAttribute('aria-checked', String(b.dataset.v === sp.id));
+    $('lvSpawn').value = sp.id;
+    if (go) doReset(false);
+  }
+  function cycleCam() {
+    rig.setMode((rig.mode + 1) % rig.names.length); $('camName').textContent = rig.names[rig.mode];
+    if (rig.mode === 3) pushFeed(matchMedia('(hover: none) and (pointer: coarse)').matches ? 'Free camera · pedals fly, arrows strafe, drag to look'
+      : 'Free camera · W A S D fly, Q E down / up, Shift faster, drag to look, C leaves it');
+  }
   function toggleNodes() { const on = !view.debug; view.setDebug(on); needFrame = true; $('btnNodes').setAttribute('aria-pressed', String(on)); }
   function toggleSlow() { timeScale = timeScale === 1 ? SLOWMO : 1; $('btnSlow').setAttribute('aria-pressed', String(timeScale !== 1)); }
   function toggleLights() { setLights(!lightsOn); pushFeed(lightsOn ? 'Headlights on' : 'Headlights off', false); }
   $('btnReset').addEventListener('click', () => doReset());
+  // the spawn point list (toolbar) and the Choose Level select (menu) share one choice
+  const spawnPanel = $('spawns');
+  const showSpawns = (on) => { spawnPanel.hidden = !on; $('btnSpawn').setAttribute('aria-expanded', String(on)); if (on) showSettings(false); };
+  for (const sp of SPAWNS) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sp-item'; b.setAttribute('role', 'radio'); b.dataset.v = sp.id;
+    b.innerHTML = '<b></b><span></span>'; b.firstChild.textContent = sp.label; b.lastChild.textContent = sp.note;
+    b.addEventListener('click', () => { chooseSpawn(sp, true); showSpawns(false); canvas.focus({ preventScroll: true }); });
+    $('spawnList').appendChild(b);
+    const o = document.createElement('option'); o.value = sp.id; o.textContent = sp.label; $('lvSpawn').appendChild(o);
+  }
+  $('btnSpawn').addEventListener('click', () => showSpawns(spawnPanel.hidden));
+  $('btnSpawnClose').addEventListener('click', () => showSpawns(false));
+  $('lvSpawn').addEventListener('change', () => chooseSpawn(SPAWNS.find(sp => sp.id === $('lvSpawn').value), false));
+  chooseSpawn(spawn, false);
   $('btnCam').addEventListener('click', cycleCam);
   $('btnNodes').addEventListener('click', toggleNodes);
   $('btnSlow').addEventListener('click', toggleSlow);
@@ -5861,6 +5975,7 @@ async function main() {
   const panel = $('settings');
   const showSettings = (on) => {
     panel.hidden = !on; $('btnSettings').setAttribute('aria-expanded', String(on));
+    if (on && !$('spawns').hidden) { $('spawns').hidden = true; $('btnSpawn').setAttribute('aria-expanded', 'false'); }
     panel.querySelector('.set-head span').textContent = menuOpen ? 'Options' : 'Settings';
     menuEl.classList.toggle('dimmed', !levelsEl.hidden || (menuOpen && on));
   };
@@ -5886,7 +6001,7 @@ async function main() {
   // --- main menu: title screen over a desaturated live view, Choose Level, Options, Exit. Physics is
   // paused while it is up; Esc or MENU opens it in a session, and Resume carries on where it left off.
   const LEVEL = {
-    day: { label: 'Day', desc: 'The white gridmap under a blue sky: crash wall, ramps, a steel post, a suspension test course (bumps, twist, washboard, kerbs, an articulation ramp), a 2 km drag strip and a skid pad.' },
+    day: { label: 'Day', desc: 'The white gridmap under a blue sky: crash wall, ramps, a steel post, a 22 m tower to drive off, a suspension test course (bumps, twist, washboard, kerbs, an articulation ramp), a 2 km drag strip and a skid pad.' },
     evening: { label: 'Evening', desc: 'The same bench in low evening sun: long shadows and warm light, with the floodlights coming on.' },
     night: { label: 'Night', desc: 'After dark under five floodlights. Headlights on; the floodlights light the run-up to the wall.' },
   };
@@ -5927,7 +6042,7 @@ async function main() {
     if (menuOpen) return;
     menuOpen = true; document.body.classList.add('in-menu');
     keys.clear(); for (const k in touch) touch[k] = false; document.querySelectorAll('.ctl.on').forEach(b => b.classList.remove('on'));
-    showSettings(false); $('mnResume').hidden = !inSession; menuT = 0; needFrame = true;
+    showSettings(false); showSpawns(false); $('mnResume').hidden = !inSession; menuT = 0; needFrame = true;
     $(inSession ? 'mnResume' : 'mnPlay').focus({ preventScroll: true });
   }
   function closeMenu() {
@@ -5945,7 +6060,7 @@ async function main() {
   function exitGame() { levelsEl.hidden = true; showSettings(false); byeOn = true; $('bye').classList.add('on'); }
   function leaveBye() {
     byeOn = false; $('bye').classList.remove('on'); menuEl.classList.remove('dimmed');
-    inSession = false; $('mnResume').hidden = true; doReset(true).then(park); $('mnPlay').focus({ preventScroll: true });
+    inSession = false; $('mnResume').hidden = true; doReset(true, true).then(park); $('mnPlay').focus({ preventScroll: true });
   }
   function menuKey(e) {
     if (e.code === 'Escape') {
@@ -6035,8 +6150,12 @@ async function main() {
     const dtF = Math.min(0.1, (now - last) / 1000);
     last = now;
     // driver input with rate limiting (keyboard and touch share the same smoothing)
-    const thrT = keys.has('throttle') || touch.throttle ? 1 : 0, brkT = keys.has('brake') || touch.brake ? 1 : 0;
-    const stT = (keys.has('left') || touch.left ? 1 : 0) - (keys.has('right') || touch.right ? 1 : 0);
+    let thrT = keys.has('throttle') || touch.throttle ? 1 : 0, brkT = keys.has('brake') || touch.brake ? 1 : 0;
+    let stT = (keys.has('left') || touch.left ? 1 : 0) - (keys.has('right') || touch.right ? 1 : 0);
+    if (rig.mode === 3) {   // free camera: the same keys fly it, and the truck coasts with no input
+      rig.fly(thrT - brkT, -stT, (keys.has('up') ? 1 : 0) - (keys.has('down') ? 1 : 0), keys.has('fast'));
+      thrT = brkT = stT = 0;
+    }
     input.throttle += Math.max(-dtF * 6, Math.min(dtF * 6, thrT - input.throttle));
     input.brake += Math.max(-dtF * 8, Math.min(dtF * 8, brkT - input.brake));
     const rate = stT === 0 || Math.sign(stT) !== Math.sign(steerState.v) ? 5 : 2.6;
@@ -6134,6 +6253,7 @@ async function main() {
 
   setLoader('Ready', 1);
   if (params.get('menu') !== '0') { openMenu(); menuK = 1; park(); }   // ?menu=0 starts straight in the game
+  else if (spawn.id !== 'start') doReset(true);   // straight in: at the chosen spawn point
   $('loader').classList.add('done');
   setTimeout(() => $('keys').classList.add('gone'), 20000);   // the controls hint steps aside after a while
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });

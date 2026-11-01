@@ -43,7 +43,7 @@ The game opens on a title screen in the style of an early-2010s simulator alpha.
 
 What the buttons do:
 
-- **Play** opens a Choose Level window over the dimmed menu. It shows a large preview of GridMap and three thumbnails, one each for day, evening and night. The previews are rendered from the live scene in colour the first time the window opens. Picking a thumbnail sets the time of day, and **Go!** starts the level with a fresh truck at the start line. Arrow keys move between the thumbnails, and a double-click on one starts it.
+- **Play** opens a Choose Level window over the dimmed menu. It shows a large preview of GridMap and three thumbnails, one each for day, evening and night. The previews are rendered from the live scene in colour the first time the window opens. Picking a thumbnail sets the time of day, the **Spawn point** list picks where the truck starts, and **Go!** starts the level with a fresh truck there. Arrow keys move between the thumbnails, and a double-click on one starts it.
 - **Options** opens the settings (deformation and graphics) as a desktop window.
 - **Exit** closes the game to a black screen. A click or a key brings the menu back.
 
@@ -59,7 +59,8 @@ The windows and buttons are drawn in a plain desktop style (Segoe UI, light grey
 | Brake (ABS); hold at a stop to reverse | S / ↓ | Brake pedal (touch) |
 | Steer | A D / ← → | ◀ ▶ buttons (touch) |
 | Reset vehicle | R | Reset |
-| Cycle camera (chase, orbit, trackside) | C | Camera |
+| Cycle camera (chase, orbit, trackside, free) | C | Camera |
+| Spawn point: pick where the truck starts and resets | P | Spawn |
 | Zoom in / out | + / − or the mouse wheel | + / −, or pinch on the view |
 | Headlights on / off | L | Lights |
 | Node and beam debug view | N | Node view |
@@ -67,8 +68,27 @@ The windows and buttons are drawn in a plain desktop style (Segoe UI, light grey
 | Settings: deformation and graphics | G (Esc closes) | Settings |
 | Main menu (pauses) | Esc | Menu |
 | Orbit camera | drag on the view | drag on the view |
+| Free camera: fly forward, back, sideways | W S A D (Shift ×4 faster) | pedals, ◀ ▶ |
+| Free camera: down / up; look | Q E; drag on the view | drag on the view |
 
 The chase camera holds the truck's heading closely, so a hard turn doesn't show the truck from the side as if it slid. Its lens widens a little with speed.
+
+The **free camera** starts where the camera was, looking the same way, and flies along the view at 9 m/s. Zoom changes its speed (1.5–60 m/s). While it is on, the driving keys move the camera, and the truck gets no input and coasts.
+
+**Spawn points.** Reset puts a fresh truck at the chosen spawn point. The choice is remembered in the browser; `?spawn=tower` in the address picks one too.
+
+| Spawn point | Where | For |
+| --- | --- | --- |
+| Start box | the test bench, facing the wall 45 m ahead | the usual |
+| Tower roof | on top of a 22 m tower, 50 m from its end; a 10° kicker at the end lifts only the left wheels | jumping off a building: straight off the flat, the truck noses down and goes over onto its roof; off the kicker it corkscrews |
+| Roof drop | upside down, 12 m up, over open ground | landing on the roof |
+| Ramp, 10° / Ramp, 22° | lined up on each ramp | jumps |
+| Steel post | lined up on the post, 34 m away | narrow-object hits |
+| Suspension course | at the start of the lane | suspension |
+| Drag strip | on the start line | acceleration and top speed |
+| Skid pad | on the 20 m circle | cornering |
+
+Placing the truck upside down turns the shape-matching frames with it (their rotation is found iteratively from the last one, so a half turn in one go would leave them stuck facing the old way).
 
 The test area is the classic gridmap: a white floor ruled every 0.5 m in fine grey lines inside 4 m squares edged in heavy black, under a deep blue sky with drifting fair-weather cumulus. Every obstacle is a block ruled the same way in a cool grey, which the sky turns blue on its shaded faces. Pale sand dunes ring the horizon, and two islands of sand, bushes and palms stand off to the right (scenery only). Markings are painted straight on the grid in yellow, with dark lettering. The floodlight poles stand only in the evening and at night.
 
@@ -79,6 +99,7 @@ Seen from the spawn (+x is to the left):
 | Concrete wall, 18 m wide and 5 m tall | 45 m straight ahead; yellow lines on the run-up mark the distance every 5 m | full-width frontal hits |
 | Ramps of 10° and 22° | either side of the run-up | jumps and rollovers |
 | Steel post, 0.4 m square | right of the wall | narrow-object hits |
+| Grid tower, 16 × 50 m and 22 m tall, with a 10° kicker on its roof's edge (ramps can stand on top of things) | 108 m left, from 40 m behind the spawn | drives off a building |
 | Short concrete block, 6 m wide and 1.6 m tall | right of the wall | small-overlap hits |
 | Grid blocks, some stacked two high | behind the wall | a backdrop to hit |
 | Suspension test course: an asphalt lane with four speed humps, a twist section, a washboard and two kerbs, plus a 15° ramp beside it for one wheel | 44 m left, from 30 m behind the spawn to the wall's end | suspension travel, articulation and damping |
@@ -100,9 +121,9 @@ The humps are smooth raised-cosine profiles in the physics (their own collider t
 
 **HUD.** The in-game interface is a simulator's, not an arcade's. It uses Overpass and Overpass Mono, white text in sentence case on dark translucent panels, and a single orange accent for state.
 
-- **Toolbar** across the top: the Beams.Web mark with Menu, then Reset, Camera (with the current mode), Lights, Slow motion, Node view and Settings, each with its key. On the right are the structure's size, the solver rate and the zoom buttons. A toggled button gets an orange underline. On narrow screens the buttons shrink to icons.
+- **Toolbar** across the top: the Beams.Web mark with Menu, then Reset, Camera (with the current mode), Lights, Slow motion, Node view, Spawn (with the current spawn point, opening a list of them) and Settings, each with its key. On the right are the structure's size, the solver rate and the zoom buttons. A toggled button gets an orange underline. On narrow screens the buttons shrink to icons.
 - **Physics app** at the upper left, which folds away; its state is remembered in the browser, and it starts folded on small screens. It shows nodes, beams, substep, solver, step and skinning time per frame, broken and deformed beams, active skin nodes and damage. Below those are each tyre's share of the load (weight transfer, red while the tyre slides) and the body's lateral and longitudinal g.
-- **Speedometer app** at the lower right: speed, gear and an rpm bar with a redline. On touch screens it moves to the bottom centre.
+- **Speedometer app** at the lower right: speed, gear and an rpm bar with a redline. On touch screens it moves, smaller, to the top right under the toolbar, out of the view and clear of the pedals.
 - **Messages** in small dark toasts under the toolbar. Warnings, such as a detached part or structural failure, get an orange edge.
 - **Controls hint** at the lower left, which steps aside after 20 s, above the model credit.
 - **On-screen steering and pedals** only on touch screens.
